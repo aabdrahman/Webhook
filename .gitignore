@@ -58,3 +58,6 @@ nunit-*.xml
 
 #Utilities
 .vs/	
+/.vs/Webhook.slnx/v18/
+/.vs/Webhook.slnx/FileContentIndex/
+/.vs/Webhook.slnx/v18
