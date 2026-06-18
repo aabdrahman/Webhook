@@ -11,8 +11,17 @@
 	<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="8.1.4" />  Commented out for swagger implementation -->
 	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
 	
-	<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="8.1.4" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="8.1.4" />
 	  <PackageReference Include="Swashbuckle.AspNetCore.ReDoc" Version="10.2.1" />
+
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+	  </PackageReference>
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+	  </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
