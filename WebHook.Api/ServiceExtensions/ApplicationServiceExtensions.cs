@@ -1,4 +1,7 @@
-﻿namespace WebHook.Api.ServiceExtensions;
+﻿using Microsoft.EntityFrameworkCore;
+using WebHook.Infrastructure.Data_Persistence;
+
+namespace WebHook.Api.ServiceExtensions;
 
 public static class ApplicationServiceExtensions
 {
@@ -16,5 +19,19 @@ public static class ApplicationServiceExtensions
         //    });
         //});
 
+    }
+
+    internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration) 
+    {
+        services.AddDbContext<RepositoryContext>(opts =>
+        {
+            opts.UseNpgsql(configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Database configuration string not provided"))
+                .EnableSensitiveDataLogging()
+                .LogTo(Serilog.Log.Information, 
+                        new[] { DbLoggerCategory.Database.Command.Name }, 
+                        minimumLevel: LogLevel.Information, 
+                        options: Microsoft.EntityFrameworkCore.Diagnostics.DbContextLoggerOptions.SingleLine
+                 );
+        });
     }
 }
