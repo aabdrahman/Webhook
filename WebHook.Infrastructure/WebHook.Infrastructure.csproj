@@ -20,4 +20,14 @@
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
 	</ItemGroup>
 
+
+	<ItemGroup>
+	  <ProjectReference Include="..\WebHook.Core\WebHook.Core.csproj" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+	  <Folder Include="Data Persistence\Migrations\" />
+	</ItemGroup>
+
 </Project>

@@ -11,6 +11,6 @@ public class WebhookDeliveryAttempt
 
     //RELATIONSHIPS
     //-----------One to many relationship with webhook delivery
-    public Guid WebhookDeliveryAttemptId { get; set; }
-    public WebhookDeliveryAttempt webhookDeliveryAttempt { get; set; }
+    public Guid WebhookDeliveryId { get; set; }
+    public WebhookDelivery webhookDelivery { get; set; }
 }

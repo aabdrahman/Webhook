@@ -7,13 +7,13 @@ public class WebHookEventCatalog
     public string NormalizedEventName { get; set; }
     public bool IsActive { get; set; } = true;
     public string Description { get; set; } = string.Empty;
-    public string PayLoad { get; set; } = string.Empty;
+    //public string PayLoad { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public string AvailableFields { get; set; } = string.Empty;
+    public List<string> AvailableFields { get; set; }
 
     //RELATIONSHIP
     //----Many-to-Many relationship with the webhook subscription
-    public ICollection<WebhookSubscrptionEvent> WebhookSubscriptions { get; set; } = [];
+    public ICollection<WebhookSubscriptionEvent> WebhookSubscriptions { get; set; } = [];
     //-----One to many relationship with webhook delivery
     public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
 }

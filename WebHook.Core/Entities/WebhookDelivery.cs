@@ -17,9 +17,13 @@ public class WebhookDelivery
     public Guid WebhookSubscriptionId { get; set; }
     public WebhookSubscription webhookSubscription { get; set; }
 
-    //-----------One to many relationship with webhook event
+    //-----------One to many relationship with webhook event catalog
     public Guid WebhookEventCatalogId { get; set; }
     public WebHookEventCatalog webHookEventCatalog { get; set; }
+
+    //----------One to many relationship with webhook event
+    public Guid WebhookEventId { get; set; }
+    public WebhookEvent webhookEvent { get; set; }
 
     //-----------One to many relationship with delivery attempts
     public ICollection<WebhookDeliveryAttempt> WebhookDeliveryAttempts { get; set; } = [];

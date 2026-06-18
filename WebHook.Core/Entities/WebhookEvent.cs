@@ -2,7 +2,7 @@
 
 namespace WebHook.Core.Entities;
 
-public class WebhookEvents
+public class WebhookEvent
 {
     public Guid Id { get; set; }
     public string EventType { get; set; }
@@ -12,4 +12,8 @@ public class WebhookEvents
     public string Source { get; set; }
     public Guid CorrelationId { get; set; }
     public WebHookEventStatus Status { get; set; }
+
+    //RELATIONSHIP
+    //---------One to many relationship with webhook delivery
+    public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
 }

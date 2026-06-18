@@ -1,6 +1,6 @@
 ﻿namespace WebHook.Core.Entities;
 
-public class WebhookSubscrptionEvent
+public class WebhookSubscriptionEvent
 {
     public Guid Id { get; set; }
     public Guid WebhookSubscriptionId { get; set; }
