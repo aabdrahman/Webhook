@@ -35,7 +35,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     EventName = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    NormalizedEventName = table.Column<string>(type: "text", nullable: false, computedColumnSql: "UPPER([EventName])"),
+                    NormalizedEventName = table.Column<string>(type: "text", nullable: false, computedColumnSql: "UPPER(\"EventName\")", stored: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     Description = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),

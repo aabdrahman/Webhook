@@ -23,7 +23,8 @@ public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(50);
 
         builder.Property(x => x.NormalizedEventName)
-            .HasComputedColumnSql("UPPER([EventName])")
+            //.HasComputedColumnSql("UPPER(EventName)", stored: true) This works for sql server but fails for postgres
+            .HasComputedColumnSql("UPPER(\"EventName\")", stored: true)
             .IsRequired();
 
         builder.Property(x => x.IsActive)

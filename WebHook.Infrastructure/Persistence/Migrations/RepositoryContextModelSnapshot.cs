@@ -53,7 +53,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("text")
-                        .HasComputedColumnSql("UPPER([EventName])");
+                        .HasComputedColumnSql("UPPER(\"EventName\")", true);
 
                     b.HasKey("Id");
 

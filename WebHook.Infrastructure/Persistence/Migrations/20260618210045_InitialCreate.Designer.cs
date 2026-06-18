@@ -12,7 +12,7 @@ using WebHook.Infrastructure.Data_Persistence;
 namespace WebHook.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RepositoryContext))]
-    [Migration("20260618202348_InitialCreate")]
+    [Migration("20260618210045_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -56,7 +56,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("text")
-                        .HasComputedColumnSql("UPPER([EventName])");
+                        .HasComputedColumnSql("UPPER(\"EventName\")", true);
 
                     b.HasKey("Id");
 

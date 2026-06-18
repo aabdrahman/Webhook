@@ -25,7 +25,7 @@ public static class ApplicationServiceExtensions
     {
         services.AddDbContext<RepositoryContext>(opts =>
         {
-            opts.UseNpgsql(configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Database configuration string not provided"))
+            opts.UseNpgsql(configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Database configuration string not provided"), v => v.SetPostgresVersion(18, 0))
                 .EnableSensitiveDataLogging()
                 .LogTo(Serilog.Log.Information, 
                         new[] { DbLoggerCategory.Database.Command.Name }, 
