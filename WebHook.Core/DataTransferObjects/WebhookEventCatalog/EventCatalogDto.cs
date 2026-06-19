@@ -1,5 +1,9 @@
 ﻿namespace WebHook.Core.DataTransferObjects.WebhookEventCatalog;
 
+/// <summary>
+/// Represents a webhook event type definition used to expose subscribable events
+/// from the event catalog.
+/// </summary>
 public record class EventCatalogDto
 {
     public Guid Id { get; set; }

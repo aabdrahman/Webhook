@@ -33,14 +33,17 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseSwaggerUI(opts =>
+{
+    opts.RoutePrefix = "webhookapi";
+    opts.SwaggerEndpoint("/openapi/v1.json", "Webhook API V1");
+});
+
 app.UseReDoc(opts =>
 {
     opts.SpecUrl("/openapi/v1.json");
-});
-
-app.UseSwaggerUI(opts =>
-{
-    opts.SwaggerEndpoint("/openapi/v1.json", "Webhook API V1");
+    opts.DocumentTitle = "Webhook API v1 Documentation";
+    opts.RoutePrefix = "webhookapi/api-docs";
 });
 
 app.UseHttpsRedirection();

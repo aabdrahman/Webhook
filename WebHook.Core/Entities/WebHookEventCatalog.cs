@@ -1,5 +1,9 @@
 ﻿namespace WebHook.Core.Entities;
 
+/// <summary>
+/// Represents a webhook event catalog entry, which defines a subscribable event type
+/// that can be registered and used for webhook notifications.
+/// </summary>
 public class WebHookEventCatalog
 {
     public Guid Id { get; set; }

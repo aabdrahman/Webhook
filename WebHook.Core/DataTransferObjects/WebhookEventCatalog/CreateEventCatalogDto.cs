@@ -2,6 +2,9 @@
 
 namespace WebHook.Core.DataTransferObjects.WebhookEventCatalog;
 
+/// <summary>
+/// Defines the input required to register a new webhook event type in the event catalog.
+/// </summary>
 public record class CreateEventCatalogDto
 {
     [Required(ErrorMessage = "Event Catalog name is a required field")]
