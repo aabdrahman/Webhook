@@ -77,7 +77,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
 
                 _logger.Information("Webhook Event Catalog successfully created - {0}", webHookEventCatalogToInsert.ToDto());
 
-                return GenericResponse<string>.Success("Operation successful.", "Event Catlog successfully created.", HttpStatusCode.Created);
+                return GenericResponse<string>.Success("Operation successful.", "Event Catalog successfully created.", HttpStatusCode.Created);
             }
             catch (Exception ex)
             {
@@ -137,7 +137,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
             {
                 await _repositoryContext.SaveChangesAsync(ct);
 
-                return GenericResponse<string>.Success("Operation Successful", isDeactivate ? "Event Catlog successfully deactivated." : "Event Catalog successfully reactivated.", HttpStatusCode.NoContent);
+                return GenericResponse<string>.Success("Operation Successful", isDeactivate ? "Event Catalog successfully deactivated." : "Event Catalog successfully reactivated.", HttpStatusCode.NoContent);
             }
             catch (Exception ex)
             {
