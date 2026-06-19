@@ -20,6 +20,7 @@ Log.Logger = new LoggerConfiguration()
 builder.Services.ConfigureDatabaseConnection(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.ConfigureApplicationServices();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

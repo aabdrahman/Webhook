@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Services;
 
 namespace WebHook.Api.ServiceExtensions;
 
@@ -33,5 +35,10 @@ public static class ApplicationServiceExtensions
                         options: Microsoft.EntityFrameworkCore.Diagnostics.DbContextLoggerOptions.SingleLine
                  );
         });
+    }
+
+    internal static void ConfigureApplicationServices(this IServiceCollection services)
+    {
+        services.AddScoped<IWebhookEventCatalogService, WebhookEventCatalogService>();
     }
 }

@@ -6,15 +6,15 @@ namespace WebHook.Core.DataTransferObjects;
 public class GenericResponse<T> where T : class
 {
     [JsonPropertyName("responseData")]
-    private T? ResponseData { get; set; }
+    public T? ResponseData { get; private set; }
     [JsonPropertyName("responseMessage")]
-    private string ResponseMessage { get; set; }
+    public string ResponseMessage { get; private set; }
     [JsonPropertyName("isSuccessful")]
-    private bool IsSuccessful { get; set; }
+    public bool IsSuccessful { get; private set; }
     [JsonPropertyName("errorDetail")]
-    private ErrorDetail? ErrorDetail { get; set; } = null;
+    public ErrorDetail? ErrorDetail { get; private set; } = null;
     [JsonPropertyName("httpStatusCode")]
-    private HttpStatusCode HttpStatusCode { get; set; }
+    public HttpStatusCode HttpStatusCode { get; private set; }
 
     public GenericResponse(T? responseData, string responseMessage, HttpStatusCode httpStatusCode, bool isSuccessful, ErrorDetail? errorDetail = null)
     {
