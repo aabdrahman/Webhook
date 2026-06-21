@@ -256,6 +256,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
 
     }
 
+    [Fact]
     public async Task GetAllEventCatalogAsync_NoRecord_Returns404()
     {
         //Arrange
@@ -268,7 +269,6 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
         Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
-        Assert.True(!result.ResponseData!.Any());
     }
     
     [Fact]

@@ -24,4 +24,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="UnitTests\Security\" />
+  </ItemGroup>
+
 </Project>
