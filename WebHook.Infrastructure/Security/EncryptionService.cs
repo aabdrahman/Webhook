@@ -17,7 +17,7 @@ public sealed class EncryptionService : IEncryptionService
 
         var encryptionIV = Environment.GetEnvironmentVariable("env_webhook_encrypt_iv");
         if (string.IsNullOrWhiteSpace(encryptionIV))
-            throw new InvalidOperationException("Encryption IV is missing.");
+            throw new ArgumentNullException("Encryption IV is missing.");
 
 
         byte[] encryptyIvByte = Convert.FromHexString(encryptionIV);
@@ -42,7 +42,7 @@ public sealed class EncryptionService : IEncryptionService
 
     public string Encrypt(string valueToEncrypt, string encryptionKey = "")
     {
-        ArgumentNullException.ThrowIfNullOrEmpty(encryptionKey, nameof(encryptionKey));
+        ArgumentNullException.ThrowIfNullOrEmpty(valueToEncrypt, nameof(encryptionKey));
 
         var encryptKeyDefault = Environment.GetEnvironmentVariable("env_webhook_encrypt_key");
         var encryptionIV = Environment.GetEnvironmentVariable("env_webhook_encrypt_iv");
@@ -52,10 +52,10 @@ public sealed class EncryptionService : IEncryptionService
             : encryptionKey;
 
         if (string.IsNullOrWhiteSpace(keyToUse))
-            throw new InvalidOperationException("Encryption key is missing.");
+            throw new ArgumentNullException("Encryption key is missing.");
 
         if (string.IsNullOrWhiteSpace(encryptionIV))
-            throw new InvalidOperationException("Encryption IV is missing.");
+            throw new ArgumentNullException("Encryption IV is missing.");
 
         byte[] encryptyIvByte = Convert.FromHexString(encryptionIV);
         byte[] encryptionKeyByte = Convert.FromHexString(keyToUse);
