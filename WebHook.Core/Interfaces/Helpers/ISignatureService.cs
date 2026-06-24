@@ -25,5 +25,5 @@ public interface ISignatureService
     /// <param name="timeStamp">The value from the X-Webhook-Timestamp header (ISO 8601).</param>
     /// <param name="toleranceWindowInMinutes">How many minutes old a request is allowed to be. Defaults to 5.</param>
     /// <returns>True if the timestamp is within the tolerance window; otherwise false.</returns>
-    bool IsTimeStampValid(DateTime timeStamp, int toleranceWindowInMinutes = 5);
+    bool IsTimeStampValid(DateTimeOffset timeStamp, int toleranceWindowInMinutes = 5);
 }

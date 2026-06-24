@@ -59,7 +59,7 @@ public sealed class SignatureService : ISignatureService
         }
     }
     ///<inheritdoc />
-    public bool IsTimeStampValid(DateTime timeStamp, int toleranceWindowInMinutes = 5)
+    public bool IsTimeStampValid(DateTimeOffset timeStamp, int toleranceWindowInMinutes = 5)
     {
         _logger = _logger.ForContext(_methodName, nameof(IsTimeStampValid));
 
