@@ -90,6 +90,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                                                             .Where(x => eventsToSubscribe.Contains(x.NormalizedEventName))
                                                             .Select(x => new { x.Id, x.NormalizedEventName })
                                                             .ToListAsync(ct);
+
             var notExistingEvents = eventsToSubscribe.Except(subscribedEventsInDatabase.Select(x => x.NormalizedEventName).ToList()).ToList();
 
             if(eventsToSubscribe.Count != subscribedEventsInDatabase.Count)
@@ -101,6 +102,11 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             //Begin insertion operations
             WebhookSubscription subscriptionToInsert = createWebhookSubscription.ToEntity();
             subscriptionToInsert.SecretKey = GenerateAndEncryptSignatureService();
+
+            List<WebhookSubscriptionEvent> submittedEventsToMap = subscribedEventsInDatabase.Select(x => new WebhookSubscriptionEvent() { WebhookEventCatalogId = x.Id }).ToList();
+
+            subscriptionToInsert.WebhookEvents = submittedEventsToMap;
+            
 
             await _repositoryContext.WebhookSubscriptions.AddAsync(subscriptionToInsert, ct);
 
@@ -161,7 +167,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         {
             _logger.Information("Fetching all webhook subscriptions....");
 
-            IReadOnlyList<WebhookSubscriptionDto> subscriptions = await _repositoryContext.WebhookSubscriptions.AsNoTracking().Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync();
+            IReadOnlyList<WebhookSubscriptionDto> subscriptions = await _repositoryContext.WebhookSubscriptions.AsNoTracking().Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
 
             _logger.Information("Webhook Subscriptions fetched successfully - {0}", subscriptions);
 
