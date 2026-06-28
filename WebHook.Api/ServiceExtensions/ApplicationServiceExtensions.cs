@@ -1,6 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 
 namespace WebHook.Api.ServiceExtensions;
@@ -37,8 +40,19 @@ public static class ApplicationServiceExtensions
         });
     }
 
+    internal static void AddConfigurationModels(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
+    }
+
     internal static void ConfigureApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IWebhookEventCatalogService, WebhookEventCatalogService>();
+        services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
+
+
+        services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
     }
 }
