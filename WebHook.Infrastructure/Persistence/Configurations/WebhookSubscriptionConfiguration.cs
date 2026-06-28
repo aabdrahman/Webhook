@@ -10,6 +10,8 @@ public sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<
     {
         builder.HasKey(x => x.Id);
 
+        builder.HasQueryFilter(x => x.IsActive);
+
         builder.Property(x => x.Name)
             .HasMaxLength(100)
             .IsRequired();

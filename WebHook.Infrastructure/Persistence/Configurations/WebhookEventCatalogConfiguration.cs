@@ -14,6 +14,8 @@ public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(x => x.NormalizedEventName)
             .IsUnique();
 
+        builder.HasQueryFilter(x => x.IsActive);
+
         builder.Property(x => x.Description)
             .HasMaxLength(150)
             .IsRequired(false);
