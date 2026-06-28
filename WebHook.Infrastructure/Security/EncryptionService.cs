@@ -42,7 +42,7 @@ public sealed class EncryptionService : IEncryptionService
 
     public string Encrypt(string valueToEncrypt, string encryptionKey = "")
     {
-        ArgumentNullException.ThrowIfNullOrEmpty(valueToEncrypt, nameof(encryptionKey));
+        ArgumentNullException.ThrowIfNullOrEmpty(valueToEncrypt, nameof(valueToEncrypt));
 
         var encryptKeyDefault = Environment.GetEnvironmentVariable("env_webhook_encrypt_key");
         var encryptionIV = Environment.GetEnvironmentVariable("env_webhook_encrypt_iv");

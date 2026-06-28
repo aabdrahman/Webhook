@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using WebHook.Core.CustomValidators;
 
 namespace WebHook.Core.DataTransferObjects.WebhookSubscription;
 
@@ -15,5 +16,6 @@ public record class CreateWebhookSubscriptionDto
     public List<string> SubscribedFields { get; set; }
     [Required(ErrorMessage = "Cal Back Url is a required field.")]
     [Display(Name = "Call Back Url")]
+    [CallBackUrlValidator]
     public string CallBackUrl { get; set; }
 }

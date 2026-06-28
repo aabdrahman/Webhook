@@ -1,11 +1,12 @@
-﻿using WebHook.Core.DataTransferObjects.WebhookSubscription;
+﻿using System.Linq.Expressions;
+using WebHook.Core.DataTransferObjects.WebhookSubscription;
 using WebHook.Core.Entities;
 
 namespace WebHook.Core.Mapper;
 
 public static class WebhookSubscriptionMapper
 {
-    public static Func<WebhookSubscription, WebhookSubscriptionDto> ToDtoExpression()
+    public static Expression<Func<WebhookSubscription, WebhookSubscriptionDto>> ToDtoExpression()
     {
         return wbSubscription => new WebhookSubscriptionDto()
         {
