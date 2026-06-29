@@ -36,7 +36,7 @@ public class WebhookSubscriptionController : ControllerBase
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred calling endpoint.");
-            GenericResponse<string> resp = GenericResponse<string>.Failure(null, "An error occrred performing operation.", HttpStatusCode.InternalServerError, 
+            GenericResponse<string> resp = GenericResponse<string>.Failure(null, "An error occurred performing operation.", HttpStatusCode.InternalServerError, 
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
             return StatusCode((int)HttpStatusCode.InternalServerError, resp);
         }
