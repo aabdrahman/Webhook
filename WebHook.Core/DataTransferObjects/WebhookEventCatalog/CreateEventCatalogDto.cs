@@ -15,5 +15,5 @@ public record class CreateEventCatalogDto
     [Required(ErrorMessage = "Available Field is a required field.")]
     [NotEmptyCollectionValidator]
     //[Range(1, double.MaxValue, ErrorMessage = "One or more Available fields should be provided.")]
-    public List<string> AvailableFields { get; set; }
+    public Dictionary<string, string> AvailableFields { get; set; }
 }

@@ -60,7 +60,7 @@ public class WebhookSubscriptionTests : IDisposable
         IsActive = true,
         Description = $"Test Event Catalog: {name}",
         CreatedAt = DateTimeOffset.UtcNow,
-        AvailableFields = availableFields,
+        AvailableFields = availableFields.ToDictionary(f => f, f => "string"),
         NormalizedEventName = name.ToUpper()
     };
 

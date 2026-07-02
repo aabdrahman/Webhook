@@ -39,7 +39,7 @@ public class WebhookEventCatalogControllerTests
         {
             EventCatalogName = "OrderCreated",
             Description = "Order created description.",
-            AvailableFields = ["referenceNumber", "count"]
+            AvailableFields = { { "referenceNumber", "string" }, { "count", "int" } }
         };
     }
 

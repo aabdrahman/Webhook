@@ -13,7 +13,7 @@ public class WebHookEventCatalog
     public string Description { get; set; } = string.Empty;
     //public string PayLoad { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public List<string> AvailableFields { get; set; }
+    public Dictionary<string, string> AvailableFields { get; set; }
 
     //RELATIONSHIP
     //----Many-to-Many relationship with the webhook subscription

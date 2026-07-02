@@ -40,7 +40,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         IsActive = true,
         Description = $"Test Event Catalog: {name}",
         CreatedAt = DateTimeOffset.UtcNow,
-        AvailableFields = availableFields,
+        AvailableFields = availableFields.ToDictionary(f => f, f => "string"),
         NormalizedEventName = name.ToUpper()
     };
 
@@ -48,7 +48,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
     {
         Description = $"",
         EventCatalogName = name,
-        AvailableFields = availableFields
+        AvailableFields = availableFields.ToDictionary(f => f, f => "string")
     };
 
     [Fact]

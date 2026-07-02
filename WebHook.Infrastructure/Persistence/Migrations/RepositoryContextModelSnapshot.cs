@@ -59,7 +59,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.HasIndex("NormalizedEventName")
                         .IsUnique();
 
-                    b.ToTable("WebHookEventCatalogs");
+                    b.ToTable("WebHookEventCatalogs", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookDeadLetterQueue", b =>
@@ -83,7 +83,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "WebhookDeliveryId" }, "IX_Webhook_DeadLetter_DeliveryId");
 
-                    b.ToTable("WebhookDeadLetterQueues");
+                    b.ToTable("WebhookDeadLetterQueues", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookDelivery", b =>
@@ -131,7 +131,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WebhookSubscriptionId");
 
-                    b.ToTable("WebhookDeliveries");
+                    b.ToTable("WebhookDeliveries", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookDeliveryAttempt", b =>
@@ -164,7 +164,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("WebhookDeliveryId");
 
-                    b.ToTable("WebhookDeliveryAttempts");
+                    b.ToTable("WebhookDeliveryAttempts", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookEvent", b =>
@@ -205,7 +205,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "EventType" }, "IX_Webhook_Event_EventType");
 
-                    b.ToTable("WebhookEvents");
+                    b.ToTable("WebhookEvents", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscription", b =>
@@ -242,7 +242,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WebhookSubscriptions");
+                    b.ToTable("WebhookSubscriptions", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscriptionEvent", b =>
@@ -265,7 +265,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Webhook_Event_Subscription");
 
-                    b.ToTable("WebhookEventSubscriptions");
+                    b.ToTable("WebhookEventSubscriptions", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookDeadLetterQueue", b =>
