@@ -13,7 +13,7 @@ public record class CreateEventCatalogDto
     public string EventCatalogName { get; set; }
     public string? Description { get; set; }
     [Required(ErrorMessage = "Available Field is a required field.")]
-    [NotEmptyCollectionValidator]
+    [NotEmptyDictionaryCollection]
     //[Range(1, double.MaxValue, ErrorMessage = "One or more Available fields should be provided.")]
     public Dictionary<string, string> AvailableFields { get; set; }
 }

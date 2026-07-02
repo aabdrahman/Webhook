@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
@@ -30,7 +31,16 @@ public static class ApplicationServiceExtensions
     {
         services.AddDbContext<RepositoryContext>(opts =>
         {
-            opts.UseNpgsql(configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Database configuration string not provided"), v => v.SetPostgresVersion(18, 0))
+            // UseNpgsql is used to configure the DbContext to use PostgreSQL as the database provider. It retrieves the connection string from the configuration using the key "DbConnection".
+            // If the connection string is not provided, it throws an ArgumentNullException with a message indicating that the database configuration string is not provided.
+            //It uses the native supporter for json conversion
+
+            // NpgsqlDataSourceBuilder is used to create a data source for PostgreSQL. It enables dynamic JSON support and parameter logging for better debugging and monitoring of database operations.
+            var dataSource = new NpgsqlDataSourceBuilder(configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Database configuration string not provided"));
+            dataSource.EnableDynamicJson();
+            dataSource.EnableParameterLogging();
+
+            opts.UseNpgsql(dataSource.Build(), v => v.SetPostgresVersion(18, 0))
                 .EnableSensitiveDataLogging()
                 .LogTo(Serilog.Log.Information, 
                         new[] { DbLoggerCategory.Database.Command.Name }, 

@@ -23,7 +23,7 @@ public static class EventCatalogMapper
     {
         return new WebHookEventCatalog()
         {
-            AvailableFields = createEventCatalog.AvailableFields,
+            AvailableFields = createEventCatalog.AvailableFields.ToDictionary(k => k.Key.ToLower(), v => v.Value.ToLower()),
             EventName = createEventCatalog.EventCatalogName,
             Description = createEventCatalog.Description ?? string.Empty,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -44,7 +44,7 @@ public static class EventCatalogMapper
         return new EventCatalogDto()
         {
             Id = webHookEventCatalog.Id,
-            AvailableFields = webHookEventCatalog.AvailableFields.Keys.ToList(),
+            AvailableFields = webHookEventCatalog.AvailableFields,
             Description = webHookEventCatalog.Description,
             EventCatalogName = webHookEventCatalog.EventName,
             IsActive = webHookEventCatalog.IsActive
@@ -63,7 +63,7 @@ public static class EventCatalogMapper
         return webHookEventCatalog => new EventCatalogDto()
         {
             Id = webHookEventCatalog.Id,
-            AvailableFields = webHookEventCatalog.AvailableFields.Keys.ToList(),
+            AvailableFields = webHookEventCatalog.AvailableFields,
             Description = webHookEventCatalog.Description,
             EventCatalogName = webHookEventCatalog.EventName,
             IsActive = webHookEventCatalog.IsActive

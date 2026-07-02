@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using System.Text.Json;
 using WebHook.Core.Entities;
 using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
@@ -34,6 +35,8 @@ public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<
             .HasDefaultValue(true);
 
         builder.Property(x => x.AvailableFields)
+            .HasConversion(v => JsonSerializer.Serialize(v, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ?? "", 
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ?? new Dictionary<string, string>())
             .HasColumnType("jsonb")
             .IsRequired();
 

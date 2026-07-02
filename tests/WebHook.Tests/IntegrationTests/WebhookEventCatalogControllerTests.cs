@@ -29,7 +29,7 @@ public class WebhookEventCatalogControllerTests
             EventCatalogName = "CUSTOMERCREATED",
             Description = "Customer Created Description",
             IsActive = true,
-            AvailableFields = ["name", "email"]
+            AvailableFields = { { "name", "string" }, { "email", "string" } }
         };
     }
 

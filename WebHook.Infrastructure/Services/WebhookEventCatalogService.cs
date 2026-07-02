@@ -59,6 +59,17 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
         {
            _logger.Information("Create new event catalog - {0}", createEventCatalogDto);
 
+            //Validate the available fields dictionary to ensure that the values are of the correct type (string, int, bool, guid, datetime, float, decimal or double). If any value is not of the correct type, return a failure response.
+            if (!createEventCatalogDto.AvailableFields.All(kvp => kvp.Value.ToLower() == "string" || kvp.Value == "int" ||
+                                                            kvp.Value == "bool" || kvp.Value == "guid" ||
+                                                            kvp.Value == "datetime" || kvp.Value == "double" ||
+                                                            kvp.Value == "decimal" || kvp.Value == "float")
+                )
+            {
+                _logger.Information("Invalid field types in available fields - {0}", createEventCatalogDto.AvailableFields);
+                return GenericResponse<string>.Failure(null, "Invalid field types in available fields.", HttpStatusCode.BadRequest);
+            }
+
             bool isNameExists = await _repositoryContext.WebHookEventCatalogs.AnyAsync(x => x.NormalizedEventName == createEventCatalogDto.EventCatalogName.ToUpper(), ct);
 
             if (isNameExists)
@@ -171,7 +182,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
 
             _logger.Information("Event catalogs fetched successfully - {0}", allEventCatalogs);
 
-            return allEventCatalogs.Any() ? GenericResponse<IReadOnlyList<EventCatalogDto>>.Success(allEventCatalogs, "Event Catlogs successfully fetched.", HttpStatusCode.OK) :
+            return allEventCatalogs.Any() ? GenericResponse<IReadOnlyList<EventCatalogDto>>.Success(allEventCatalogs, "Event Catalogs successfully fetched.", HttpStatusCode.OK) :
                                             GenericResponse<IReadOnlyList<EventCatalogDto>>.Failure(null, "No event catalog fetched.", HttpStatusCode.NotFound);
         }
         catch (Exception ex)
