@@ -125,7 +125,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
         {
             _logger.Information("Performing Event Catalog Activation Operation. Is Deactivate - {0}. Event Catalog Id - {1}", isDeactivate, EventCatalogId);
 
-            WebHookEventCatalog? webHookEventCatalogToPerformOperation = await _repositoryContext.WebHookEventCatalogs.FirstOrDefaultAsync(x => x.Id == EventCatalogId, ct);
+            WebHookEventCatalog? webHookEventCatalogToPerformOperation = await _repositoryContext.WebHookEventCatalogs.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == EventCatalogId, ct);
 
             if(webHookEventCatalogToPerformOperation is null)
             {

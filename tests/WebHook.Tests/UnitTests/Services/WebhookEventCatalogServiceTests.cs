@@ -66,12 +66,30 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.NotNull(result);
         //Assert.True(result.IsSuccessful);
         Assert.True(result.ResponseMessage.Contains("successfully created", StringComparison.OrdinalIgnoreCase));
-        Assert.True(result.HttpStatusCode == System.Net.HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, result.HttpStatusCode);
 
         var persisted = await operationParameters.ctx.WebHookEventCatalogs.FirstOrDefaultAsync(x => x.EventName == createEventDto.EventCatalogName);
 
         Assert.NotNull(persisted);
         Assert.True(persisted.EventName.Contains(createEventDto.EventCatalogName, StringComparison.OrdinalIgnoreCase));
+
+    }
+
+    [Fact]
+    public async Task CreateNewEventCatalogAsync_InValidRequest_Returns400BadRequest()
+    {
+        //Arrange
+        var createEventDto = BuildCreateCatalogDto(["name", "reference", "amount"], "PaymentCompleted");
+        createEventDto.AvailableFields.Add("payeeTimestamp", "datetimeoffset");
+        var operationParameters = GetSut();
+
+        //Act
+        var result = await operationParameters.svc.CreateNewEventCatalogAsync(createEventDto);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
 
     }
 
@@ -133,8 +151,8 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.True(result.IsSuccessful);
 
         var modifiedData = await operationParameters.ctx.WebHookEventCatalogs.FirstOrDefaultAsync(x => x.Id == eventCatalogEntity.Id);
-        Assert.NotNull(modifiedData);
-        Assert.False(modifiedData.IsActive);
+        Assert.Null(modifiedData);
+        //Assert.False(modifiedData.IsActive);
     }
 
     [Fact]
@@ -152,12 +170,12 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
 
         //Assert
         Assert.NotNull(result);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, result.HttpStatusCode);
         Assert.True(result.IsSuccessful);
 
         var modifiedData = await operationParameters.ctx.WebHookEventCatalogs.FirstOrDefaultAsync(x => x.Id == eventCatalogEntity.Id);
-        Assert.NotNull(modifiedData);
-        Assert.False(modifiedData.IsActive);
+        Assert.Null(modifiedData);
+        //Assert.False(modifiedData.IsActive);
 
     }
 
@@ -207,9 +225,9 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, result.HttpStatusCode);
 
-        var modified = await operationParameters.ctx.WebHookEventCatalogs.FindAsync(eventCatalogEntity.Id);
+        var modified = await operationParameters.ctx.WebHookEventCatalogs.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == eventCatalogEntity.Id);
         Assert.NotNull(modified);
         Assert.True(modified.IsActive);
         
@@ -295,9 +313,9 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.True(result!.ResponseData!.Any());
-        Assert.True(result!.ResponseData!.Count() == 4);
+        Assert.Equal(3, result!.ResponseData!.Count());
     }
 
     [Fact]
