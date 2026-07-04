@@ -7,6 +7,7 @@ using WebHook.Core.Entities;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Core.Mapper;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventObjectGenerator;
 
 namespace WebHook.Infrastructure.Services;
 
@@ -68,6 +69,19 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
             {
                 _logger.Information("Invalid field types in available fields - {0}", createEventCatalogDto.AvailableFields);
                 return GenericResponse<string>.Failure(null, "Invalid field types in available fields.", HttpStatusCode.BadRequest);
+            }
+
+            //Validate that a class can e created with the available fields dictionary. If not, return a failure response.
+            try
+            {
+                Dictionary<string, Type> eventPropertiesType = RuntimeEventBuilder.GetPropertyTypes(createEventCatalogDto.AvailableFields);
+                Type eventType = RuntimeEventBuilder.CreateEventType($"{createEventCatalogDto.EventCatalogName.ToLower()}Dto", eventPropertiesType);
+                _logger.Information("Event type created successfully - {0}", eventType);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "An error occurred while creating the event type.");
+                return GenericResponse<string>.Failure(null, "An error occurred while creating the event type with provided properties.", HttpStatusCode.BadRequest);
             }
 
             bool isNameExists = await _repositoryContext.WebHookEventCatalogs.AnyAsync(x => x.NormalizedEventName == createEventCatalogDto.EventCatalogName.ToUpper(), ct);
