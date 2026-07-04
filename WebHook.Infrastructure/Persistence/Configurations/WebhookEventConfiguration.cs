@@ -10,12 +10,26 @@ internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webho
     {
         builder.HasKey(x => x.Id);
 
-        builder.HasIndex(x => x.EventType, "IX_Webhook_Event_EventType");
+        //builder.HasIndex(x => x.EventType, "IX_Webhook_Event_EventType");
 
-        builder.HasIndex(x => x.CorrelationId, "IX_Webhook_Event_CorrelationId");
+        builder.HasIndex(x => new { x.CorrelationId, x.EventType }, "IX_Webhook_Event_CorrelationId_EventType");
+
+        builder.HasIndex(x => x.CreatedAt, "IX_Webhook_Event_CreatedAt");
+
+        builder.HasIndex(x => x.Status, "IX_Webhook_Event_Status");
+
+        builder.HasIndex(x => x.ProcessedAt, "IX_Webhook_Event_ProcessedAt");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_WebhookEvents_ProcessedAt_After_CreatedAt",
+            "\"ProcessedAt\" IS NULL OR \"ProcessedAt\" >= \"CreatedAt\""));
+
+        builder.ToTable(t => t.HasCheckConstraint
+                    ("CK_WebhookEvents_Status",
+                    "\"Status\" IN ('Pending', 'Processing', 'Processed', 'PartiallyProcessed' , 'Failed')"));
 
         builder.Property(x => x.EventType)
-            .IsRequired();
+                .IsRequired();
 
         builder.Property(x => x.CorrelationId)
             .IsRequired();
