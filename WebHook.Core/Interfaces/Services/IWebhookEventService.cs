@@ -7,5 +7,5 @@ public interface IWebhookEventService
 {
     Task<GenericResponse<string>> CreateEventAsync(CreateWebhookEventDto createWebhookEvent, CancellationToken ct = default);
     Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventsAsync(GetWebhookEventParameters parameters, CancellationToken ct = default);
-    Task<GenericResponse<WebhookEventDto>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default);
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Net;
+using System.Reflection;
 using System.Text.Json;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
@@ -59,15 +60,25 @@ public sealed class WebhookEventService : IWebhookEventService
             try
             {
                 var eventTypeProperties = RuntimeEventBuilder.GetPropertyTypes(eventTypeInCatalog.AvailableFields);
-                Type raisedEventType = RuntimeEventBuilder.CreateEventType($"{eventTypeInCatalog.NormalizedEventName.ToLower()}dto", eventTypeProperties);
+                Type raisedEventType = RuntimeEventBuilder.CreateEventType($"{eventTypeInCatalog.NormalizedEventName.ToLower()}Dto", eventTypeProperties);
 
-                object? raisedEventObject = JsonSerializer.Deserialize(createWebhookEvent.PayLoad, raisedEventType);
+                object? raisedEventObject = JsonSerializer.Deserialize(createWebhookEvent.PayLoad, raisedEventType, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
 
                 if (raisedEventObject is null)
                 {
                     _logger.Warning("Invalid payload for event type - {0}", createWebhookEvent.EventType);
                     return GenericResponse<string>.Failure("Operation Failed.", "Invalid payload for event type.", HttpStatusCode.BadRequest);
                 }
+
+                PropertyInfo[] properties = raisedEventType.GetProperties();
+                var anyNullValues = properties.Where(p => p.CanRead && p.CanWrite && p.GetValue(raisedEventObject) is null).Select(x => x.Name).ToList();
+
+                if(anyNullValues.Any())
+                {
+                    _logger.Warning("Invalid payload for event type - {0}, Missing required fields: {1}", createWebhookEvent.EventType, string.Join(", ", anyNullValues));
+                    return GenericResponse<string>.Failure("Operation Failed.", $"Invalid payload for event type. Missing required fields: {string.Join(", ", anyNullValues)}", HttpStatusCode.BadRequest);
+                }
+
             }
             catch (Exception ex)
             {
@@ -92,7 +103,7 @@ public sealed class WebhookEventService : IWebhookEventService
         }
     }
 
-    public async Task<GenericResponse<WebhookEventDto>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default)
+    public async Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetWebhookEventAsync));
 
@@ -100,21 +111,21 @@ public sealed class WebhookEventService : IWebhookEventService
         {
             _logger.Information("Fetching webhook event for correlation id - {0}", correlationId);
 
-            WebhookEventDto? webhookEvent = await _repositoryContext.WebhookEvents.Select(WebhookEventMapper.ToDtoExpression()).SingleOrDefaultAsync(x => x.CorrelationId == correlationId, ct);
+            var webhookEvents = await _repositoryContext.WebhookEvents.Where(x => x.CorrelationId == correlationId).Select(WebhookEventMapper.ToDtoExpression()).ToListAsync(ct);
 
-            if(webhookEvent is null)
+            if(!webhookEvents.Any())
             {
                 _logger.Warning("Webhook event not found for correlation id - {0}", correlationId);
-                return GenericResponse<WebhookEventDto>.Failure(null, "Webhook event not found.", HttpStatusCode.NotFound);
+                return GenericResponse<IReadOnlyList<WebhookEventDto>>.Failure(null, "Webhook event not found.", HttpStatusCode.NotFound);
             }
 
-            _logger.Information("Successfully fetched webhook event for correlation id - {0}, {1}", correlationId, webhookEvent);
-            return GenericResponse<WebhookEventDto>.Success(webhookEvent, "Webhook event fetched successfully.", HttpStatusCode.OK);
+            _logger.Information("Successfully fetched webhook event for correlation id - {0}, {1}", correlationId, webhookEvents);
+            return GenericResponse<IReadOnlyList<WebhookEventDto>>.Success(webhookEvents, "Webhook event fetched successfully.", HttpStatusCode.OK);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "An error ocurred while getting webhook event details.");
-            return GenericResponse<WebhookEventDto>.Failure(null, "An error occurred while fetching the webhook event.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<IReadOnlyList<WebhookEventDto>>.Failure(null, "An error occurred while fetching the webhook event.", HttpStatusCode.InternalServerError, 
                                                             new ErrorDetail { ErrorMessage = ex.Message, ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "" });
             
         }
@@ -137,7 +148,7 @@ public sealed class WebhookEventService : IWebhookEventService
 
             if(!string.IsNullOrWhiteSpace(parameters.EventType))
             {
-                query = query.Where(x => x.EventType == parameters.EventType);
+                query = query.Where(x => x.EventType == parameters.EventType.ToUpper());
             }
 
             if(!string.IsNullOrWhiteSpace(parameters.Status) && Enum.TryParse<WebHookEventStatus>(parameters.Status, true, out var enumStatus))

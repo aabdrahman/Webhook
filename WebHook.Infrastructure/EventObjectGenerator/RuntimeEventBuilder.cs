@@ -21,6 +21,15 @@ public static class RuntimeEventBuilder
 
     public static Type CreateEventType(string eventTypeName, Dictionary<string, Type> properties)
     {
+        //This part is added because the test was throwing exception that the class with name exists. So, we check if a class exists with the same name and return it if it does. This is a temporary fix and should be optimized further.
+
+        var existingType = _moduleBuilder.GetType(eventTypeName);
+
+        if (existingType != null)
+        {
+            return existingType;
+        }
+
         var typeBuilder = _moduleBuilder.DefineType(eventTypeName, TypeAttributes.Public | TypeAttributes.Class);
         foreach (var property in properties)
         {
