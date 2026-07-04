@@ -29,7 +29,7 @@ public class WebhookEventCatalogControllerTests
             EventCatalogName = "CUSTOMERCREATED",
             Description = "Customer Created Description",
             IsActive = true,
-            AvailableFields = { { "name", "string" }, { "email", "string" } }
+            AvailableFields = new Dictionary<string, string>(){ { "name", "string" }, { "email", "string" } }
         };
     }
 
@@ -39,7 +39,7 @@ public class WebhookEventCatalogControllerTests
         {
             EventCatalogName = "OrderCreated",
             Description = "Order created description.",
-            AvailableFields = { { "referenceNumber", "string" }, { "count", "int" } }
+            AvailableFields = new Dictionary<string, string>(){ { "referenceNumber", "string" }, { "count", "int" } }
         };
     }
 
