@@ -24,6 +24,8 @@ builder.Services.ConfigureApplicationServices();
 builder.Services.AddConfigurationModels(builder.Configuration);
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.ConfigureSwagger();
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
 

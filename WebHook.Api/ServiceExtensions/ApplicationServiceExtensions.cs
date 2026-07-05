@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using System.Reflection;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
@@ -9,7 +11,7 @@ using WebHook.Infrastructure.Services;
 
 namespace WebHook.Api.ServiceExtensions;
 
-public static class ApplicationServiceExtensions
+internal static class ApplicationServiceExtensions
 {
     internal static void ConfigureSwagger(this IServiceCollection services)
     {
@@ -24,6 +26,13 @@ public static class ApplicationServiceExtensions
         //        Summary = "Swager documentation for the webhook api"
         //    });
         //});
+
+        services.AddSwaggerGen(opts =>
+        {
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            opts.IncludeXmlComments(xmlPath);
+        });
 
     }
 
