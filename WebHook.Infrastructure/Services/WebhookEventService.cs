@@ -111,7 +111,7 @@ public sealed class WebhookEventService : IWebhookEventService
         {
             _logger.Information("Fetching webhook event for correlation id - {0}", correlationId);
 
-            var webhookEvents = await _repositoryContext.WebhookEvents.Where(x => x.CorrelationId == correlationId).Select(WebhookEventMapper.ToDtoExpression()).ToListAsync(ct);
+            var webhookEvents = await _repositoryContext.WebhookEvents.AsNoTracking().Where(x => x.CorrelationId == correlationId).Select(WebhookEventMapper.ToDtoExpression()).ToListAsync(ct);
 
             if(!webhookEvents.Any())
             {
@@ -139,7 +139,7 @@ public sealed class WebhookEventService : IWebhookEventService
         {
             _logger.Information("Fetching webhook events. Parameters: {0}", parameters);
 
-            var query = _repositoryContext.WebhookEvents.Where(x => x.CreatedAt >= parameters.CreatedAtFrom && x.CreatedAt <= parameters.CreatedAtTo).AsQueryable();
+            var query = _repositoryContext.WebhookEvents.AsNoTracking().Where(x => x.CreatedAt >= parameters.CreatedAtFrom && x.CreatedAt <= parameters.CreatedAtTo).AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(parameters.Source))
             {

@@ -59,7 +59,7 @@ public static class ApplicationServiceExtensions
     {
         services.AddScoped<IWebhookEventCatalogService, WebhookEventCatalogService>();
         services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
-
+        services.AddScoped<IWebhookEventService, WebhookEventService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
