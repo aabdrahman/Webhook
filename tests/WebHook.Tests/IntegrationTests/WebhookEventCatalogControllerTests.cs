@@ -161,7 +161,7 @@ public class WebhookEventCatalogControllerTests
         //Assert
         Assert.NotNull(result);
         //Assert.NotNull(body);
-        Assert.Equal((int)objResult.StatusCode, (int)HttpStatusCode.InternalServerError);
+        Assert.Equal((int)HttpStatusCode.InternalServerError, (int)objResult.StatusCode);
     }
 
     [Fact]

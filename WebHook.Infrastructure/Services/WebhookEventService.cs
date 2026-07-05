@@ -48,7 +48,10 @@ public sealed class WebhookEventService : IWebhookEventService
 
             //Check that the raised event is valid
             //This is meant to be optimized further by having a store that holds the valid event types and their corresponding payloads. For now, we will from the database to get all events.
-            var eventTypeInCatalog = await _repositoryContext.WebHookEventCatalogs.Select(x => new { ActiveStatus = x.IsActive, AvailableFields = x.AvailableFields, x.NormalizedEventName }).FirstOrDefaultAsync(x => x.NormalizedEventName == createWebhookEvent.EventType.ToUpper(), ct);
+            var eventTypeInCatalog = await _repositoryContext.WebHookEventCatalogs
+                                        .AsNoTracking()
+                                        .Select(x => new { ActiveStatus = x.IsActive, AvailableFields = x.AvailableFields, x.NormalizedEventName })
+                                        .FirstOrDefaultAsync(x => x.NormalizedEventName == createWebhookEvent.EventType.ToUpper(), ct);
 
             if (eventTypeInCatalog is null)
             {
