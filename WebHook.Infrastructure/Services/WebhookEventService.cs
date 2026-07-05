@@ -38,7 +38,7 @@ public sealed class WebhookEventService : IWebhookEventService
             _logger.Information("Creating webhook event - {0}", createWebhookEvent);
 
             //Check that the correlation id is unique
-            bool isExistsCorrelationId = await _repositoryContext.WebhookEvents.AnyAsync(x => x.CorrelationId == createWebhookEvent.CorrelationId && x.EventType == createWebhookEvent.EventType.ToUpper(), ct);
+            bool isExistsCorrelationId = await _repositoryContext.WebhookEvents.AsNoTracking().AnyAsync(x => x.CorrelationId == createWebhookEvent.CorrelationId && x.EventType == createWebhookEvent.EventType.ToUpper(), ct);
 
             if (isExistsCorrelationId)
             {
