@@ -34,9 +34,9 @@ public sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<
             .HasForeignKey(x => x.WebhookSubscriptionId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        builder.HasMany(x => x.WebhookDeliveries)
-            .WithOne(x => x.webhookSubscription)
-            .HasForeignKey(x => x.WebhookSubscriptionId)
-            .OnDelete(DeleteBehavior.NoAction);
+        //builder.HasMany(x => x.WebhookDeliveries)
+        //    .WithOne(x => x.webhookSubscription)
+        //    .HasForeignKey(x => x.WebhookSubscriptionId)
+        //    .OnDelete(DeleteBehavior.NoAction);
     }
 }

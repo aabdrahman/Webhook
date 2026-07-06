@@ -11,19 +11,24 @@ public class WebhookDelivery
     public int RetryCount { get; set; }
     public string RequestPayload { get; set; }
     public WebhookDeliveryStatus DeliveryStatus { get; set; }
+    public string CallBackUrl { get; set; }
 
     //RELATIONSHIPS
     //------------One to many relationship with webhook subscription
-    public Guid WebhookSubscriptionId { get; set; }
-    public WebhookSubscription webhookSubscription { get; set; }
+    //public Guid WebhookSubscriptionId { get; set; }
+    //public WebhookSubscription webhookSubscription { get; set; }
 
     //-----------One to many relationship with webhook event catalog
-    public Guid WebhookEventCatalogId { get; set; }
-    public WebHookEventCatalog webHookEventCatalog { get; set; }
+    //public Guid WebhookEventCatalogId { get; set; }
+    //public WebHookEventCatalog webHookEventCatalog { get; set; }
 
     //----------One to many relationship with webhook event
     public Guid WebhookEventId { get; set; }
     public WebhookEvent webhookEvent { get; set; }
+
+    //----------One to many relationship with webhook subscription event
+    public Guid WebhookSubscriptionEventId { get; set; }
+    public WebhookSubscriptionEvent WebhookSubscriptionEvent { get; set; }
 
     //-----------One to many relationship with delivery attempts
     public ICollection<WebhookDeliveryAttempt> WebhookDeliveryAttempts { get; set; } = [];

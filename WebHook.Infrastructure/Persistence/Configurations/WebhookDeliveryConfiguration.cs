@@ -10,6 +10,14 @@ internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<We
     {
         builder.HasKey(x => x.Id);
 
+        builder.HasIndex(x => x.WebhookSubscriptionEventId);
+
+        builder.HasIndex(x => x.DeliveryStatus);
+
+        builder.ToTable(wd => wd.HasCheckConstraint("CK_WebhookDelivery_Status", "\"DeliveryStatus\" IN ('Pending', 'Processing', 'Delivered', 'Failed', 'Retrying', 'DeadLetter')"));
+
+        builder.ToTable(wd => wd.HasCheckConstraint("CK_WebhookDelivery_RetryCount", "\"RetryCount\" >= 0"));
+
         builder.Property(x => x.RequestPayload)
             .IsRequired();
 
@@ -32,14 +40,19 @@ internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<We
             .HasForeignKey(x => x.WebhookDeliveryId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        builder.HasOne(x => x.webHookEventCatalog)
-            .WithMany(x => x.WebhookDeliveries)
-            .HasForeignKey(x => x.WebhookEventCatalogId)
-            .OnDelete(DeleteBehavior.NoAction);
+        //builder.HasOne(x => x.webHookEventCatalog)
+        //    .WithMany(x => x.WebhookDeliveries)
+        //    .HasForeignKey(x => x.WebhookEventCatalogId)
+        //    .OnDelete(DeleteBehavior.NoAction);
 
-        builder.HasOne(x => x.webhookSubscription)
+        //builder.HasOne(x => x.webhookSubscription)
+        //    .WithMany(x => x.WebhookDeliveries)
+        //    .HasForeignKey(x => x.WebhookSubscriptionId)
+        //    .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(x => x.WebhookSubscriptionEvent)
             .WithMany(x => x.WebhookDeliveries)
-            .HasForeignKey(x => x.WebhookSubscriptionId)
+            .HasForeignKey(x => x.WebhookSubscriptionEventId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.webhookEvent)

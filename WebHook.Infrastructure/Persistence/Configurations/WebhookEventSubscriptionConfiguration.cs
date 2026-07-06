@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WebHook.Core.Entities;
+using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
@@ -9,6 +10,17 @@ public sealed class WebhookEventSubscriptionConfiguration : IEntityTypeConfigura
     public void Configure(EntityTypeBuilder<WebhookSubscriptionEvent> builder)
     {
         builder.HasKey(x => x.Id);
+
+        builder.HasIndex(x => x.IsActive);
+
+        builder.Property(x => x.CreatedAt)
+            .HasConversion<DateTimeOffsetColumnConverter>();
+
+        builder.Property(x => x.IsActive)
+            .HasDefaultValue(true);
+
+        builder.Property(x => x.DeletedAt)
+            .HasConversion<DateTimeOffsetColumnConverter>();
 
         builder.HasIndex(x => new { x.WebhookEventCatalogId, x.WebhookSubscriptionId })
             .IsUnique()
@@ -23,6 +35,13 @@ public sealed class WebhookEventSubscriptionConfiguration : IEntityTypeConfigura
             .WithMany(x => x.WebhookEvents)
             .HasForeignKey(x => x.WebhookEventCatalogId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasMany(x => x.WebhookDeliveries)
+            .WithOne(x => x.WebhookSubscriptionEvent)
+            .HasForeignKey(x => x.WebhookSubscriptionEventId)
+            .OnDelete(DeleteBehavior.NoAction);    
+
+        builder.HasQueryFilter(x => x.IsActive);
     }
 
 }

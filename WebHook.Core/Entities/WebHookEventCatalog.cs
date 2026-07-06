@@ -19,5 +19,5 @@ public class WebHookEventCatalog
     //----Many-to-Many relationship with the webhook subscription
     public ICollection<WebhookSubscriptionEvent> WebhookSubscriptions { get; set; } = [];
     //-----One to many relationship with webhook delivery
-    public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
+    //public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
 }
