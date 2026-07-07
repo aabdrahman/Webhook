@@ -28,12 +28,12 @@ public sealed class WebhookEventSubscriptionConfiguration : IEntityTypeConfigura
 
         builder.HasOne(x => x.webHookEventCatalog)
             .WithMany(x => x.WebhookSubscriptions)
-            .HasForeignKey(x => x.WebhookSubscriptionId)
+            .HasForeignKey(x => x.WebhookEventCatalogId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.webhookSubscription)
             .WithMany(x => x.WebhookEvents)
-            .HasForeignKey(x => x.WebhookEventCatalogId)
+            .HasForeignKey(x => x.WebhookSubscriptionId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasMany(x => x.WebhookDeliveries)

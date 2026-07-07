@@ -69,6 +69,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IWebhookEventCatalogService, WebhookEventCatalogService>();
         services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
         services.AddScoped<IWebhookEventService, WebhookEventService>();
+        services.AddScoped<IWebhookSubscriptionEventService, WebhookSubscriptionEventService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
