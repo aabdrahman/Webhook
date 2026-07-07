@@ -9,10 +9,28 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// Provides functionality for managing the webhook events associated with webhook subscriptions.
+/// </summary>
+/// <remarks>
+/// This service implements the business logic for subscribing and unsubscribing webhook
+/// subscriptions to event types, as well as retrieving the events currently associated
+/// with a subscription.
+///
+/// The service validates subscriptions and events before performing operations,
+/// prevents duplicate active subscriptions, supports reactivating previously
+/// deleted subscriptions, and persists changes using the application's repository context.
+/// </remarks>
 public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventService
 {
     private readonly RepositoryContext _repositoryContext;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookSubscriptionEventService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">
+    /// The repository context used to query and persist webhook subscription event data.
+    /// </param>
     public WebhookSubscriptionEventService(RepositoryContext repositoryContext)
     {
         _repositoryContext = repositoryContext;
@@ -24,6 +42,28 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
     private const string _methodName = "MethodName";
 
     private ILogger _logger;
+
+    /// <summary>
+    /// Retrieves all webhook events currently subscribed to by the specified webhook subscription.
+    /// </summary>
+    /// <param name="subscriptionId">
+    /// The unique identifier of the webhook subscription.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// A token used to cancel the asynchronous operation.
+    /// </param>
+    /// <returns>
+    /// A <see cref="GenericResponse{T}"/> containing the collection of subscribed webhook
+    /// events when the operation succeeds. If no subscriptions exist, a failure response
+    /// with a <see cref="HttpStatusCode.NotFound"/> status is returned.
+    /// </returns>
+    /// <remarks>
+    /// Only active event subscriptions associated with the specified webhook subscription
+    /// are returned.
+    /// </remarks>
+    /// <exception cref="Exception">
+    /// Exceptions are caught internally and returned as a failure response.
+    /// </exception>
     public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionEventDto>>> GetSubscribedEventsAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetSubscribedEventsAsync));
@@ -62,6 +102,34 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
 
     }
 
+    /// <summary>
+    /// Subscribes a webhook subscription to the specified webhook event.
+    /// </summary>
+    /// <param name="subscriptionId">
+    /// The unique identifier of the webhook subscription.
+    /// </param>
+    /// <param name="eventName">
+    /// The normalized name of the webhook event to subscribe to.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// A token used to cancel the asynchronous operation.
+    /// </param>
+    /// <returns>
+    /// A <see cref="GenericResponse{T}"/> indicating the outcome of the subscription request.
+    /// </returns>
+    /// <remarks>
+    /// This operation:
+    /// <list type="bullet">
+    /// <item><description>Verifies that the webhook subscription exists.</description></item>
+    /// <item><description>Verifies that the requested webhook event exists.</description></item>
+    /// <item><description>Prevents duplicate active subscriptions.</description></item>
+    /// <item><description>Reactivates an inactive subscription instead of creating a duplicate.</description></item>
+    /// <item><description>Creates a new subscription when none exists.</description></item>
+    /// </list>
+    /// </remarks>
+    /// <exception cref="Exception">
+    /// Exceptions are caught internally and returned as a failure response.
+    /// </exception>
     public async Task<GenericResponse<string>> SubscribeToEventAsync(Guid subscriptionId, string eventName, CancellationToken cancellationToken = default)
     {
         _logger = Log.ForContext(_methodName, nameof(SubscribeToEventAsync));
@@ -140,6 +208,30 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
         }
     }
 
+    /// <summary>
+    /// Removes an event subscription from a webhook subscription.
+    /// </summary>
+    /// <param name="subscriptionId">
+    /// The unique identifier of the webhook subscription.
+    /// </param>
+    /// <param name="eventName">
+    /// The normalized name of the webhook event to remove.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// A token used to cancel the asynchronous operation.
+    /// </param>
+    /// <returns>
+    /// A <see cref="GenericResponse{T}"/> indicating whether the webhook subscription
+    /// was successfully removed from the specified event.
+    /// </returns>
+    /// <remarks>
+    /// This operation performs a soft delete by marking the subscription as inactive
+    /// and recording the deletion timestamp. The subscription can be reactivated
+    /// through a subsequent subscription request.
+    /// </remarks>
+    /// <exception cref="Exception">
+    /// Exceptions are caught internally and returned as a failure response.
+    /// </exception>
     public async Task<GenericResponse<string>> UnsubscribeFromEventAsync(Guid subscriptionId, string eventName, CancellationToken cancellationToken = default)
     {
         _logger = Log.ForContext(_methodName, nameof(UnsubscribeFromEventAsync));
