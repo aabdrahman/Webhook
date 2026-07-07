@@ -21,6 +21,8 @@
 		<PackageReference Include="Serilog" Version="4.3.1" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+		<PackageReference Include="MassTransit" Version="9.1.2" />
+		<PackageReference Include="MassTransit.AspNetCore" Version="7.3.1" />
 	</ItemGroup>
 
 
