@@ -22,6 +22,7 @@ builder.Services.ConfigureDatabaseConnection(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.ConfigureApplicationServices();
 builder.Services.AddConfigurationModels(builder.Configuration);
+builder.Services.ConfigureMassTransit();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.ConfigureSwagger();

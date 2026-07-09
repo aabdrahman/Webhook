@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Reflection;
@@ -34,6 +35,21 @@ internal static class ApplicationServiceExtensions
             opts.IncludeXmlComments(xmlPath);
         });
 
+    }
+
+    internal static void ConfigureMassTransit(this IServiceCollection services)
+    {
+        services.AddMassTransit(opts =>
+        {
+
+            
+
+            opts.UsingInMemory((context, config) =>
+            {
+                
+                config.ConfigureEndpoints(context);
+            });
+        });
     }
 
     internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration) 
