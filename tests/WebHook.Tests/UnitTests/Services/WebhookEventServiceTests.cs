@@ -1,7 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Moq;
 using System.Net;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
 
@@ -10,8 +13,11 @@ namespace WebHook.Tests.UnitTests.Services;
 public class WebhookEventServiceTests
 {
     private readonly DbContextOptions<RepositoryContext> _contextOptions;
+    private readonly Mock<IApplicationPublisher> _applicationPublisherMock;
     public WebhookEventServiceTests()
     {
+        _applicationPublisherMock = new Mock<IApplicationPublisher>();
+
         var builder = new DbContextOptionsBuilder<RepositoryContext>()
                             .UseInMemoryDatabase($"WebhookEventServiceTests_{Guid.NewGuid()}");
 
@@ -32,7 +38,7 @@ public class WebhookEventServiceTests
     private (RepositoryContext ctx, WebhookEventService svc) GetSut()
     {
         var context = new RepositoryContext(_contextOptions);
-        var svc = new WebhookEventService(context);
+        var svc = new WebhookEventService(context, _applicationPublisherMock.Object);
         return (context, svc);  
     }
 
@@ -167,6 +173,7 @@ public class WebhookEventServiceTests
         var sut = GetSut();
         var createDto = BuildCreateWebhookEventDto();
         createDto.PayLoad = "{\"custId\":\"12345\", \"customerName\":\"John Doe\"}"; // Simulate missing fields in payload
+        _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));
 
         //Act
         var result = await sut.svc.CreateEventAsync(createDto);
