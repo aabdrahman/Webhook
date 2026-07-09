@@ -7,6 +7,7 @@ using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Core.Mapper;
 using WebHook.Infrastructure.Data_Persistence;
@@ -37,6 +38,7 @@ namespace WebHook.Infrastructure.Services;
 public sealed class WebhookEventService : IWebhookEventService
 {
     private readonly RepositoryContext _repositoryContext;
+    private readonly IApplicationPublisher _applicationPublisher;
 
     /// <summary>
     /// Initializes a new instance of <see cref="WebhookEventService"/>.
@@ -44,9 +46,13 @@ public sealed class WebhookEventService : IWebhookEventService
     /// <param name="repositoryContext">
     /// The EF Core database context used for all persistence and query operations.
     /// </param>
-    public WebhookEventService(RepositoryContext repositoryContext)
+    /// <paramref name="applicationPublisher"/>
+    /// The application configured publisher to publish to channels designated for eacj possible operation.
+    /// </param>
+    public WebhookEventService(RepositoryContext repositoryContext, IApplicationPublisher applicationPublisher)
     {
         _repositoryContext = repositoryContext;
+        _applicationPublisher = applicationPublisher;
         _logger = Log.ForContext(_className, nameof(WebhookEventService));
     }
 
@@ -183,6 +189,8 @@ public sealed class WebhookEventService : IWebhookEventService
             await _repositoryContext.WebhookEvents.AddAsync(webhookEvent, ct);
 
             await _repositoryContext.SaveChangesAsync(ct);
+
+            await _applicationPublisher.QueueEventRaised(new Core.EventContracts.Events.EventRaised(webhookEvent.Id));
 
             return GenericResponse<string>.Success(webhookEvent.Id.ToString(), "Webhook event created successfully.", HttpStatusCode.Created);
         }

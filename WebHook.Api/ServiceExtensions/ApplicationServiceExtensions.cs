@@ -1,14 +1,16 @@
 ﻿using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Reflection;
 using System.Threading.Channels;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
+using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 
@@ -92,6 +94,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -105,5 +109,10 @@ internal static class ApplicationServiceExtensions
                 
             });
         });
+    }
+
+    internal static void ConfigureApplicationWorkers(this IServiceCollection services)
+    {
+        services.AddHostedService<EventRaisedWorker>();
     }
 }

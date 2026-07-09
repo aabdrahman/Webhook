@@ -24,6 +24,7 @@ builder.Services.ConfigureApplicationServices();
 builder.Services.AddConfigurationModels(builder.Configuration);
 //builder.Services.ConfigureMassTransit();
 builder.Services.ConfigureApplicationChannels();
+builder.Services.ConfigureApplicationWorkers();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.ConfigureSwagger();
