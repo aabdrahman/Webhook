@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using System.Reflection;
+using System.Threading.Channels;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.EventContracts.Events;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
@@ -90,5 +92,18 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+    }
+
+    internal static void ConfigureApplicationChannels(this IServiceCollection services)
+    {
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false
+                
+            });
+        });
     }
 }
