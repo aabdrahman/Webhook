@@ -10,7 +10,7 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
-public sealed class EventRaisedWorker : BackgroundService
+public class EventRaisedWorker : BackgroundService
 {
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly IServiceScopeFactory _serviceScopeFactory;
