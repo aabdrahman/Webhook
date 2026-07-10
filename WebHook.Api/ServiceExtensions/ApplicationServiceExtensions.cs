@@ -114,5 +114,6 @@ internal static class ApplicationServiceExtensions
     internal static void ConfigureApplicationWorkers(this IServiceCollection services)
     {
         services.AddHostedService<EventRaisedWorker>();
+        services.AddHostedService<PendingRaisedEventsWorker>();
     }
 }

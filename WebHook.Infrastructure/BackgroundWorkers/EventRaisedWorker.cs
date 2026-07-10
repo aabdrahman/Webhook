@@ -29,7 +29,7 @@ public sealed class EventRaisedWorker : BackgroundService
     private const string _methodName = "MethodName";
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger = Log.ForContext(_methodName, nameof(ExecuteAsync));
+        _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));
 
         var timespanTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
     
@@ -150,7 +150,7 @@ public sealed class EventRaisedWorker : BackgroundService
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger = Log.ForContext(_methodName, nameof(StartAsync));
+        _logger = _logger.ForContext(_methodName, nameof(StartAsync));
 
         _logger.Information("Starting event raised worker service - Initial Count: {0}", 0);
 
@@ -159,7 +159,7 @@ public sealed class EventRaisedWorker : BackgroundService
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger = Log.ForContext(_methodName, nameof(StopAsync));
+        _logger = _logger.ForContext(_methodName, nameof(StopAsync));
 
         _logger.Information("Stopping event raised worker at - {0}. Total Unprocessed channel items - {1}", DateTimeOffset.UtcNow, 0);
 
