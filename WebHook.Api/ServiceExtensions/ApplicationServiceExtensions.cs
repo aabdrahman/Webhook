@@ -13,6 +13,7 @@ using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Api.ServiceExtensions;
 
@@ -96,6 +97,9 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ISignatureService, SignatureService>();
 
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+
+        services.AddScoped<WebhookDeliveryRetryAfterService>();
+        services.AddScoped<WebhookDeliveryProcessorService>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -115,5 +119,21 @@ internal static class ApplicationServiceExtensions
     {
         services.AddHostedService<EventRaisedWorker>();
         services.AddHostedService<PendingRaisedEventsWorker>();
+    }
+
+    internal static void ConfigureHttpClient(this IServiceCollection services)
+    {
+        //This adds teh webhook delivery named httpclient without the base address wich will be injected at teh point of calling the api.
+        services.AddHttpClient("WebhookDeliveryClient", opts =>
+        {
+            opts.Timeout = TimeSpan.FromSeconds(30);
+
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler()
+        {
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+            MaxConnectionsPerServer = 10,
+            PooledConnectionLifetime = TimeSpan.FromSeconds(120),
+            EnableMultipleHttp2Connections = true
+        });
     }
 }
