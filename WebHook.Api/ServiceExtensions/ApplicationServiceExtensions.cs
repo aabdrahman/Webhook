@@ -83,6 +83,7 @@ internal static class ApplicationServiceExtensions
     internal static void AddConfigurationModels(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
+        services.Configure<WebhookDeliveryWorkerConfiguration>(configuration.GetSection("WebhookDeliveryWorker"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
@@ -119,6 +120,7 @@ internal static class ApplicationServiceExtensions
     {
         services.AddHostedService<EventRaisedWorker>();
         services.AddHostedService<PendingRaisedEventsWorker>();
+        services.AddHostedService<WebhookDeliveryProcessorWorker>();
     }
 
     internal static void ConfigureHttpClient(this IServiceCollection services)

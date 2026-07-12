@@ -31,7 +31,7 @@ public sealed class WebhookDeliveryProcessorService
 
         try
         {
-            _logger.Information("Beging processing of pending deliveries.....");
+            _logger.Information("Begin processing of pending deliveries.....");
 
             List<WebhookDelivery> deliveriesToProcess = await _repositoryContext.WebhookDeliveries.FromSqlRaw
             (
