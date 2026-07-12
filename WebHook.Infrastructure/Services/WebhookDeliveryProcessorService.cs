@@ -35,8 +35,8 @@ public sealed class WebhookDeliveryProcessorService
 
             List<WebhookDelivery> deliveriesToProcess = await _repositoryContext.WebhookDeliveries.FromSqlRaw
             (
-                @" SELECT * FROM ""WebhookDeliveries"" WHERE ""DeliveryStatus"" = {@DeliveryStatus} FOR UPDATE SKIP LOCKED ", WebHook.Core.Constants.WebhookDeliveryStatus.Pending.ToString()
-            ).Where(x => !x.NextRetryAt.HasValue).OrderBy(x => x.CreatedAt).Take(totalToProcess).ToListAsync(ct);
+                @"SELECT * FROM ""WebhookDeliveries"" WHERE ""DeliveryStatus"" = {0} AND ""NextRetryAt"" IS NULL ORDER BY ""CreatedAt"" LIMIT {1} FOR UPDATE SKIP LOCKED", WebHook.Core.Constants.WebhookDeliveryStatus.Pending.ToString(), totalToProcess
+            ).ToListAsync(ct);
 
             if (!deliveriesToProcess.Any())
             {
@@ -74,10 +74,12 @@ public sealed class WebhookDeliveryProcessorService
                     {
                         delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Delivered;
                         delivery.DeliveredAt = attemptedTime;
+                        delivery.RetryCount++;
                     }
                     else
                     {
                         delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Failed;
+                        delivery.RetryCount++;
                         delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
                     }
                 }
@@ -102,7 +104,7 @@ public sealed class WebhookDeliveryProcessorService
 
                     }
                 );
-                _logger.Information("Saving webhook delivery attempt to the database....");
+                _logger.Information("Saving webhook delivery attempt and webhook delivery changes to the database....");
                 await _repositoryContext.SaveChangesAsync(requestCts.Token);
             }
 
