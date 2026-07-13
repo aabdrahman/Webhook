@@ -14,6 +14,7 @@ using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
+using WebhookServices;
 
 namespace WebHook.Api.ServiceExtensions;
 
@@ -121,6 +122,7 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<EventRaisedWorker>();
         services.AddHostedService<PendingRaisedEventsWorker>();
         services.AddHostedService<WebhookDeliveryProcessorWorker>();
+        services.AddHostedService<WebhookLongerPendingServiceBackground>();
     }
 
     internal static void ConfigureHttpClient(this IServiceCollection services)
