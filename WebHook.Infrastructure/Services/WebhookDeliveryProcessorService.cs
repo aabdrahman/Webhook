@@ -2,6 +2,7 @@
 using Serilog;
 using System.Diagnostics;
 using System.Text;
+using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Utilities;
@@ -35,7 +36,7 @@ public sealed class WebhookDeliveryProcessorService
 
             List<WebhookDelivery> deliveriesToProcess = await _repositoryContext.WebhookDeliveries.FromSqlRaw
             (
-                @"SELECT * FROM ""WebhookDeliveries"" WHERE ""DeliveryStatus"" = {0} AND ""NextRetryAt"" IS NULL ORDER BY ""CreatedAt"" LIMIT {1} FOR UPDATE SKIP LOCKED", WebHook.Core.Constants.WebhookDeliveryStatus.Pending.ToString(), totalToProcess
+                @"SELECT * FROM ""WebhookDeliveries"" WHERE ""DeliveryStatus"" = {0} AND ""NextRetryAt"" IS NULL ORDER BY ""CreatedAt"" LIMIT {1} FOR UPDATE SKIP LOCKED", WebhookDeliveryStatus.Pending.ToString(), totalToProcess
             ).ToListAsync(ct);
 
             if (!deliveriesToProcess.Any())
@@ -72,13 +73,13 @@ public sealed class WebhookDeliveryProcessorService
 
                     if (httpResponse.IsSuccessStatusCode)
                     {
-                        delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Delivered;
+                        delivery.DeliveryStatus = WebhookDeliveryStatus.Delivered;
                         delivery.DeliveredAt = attemptedTime;
                         delivery.RetryCount++;
                     }
                     else
                     {
-                        delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Failed;
+                        delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
                         delivery.RetryCount++;
                         delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
                     }
@@ -87,7 +88,7 @@ public sealed class WebhookDeliveryProcessorService
                 {
                     stopWatch.Stop();
                     _logger.Error(ex, "An error occurred while calling the endpoint: {0}", urlToCall);
-                    delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Failed;
+                    delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
                     delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
 
                 }

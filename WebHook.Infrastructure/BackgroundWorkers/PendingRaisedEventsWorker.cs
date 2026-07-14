@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Threading.Channels;
+using WebHook.Core.Constants;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.Data_Persistence;
 
@@ -43,7 +44,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
             DateTimeOffset thresholdDatetime = DateTimeOffset.UtcNow.AddMinutes(-30);
 
             List<Guid> pendingIds = await repositoryContext.WebhookEvents
-                                        .Where(x => x.Status == Core.Constants.WebHookEventStatus.Pending && x.CreatedAt <= thresholdDatetime)
+                                        .Where(x => x.Status == WebHookEventStatus.Pending && x.CreatedAt <= thresholdDatetime)
                                         .Select(x => x.Id)
                                         .ToListAsync(stoppingToken);
 
