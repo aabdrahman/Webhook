@@ -35,8 +35,8 @@ public sealed class RetryAfterPendingService
             _logger.Information("Begin processing deliveries to retry......");
 
             var deliveriesToReattmpt = await _repositoryContext.WebhookDeliveries
-                                                                        .FromSqlRaw(@"SELECT * FROM ""WebhookDeliveries"" WHERE ""RetryCount"" >= 1 AND ""DeliveryStatus"" = {0} AND ""NextRetryAt"" <= CURRENT_TIMESTAMP ORDER BY ""CreatedAt"" LIMIT {1} FOR UPDATE SKIP LOCKED", WebhookDeliveryStatus.Failed.ToString(), totalAttempts)
-                                                                        .ToListAsync(ct);
+                                                    .FromSqlRaw(@"SELECT * FROM ""WebhookDeliveries"" WHERE ""RetryCount"" >= 1 AND ""DeliveryStatus"" = {0} AND ""NextRetryAt"" <= CURRENT_TIMESTAMP ORDER BY ""CreatedAt"" LIMIT {1} FOR UPDATE SKIP LOCKED", WebhookDeliveryStatus.Failed.ToString(), totalAttempts)
+                                                    .ToListAsync(ct);
 
             //Instantiate the client factory
             var httpClient = _httpClientFactory.CreateClient("WebhookDeliveryClient");
@@ -57,7 +57,7 @@ public sealed class RetryAfterPendingService
 
                     if (httpResponse.IsSuccessStatusCode)
                     {
-                        delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Delivered;
+                        delivery.DeliveryStatus = WebhookDeliveryStatus.Delivered;
                         delivery.RetryCount++;
                         delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
                         delivery.DeliveredAt = attemptedTime;
@@ -73,7 +73,7 @@ public sealed class RetryAfterPendingService
                     }
                     else
                     {
-                        delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.Failed;
+                        delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
                         delivery.RetryCount++;
                         delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
 
@@ -101,7 +101,7 @@ public sealed class RetryAfterPendingService
                 //Also, a possibility of the escalation of long responding endpoints to be done after already saving the details.
                 if (delivery.RetryCount > maximumAttemptCount)
                 {
-                    delivery.DeliveryStatus = Core.Constants.WebhookDeliveryStatus.DeadLetter;
+                    delivery.DeliveryStatus = WebhookDeliveryStatus.DeadLetter;
                     delivery.webhookDeadLetterQueues.Add(new WebhookDeadLetterQueue()
                     {
                         Reason = $"Delivery attempted count exceeded threshold value: {maximumAttemptCount}",

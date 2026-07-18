@@ -85,6 +85,7 @@ internal static class ApplicationServiceExtensions
     {
         services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
         services.Configure<WebhookDeliveryWorkerConfiguration>(configuration.GetSection("WebhookDeliveryWorker"));
+        services.Configure<RetryDeliveresAfterFailedConfiguration>(configuration.GetSection("RetryDeliveriesAfterFailed"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
@@ -102,6 +103,7 @@ internal static class ApplicationServiceExtensions
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
+        services.AddScoped<RetryAfterPendingService>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -122,8 +124,8 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<EventRaisedWorker>();
         services.AddHostedService<PendingRaisedEventsWorker>();
         services.AddHostedService<WebhookDeliveryProcessorWorker>();
-        services.AddHostedService<WebhookLongerPendingServiceBackground>();
-        services.AddHostedService<WebhookLongerPendingServiceBackground>();
+        //services.AddHostedService<WebhookLongerPendingServiceBackground>();
+        services.AddHostedService<RetryPendingDeieveriesWorker>();
     }
 
     internal static void ConfigureHttpClient(this IServiceCollection services)
