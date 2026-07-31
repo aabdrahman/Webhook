@@ -104,6 +104,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
         services.AddScoped<RetryAfterPendingService>();
+        services.AddScoped<StaleClaimedDeliveryReleaseService>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)

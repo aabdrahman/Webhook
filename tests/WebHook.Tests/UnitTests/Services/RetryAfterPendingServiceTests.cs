@@ -19,26 +19,6 @@ namespace WebHook.IntegrationTests.Services;
 ///
 /// Uses Testcontainers PostgreSQL because the service uses:
 ///   FromSqlRaw("FOR UPDATE SKIP LOCKED") — PostgreSQL only
-///
-/// BUGS IDENTIFIED IN PRODUCTION CODE — flagged in relevant tests:
-///
-///   BUG 1: RetryCount > 1 in raw SQL excludes first-time retries (RetryCount = 1).
-///          Should be RetryCount >= 1 to include deliveries on their first retry.
-///
-///   BUG 2: On successful delivery, NextRetryAt is still set after incrementing
-///          RetryCount. A Delivered delivery should not have NextRetryAt set at all.
-///          Fix: remove the NextRetryAt assignment inside the success branch.
-///
-///   BUG 3: RetryCount is incremented on both success AND failure. On success
-///          the retry count is still incremented which inflates the count.
-///          Fix: only increment RetryCount on failure.
-///
-///   BUG 4: WebhookDeliveryAttempts and webhookDeadLetterQueues navigation
-///          properties must be initialised or loaded before .Add() is called
-///          otherwise a NullReferenceException is thrown at runtime.
-///          Fix: initialise collections in the entity constructor or use
-///          .Include() on the FromSqlRaw query.
-///
 /// Prerequisites:
 ///   - Docker running
 ///   - Testcontainers.PostgreSql 4.12.0
