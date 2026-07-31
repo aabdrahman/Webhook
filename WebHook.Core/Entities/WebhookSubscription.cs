@@ -10,6 +10,7 @@ public class WebhookSubscription
     public bool IsActive { get; set; } = true;
     public string SecretKey { get; set; }
     public List<string> SubscribedFields { get; set; } = [];
+    public string? ContactEmail { get; set; } = string.Empty;
 
     //RELATIONSHIPS
     //-----Many to Many relationship with the webhook event catalog

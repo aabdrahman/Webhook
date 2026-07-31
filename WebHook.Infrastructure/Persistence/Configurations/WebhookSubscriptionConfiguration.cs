@@ -28,6 +28,10 @@ public sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.SubscribedFields)
             .HasColumnType("jsonb");
 
+        builder.Property(x => x.ContactEmail)
+            .IsRequired(false)
+            .HasMaxLength(100);
+
         //RELATIONSHIPS
         builder.HasMany(x => x.WebhookEvents)
             .WithOne(x => x.webhookSubscription)
