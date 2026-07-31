@@ -17,33 +17,41 @@ public class RetryPendingDeieveriesWorker : BackgroundService
         _scopeFactory = scopeFactory;
         _retryDeliveresAfterFailedConfiguration = optionsMonitor.CurrentValue;
         _logger = Log.ForContext("ClassName", nameof(RetryPendingDeieveriesWorker));
-        periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(60));
     }
 
     private ILogger _logger;
-    private PeriodicTimer periodicTimer;
+
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using PeriodicTimer periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
         _logger = _logger.ForContext("MethodName", nameof(ExecuteAsync));
 
-        try
+        while (!stoppingToken.IsCancellationRequested && await periodicTimer.WaitForNextTickAsync(stoppingToken))
         {
-            while (!stoppingToken.IsCancellationRequested && await periodicTimer.WaitForNextTickAsync())
+            try
             {
+
                 _logger.Information("Begin processing failed webhook deliveries.....");
                 using var scope = _scopeFactory.CreateScope();
                 var retryService = scope.ServiceProvider.GetRequiredService<RetryAfterPendingService>();
+                var workerConfig = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>();
 
-                await retryService.RunRetryAfterFirstAttemptAsync(ct: stoppingToken, totalAttempts: _retryDeliveresAfterFailedConfiguration.TotalBatchSize,
-                                                                    maximumAttemptCount: _retryDeliveresAfterFailedConfiguration.MaximumAttendedCount, thresholdDuration: _retryDeliveresAfterFailedConfiguration.ThresholdDuration);
+                var retryDeliveresAfterFailedConfiguration = workerConfig.CurrentValue;
+
+                await retryService.RunRetryAfterFirstAttemptAsync(ct: stoppingToken, totalAttempts: retryDeliveresAfterFailedConfiguration.TotalBatchSize,
+                                                                    maximumAttemptCount: retryDeliveresAfterFailedConfiguration.MaximumAttendedCount, thresholdDuration: retryDeliveresAfterFailedConfiguration.ThresholdDuration);
 
                 _logger.Information("Failed webhook deliveries processed successfully....");
+                
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "An error occurrred while processing failed webhook deliveries......");
             }
         }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "An error occurrred while processing failed webhook deliveries......");
-        }
+
+       
     }
 }
