@@ -18,12 +18,22 @@ internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<We
 
         builder.ToTable(wd => wd.HasCheckConstraint("CK_WebhookDelivery_RetryCount", "\"RetryCount\" >= 0"));
 
+        builder.ToTable(wd => wd.HasCheckConstraint("CK_WebhookDelivery_DeliveredSttatus", "\"DeliveryStatus\" != 'Delivered' OR \"DeliveredAt\" IS NOT NULL"));
+
         builder.Property(x => x.RequestPayload)
             .IsRequired();
 
         builder.Property(x => x.RetryCount)
             .IsRequired()
             .HasDefaultValue(0);
+
+        builder.Property(x => x.LockedUntil)
+            .IsRequired(false);
+
+        builder.Property(x => x.LockedBy)
+            .IsRequired(false)
+            .HasMaxLength(100);
+
 
         builder.Property(x => x.DeliveryStatus)
             .HasConversion<string>()

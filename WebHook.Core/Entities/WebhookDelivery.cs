@@ -13,6 +13,10 @@ public class WebhookDelivery
     public WebhookDeliveryStatus DeliveryStatus { get; set; }
     public string CallBackUrl { get; set; }
 
+    //Claim and release properties
+    public string? LockedBy { get; set; }
+    public DateTimeOffset? LockedUntil { get; set; }
+
     //RELATIONSHIPS
     //------------One to many relationship with webhook subscription
     //public Guid WebhookSubscriptionId { get; set; }
