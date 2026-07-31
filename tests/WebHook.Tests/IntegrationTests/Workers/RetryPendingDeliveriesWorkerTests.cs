@@ -18,7 +18,7 @@ using Xunit;
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
 /// <summary>
-/// Integration tests for <see cref="RetryPendingDeieveriesWorker"/>.
+/// Integration tests for <see cref="RetryPendingDeliveriesWorker"/>.
 ///
 /// Uses Testcontainers PostgreSQL because <see cref="RetryAfterPendingService"/>
 /// uses FromSqlRaw with FOR UPDATE SKIP LOCKED — PostgreSQL only.
@@ -702,7 +702,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
 /// <see cref="PeriodicTimer"/> to tick.
 /// Only exists in the test project.
 /// </summary>
-internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeieveriesWorker
+internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeliveriesWorker
 {
     public TestableRetryPendingDeliveriesWorker(
         IServiceScopeFactory                                   scopeFactory,

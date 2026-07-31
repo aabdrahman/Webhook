@@ -125,7 +125,7 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<PendingRaisedEventsWorker>();
         services.AddHostedService<WebhookDeliveryProcessorWorker>();
         //services.AddHostedService<WebhookLongerPendingServiceBackground>();
-        services.AddHostedService<RetryPendingDeieveriesWorker>();
+        services.AddHostedService<RetryPendingDeliveriesWorker>();
     }
 
     internal static void ConfigureHttpClient(this IServiceCollection services)

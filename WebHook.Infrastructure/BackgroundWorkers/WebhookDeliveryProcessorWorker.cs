@@ -21,12 +21,14 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
 
     private ILogger _logger;
     private TimeSpan _timeout;
+    private Guid workerId;
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.Information(
             "WebhookDeliveryProcessorWorker starting. Tick interval: {Interval}s",
             _timeout.TotalSeconds);
+        workerId = Guid.CreateVersion7(DateTimeOffset.UtcNow);
         return base.StartAsync(cancellationToken);
     }
 
@@ -55,7 +57,7 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
                 var deliveryProcessor =
                     scope.ServiceProvider.GetRequiredService<WebhookDeliveryProcessorService>();
 
-                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess:_optionsMonitor.CurrentValue.TotalBatchSize, ct: stoppingToken);
+                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess:_optionsMonitor.CurrentValue.TotalBatchSize, ct: stoppingToken, lockDuration: _optionsMonitor.CurrentValue.DeliveryLockDuration, workerId: workerId.ToString());
 
                 _logger.Information("Webhook delivery processing completed.");
             }
