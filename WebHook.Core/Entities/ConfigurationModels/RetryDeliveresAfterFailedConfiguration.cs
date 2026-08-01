@@ -32,4 +32,3 @@ public class RetryDeliveresAfterFailedConfiguration
     /// </summary>
     public int RetryFailedDeliveryIntervalSeconds { get; set; } = 60;
 }
-

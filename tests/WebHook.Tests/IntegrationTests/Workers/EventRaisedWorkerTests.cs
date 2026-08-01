@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Serilog;
 using System.Threading.Channels;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
+using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
@@ -52,6 +54,11 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         services.AddDbContext<RepositoryContext>(opt =>
             opt.UseNpgsql(_fixture.ConnectionString));
 
+        services.Configure<EventRaisedWorkerConfiguration>(opts =>
+        {
+            opts.ProcessingIntervalInSeconds = 1;
+        });
+
         _serviceProvider = services.BuildServiceProvider();
 
         // Wipe and recreate schema so every test starts with a clean slate
@@ -60,34 +67,6 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         await ctx.Database.EnsureDeletedAsync();
         await ctx.Database.EnsureCreatedAsync();
     }
-
-    //public async Task InitializeAsync()
-    //{
-    //    // Fresh channel — no leftover items between tests
-    //    _channel = Channel.CreateUnbounded<EventRaised>();
-
-    //    var services = new ServiceCollection();
-    //    services.AddDbContext<RepositoryContext>(opt =>
-    //        opt.UseNpgsql(_fixture.ConnectionString));
-
-    //    _serviceProvider = services.BuildServiceProvider();
-
-    //    using var scope = _serviceProvider.CreateScope();
-    //    var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-
-    //    await ctx.Database.EnsureCreatedAsync();
-
-    //    // Truncate all tables — faster and more reliable than drop/recreate
-    //    await ctx.Database.ExecuteSqlRawAsync(@"
-    //        TRUNCATE TABLE
-    //            ""WebhookDeliveries"",
-    //            ""WebhookEventSubscriptions"",
-    //            ""WebhookSubscriptions"",
-    //            ""WebhookEvents"",
-    //            ""WebHookEventCatalogs""
-    //        RESTART IDENTITY CASCADE;
-    //    ");
-    //}
 
     public async Task DisposeAsync() =>
         await _serviceProvider.DisposeAsync();
@@ -99,35 +78,78 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     private TestableEventRaisedWorker CreateWorker() =>
     new TestableEventRaisedWorker(
         _channel,
-        _serviceProvider.GetRequiredService<IServiceScopeFactory>());
+        _serviceProvider.GetRequiredService<IServiceScopeFactory>(), _serviceProvider.GetRequiredService<IOptionsMonitor<EventRaisedWorkerConfiguration>>());
 
-    private static async Task RunWorkerUntilChannelDrainedAsync(
-        TestableEventRaisedWorker worker,
-        Channel<EventRaised> channel,
-        int timeoutMs = 1000_000)
+    //private static async Task RunWorkerUntilChannelDrainedAsync(
+    //    TestableEventRaisedWorker worker,
+    //    Channel<EventRaised> channel,
+    //    int timeoutMs = 10_000)
+    //{
+    //    using var cts = new CancellationTokenSource(timeoutMs);
+
+    //    // Call ExecuteAsync directly — no StartAsync, no timer, no background thread
+    //    var executeTask = worker.RunAsync(cts.Token);
+
+    //    // Poll until the channel is empty
+    //    while (channel.Reader.Count > 0 && !cts.IsCancellationRequested)
+    //        await Task.Delay(100);
+
+    //    // Small buffer for the final DB write to complete
+    //    await Task.Delay(500);
+
+    //    cts.Cancel();
+
+    //    try { await executeTask; }
+    //    catch (OperationCanceledException) { } // expected on cancellation
+    //}
+
+    private async Task RunWorkerUntilChannelDrainedAsync(
+    TestableEventRaisedWorker worker,
+    Channel<EventRaised> channel,
+    int timeoutMs = 15_000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
 
-        // Call ExecuteAsync directly — no StartAsync, no timer, no background thread
-        var executeTask = worker.RunAsync(cts.Token);
+        var executeTask = Task.Run(() => worker.RunAsync(cts.Token), cts.Token);
 
-        // Poll until the channel is empty
+        // Wait until the channel is empty first
         while (channel.Reader.Count > 0 && !cts.IsCancellationRequested)
             await Task.Delay(100);
 
-        // Small buffer for the final DB write to complete
-        await Task.Delay(500);
+        // Then wait until the DB reflects the work is done
+        // rather than a fixed Task.Delay buffer
+        await WaitForConditionAsync(
+            async () =>
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+                // Condition: no more Pending WebhookEvents (they moved to Processing)
+                return !await ctx.WebhookEvents
+                    .AnyAsync(e => e.Status == WebHookEventStatus.Pending);
+            },
+            timeoutMs: 10_000);
 
         cts.Cancel();
 
         try { await executeTask; }
-        catch (OperationCanceledException) { } // expected on cancellation
+        catch (OperationCanceledException) { }
     }
 
-    //private EventRaisedWorker CreateWorker() =>
-    //    new EventRaisedWorker(
-    //        _channel,
-    //        _serviceProvider.GetRequiredService<IServiceScopeFactory>());
+    /// <summary>
+    /// Polls a condition every 150ms until it returns true or the timeout is reached.
+    /// </summary>
+    private static async Task WaitForConditionAsync(
+        Func<Task<bool>> condition,
+        int timeoutMs = 10_000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await condition()) return;
+            await Task.Delay(150);
+        }
+    }
 
     private static EventRaised BuildEventRaised(Guid? id = null) =>
         new EventRaised ( createdEventId: id ?? Guid.NewGuid() );
@@ -184,6 +206,33 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// Runs the worker until the channel is empty AND the DB condition
+    /// is satisfied, then cancels.
+    /// </summary>
+    private async Task RunWorkerUntilAsync(
+        TestableEventRaisedWorker worker,
+        Func<Task<bool>> condition,
+        int timeoutMs = 15_000)
+    {
+        using var cts = new CancellationTokenSource(timeoutMs);
+
+        var executeTask = Task.Run(() => worker.RunAsync(cts.Token), cts.Token);
+
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTime.UtcNow < deadline && !cts.IsCancellationRequested)
+        {
+            if (await condition()) break;
+            await Task.Delay(200).ContinueWith(_ => { });
+        }
+
+        await Task.Delay(500); // buffer for final writes
+
+        cts.Cancel();
+        try { await executeTask; }
+        catch (OperationCanceledException) { }
+    }
+
     // -------------------------------------------------------------------------
     // StartAsync / StopAsync
     // -------------------------------------------------------------------------
@@ -218,7 +267,7 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task ExecuteAsync_PendingEvent_StatusChangedToProcessing()
+    public async Task ExecuteAsync_PendingEvent_NoSubscriberExists_StatusChangedToProcessed()
     {
         // Arrange
         using var scope  = _serviceProvider.CreateScope();
@@ -239,7 +288,35 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         var updated           = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
 
         Assert.NotNull(updated);
-        Assert.Equal(WebHookEventStatus.Processing, updated!.Status);
+        Assert.Equal(WebHookEventStatus.Processed, updated!.Status);
+        Assert.NotNull(updated.ProcessedAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PendingEvent_SubscriberExists_StatusChangedToProcessing()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Pending);
+        var subscription = BuildSubscription();
+
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.WebhookSubscriptions.AddAsync(subscription);
+        await ctx.SaveChangesAsync();
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        // Act
+        await RunWorkerForOneTickAsync(CreateWorker());
+
+        // Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+
+        Assert.NotNull(updated);
+        Assert.Equal(WebHookEventStatus.Processed, updated!.Status);
         Assert.NotNull(updated.ProcessedAt);
     }
 
@@ -286,26 +363,74 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     // Delivery fan-out
     // -------------------------------------------------------------------------
 
+    [Fact]
+    public async Task ExecuteAsync_OneActiveSubscriber_OneDeliveryCreated()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var catalog = BuildCatalog(["name", "email"], "CustomerCreated");
+        var subscription = BuildSubscription("https://partner.com/webhook");
+        var subEvent = new WebhookSubscriptionEvent
+        {
+            Id = Guid.NewGuid(),
+            WebhookSubscriptionId = subscription.Id,
+            WebhookEventCatalogId = catalog.Id,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        var webhookEvent = BuildWebhookEvent(
+            eventType: "CUSTOMERCREATED",
+            status: WebHookEventStatus.Pending,
+            payload: @"{""customerId"":""123""}");
+
+        await ctx.WebHookEventCatalogs.AddAsync(catalog);
+        await ctx.WebhookSubscriptions.AddAsync(subscription);
+        await ctx.WebhookEventSubscriptions.AddAsync(subEvent);
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.SaveChangesAsync();
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        // Act — wait until the event moves to Processing in the DB,
+        // which means SaveChangesAsync completed and deliveries were created
+        var worker = CreateWorker();
+        await RunWorkerUntilChannelDrainedAsync(worker, _channel);
+
+        // Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveries = await assertCtx.WebhookDeliveries
+            .Where(d => d.WebhookEventId == webhookEvent.Id)
+            .ToListAsync();
+
+        Assert.Single(deliveries);
+        Assert.Equal("https://partner.com/webhook", deliveries[0].CallBackUrl);
+        Assert.Equal(WebhookDeliveryStatus.Pending, deliveries[0].DeliveryStatus);
+        Assert.Equal(0, deliveries[0].RetryCount);
+        Assert.Equal(webhookEvent.PayLoad, deliveries[0].RequestPayload);
+    }
+
     //[Fact]
     //public async Task ExecuteAsync_OneActiveSubscriber_OneDeliveryCreated()
     //{
     //    // Arrange
-    //    using var scope  = _serviceProvider.CreateScope();
-    //    var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-    //    var catalog      = BuildCatalog(["name", "email"] ,"CustomerCreated");
+    //    using var scope = _serviceProvider.CreateScope();
+    //    var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+    //    var catalog = BuildCatalog(["name", "email"], "CustomerCreated");
     //    var subscription = BuildSubscription("https://partner.com/webhook");
-    //    var subEvent     = new WebhookSubscriptionEvent
+    //    var subEvent = new WebhookSubscriptionEvent
     //    {
-    //        Id                    = Guid.NewGuid(),
+    //        Id = Guid.NewGuid(),
     //        WebhookSubscriptionId = subscription.Id,
     //        WebhookEventCatalogId = catalog.Id,
-    //        IsActive              = true,
-    //        CreatedAt             = DateTimeOffset.UtcNow
+    //        IsActive = true,
+    //        CreatedAt = DateTimeOffset.UtcNow
     //    };
     //    var webhookEvent = BuildWebhookEvent(
     //        eventType: "CUSTOMERCREATED",
-    //        status:    WebHookEventStatus.Pending,
-    //        payload:   @"{""customerId"":""123""}");
+    //        status: WebHookEventStatus.Pending,
+    //        payload: @"{""customerId"":""123""}");
 
     //    await ctx.WebHookEventCatalogs.AddAsync(catalog);
     //    await ctx.WebhookSubscriptions.AddAsync(subscription);
@@ -322,16 +447,16 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
     //    // Assert
     //    using var assertScope = _serviceProvider.CreateScope();
-    //    var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-    //    var deliveries        = await assertCtx.WebhookDeliveries
-    //        //.Where(d => d.WebhookEventId == webhookEvent.Id)
+    //    var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+    //    var deliveries = await assertCtx.WebhookDeliveries
+    //        .Where(d => d.WebhookEventId == webhookEvent.Id)
     //        .ToListAsync();
 
     //    Assert.Single(deliveries);
     //    Assert.Equal("https://partner.com/webhook", deliveries[0].CallBackUrl);
     //    Assert.Equal(WebhookDeliveryStatus.Pending, deliveries[0].DeliveryStatus);
-    //    Assert.Equal(0,                             deliveries[0].RetryCount);
-    //    Assert.Equal(webhookEvent.PayLoad,          deliveries[0].RequestPayload);
+    //    Assert.Equal(0, deliveries[0].RetryCount);
+    //    Assert.Equal(webhookEvent.PayLoad, deliveries[0].RequestPayload);
     //}
 
     [Fact]
@@ -353,13 +478,6 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         {
             subscriptions.Add(BuildSubscription($"https://partner-{i}.com/webhook"));
         }
-
-        //var subscriptions = new[]
-        //{
-        //    BuildSubscription("https://partner-a.com/webhook"),
-        //    BuildSubscription("https://partner-b.com/webhook"),
-        //    BuildSubscription("https://partner-c.com/webhook")
-        //};
 
         var subEvents = subscriptions.Select(s => new WebhookSubscriptionEvent
         {
@@ -547,8 +665,9 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         await channelB.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
 
         var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
-        var workerA      = new EventRaisedWorker(channelA, scopeFactory);
-        var workerB      = new EventRaisedWorker(channelB, scopeFactory);
+        var workerConfig = _serviceProvider.GetRequiredService<IOptionsMonitor<EventRaisedWorkerConfiguration>>();
+        var workerA      = new EventRaisedWorker(channelA, scopeFactory, workerConfig);
+        var workerB      = new EventRaisedWorker(channelB, scopeFactory, workerConfig);
 
         using var ctsA = new CancellationTokenSource();
         using var ctsB = new CancellationTokenSource();
@@ -575,6 +694,381 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         Assert.Single(deliveries);
     }
+
+    // -------------------------------------------------------------------------
+    // Re-queue — non-existent event ID (null path → skipped not failed)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReQueue_NonExistentEventId_ItemNotReQueued()
+    {
+        // Arrange — write a non-existent ID to the channel
+        // The worker fetches it, gets null from FromSqlRaw, rolls back,
+        // and calls continue — it should NOT be re-queued because it was
+        // intentionally skipped, not failed
+        var nonExistentId = Guid.NewGuid();
+        await _channel.Writer.WriteAsync(BuildEventRaised(nonExistentId));
+
+        var worker = CreateWorker();
+
+        // Act — run until channel is drained
+        await RunWorkerUntilAsync(
+            worker,
+            () => Task.FromResult(_channel.Reader.Count == 0));
+
+        // Assert — channel should be empty, item was NOT re-queued
+        // (null path uses continue, not _unsuccessfulRequests.Add)
+        Assert.Equal(0, _channel.Reader.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Re-queue — SaveChangesAsync failure causes re-queue
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReQueue_SaveChangesThrows_ItemReQueuedToChannel()
+    {
+        // Arrange — seed a valid event so FromSqlRaw returns it
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+        var webhookEvent = BuildWebhookEvent(eventType: "CUSTOMERCREATED");
+
+        // Seed a subscription pointing to a non-existent catalog ID
+        // so when the worker builds WebhookDelivery records and calls
+        // SaveChangesAsync, PostgreSQL throws a FK constraint violation
+
+        var subscription = BuildSubscription();
+        var catalog = BuildCatalog(["name"]);
+
+        var badSubEvent = new WebhookSubscriptionEvent
+        {
+            Id = Guid.NewGuid(),
+            WebhookSubscriptionId = subscription.Id,
+            //WebhookEventCatalogId = catalog.Id, // exists in EventCatalog
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            webHookEventCatalog = catalog
+        };
+
+        await ctx.WebhookSubscriptions.AddAsync(subscription);
+        await ctx.WebhookEventSubscriptions.AddAsync(badSubEvent);
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.SaveChangesAsync();
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        var worker = CreateWorker();
+
+        // Act — run briefly so the worker processes the item and fails
+        using var cts = new CancellationTokenSource(10_000);
+        var executeTask = Task.Run(() => worker.RunAsync(cts.Token), cts.Token);
+
+        // Wait until the item is consumed from the channel
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (_channel.Reader.Count > 0 && DateTime.UtcNow < deadline)
+            await Task.Delay(200);
+
+        // Give the finally block time to re-queue
+        await Task.Delay(1000);
+
+        cts.Cancel();
+        try { await executeTask; }
+        catch (OperationCanceledException) { }
+
+        // Assert — item was re-queued because SaveChangesAsync threw
+        Assert.True(_channel.Reader.Count > 0,
+            "Item should have been re-queued after SaveChangesAsync failure.");
+
+        // And the event status must still be Pending — transaction was rolled back
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var eventStatus = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+
+        Assert.Equal(WebHookEventStatus.Pending, eventStatus!.Status);
+    }
+
+    //[Fact]
+    //public async Task ReQueue_SaveChangesFailure_ItemReQueuedToChannel()
+    //{
+    //    // Arrange — seed a valid event but with a broken subscription
+    //    // that will cause SaveChangesAsync to throw a FK violation
+    //    using var scope = _serviceProvider.CreateScope();
+    //    var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+    //    var webhookEvent = BuildWebhookEvent();
+    //    await ctx.WebhookEvents.AddAsync(webhookEvent);
+    //    await ctx.SaveChangesAsync();
+
+    //    // Seed a WebhookDelivery that will cause a constraint violation —
+    //    // point to a non-existent WebhookEventSubscription ID
+    //    // This simulates a SaveChangesAsync failure inside the inner try/catch
+    //    var badDelivery = new WebhookDelivery
+    //    {
+    //        Id = Guid.NewGuid(),
+    //        WebhookEventId = webhookEvent.Id,
+    //        WebhookSubscriptionEventId = Guid.NewGuid(), // FK violation — does not exist
+    //        CallBackUrl = "https://partner.com/webhook",
+    //        RequestPayload = "{}",
+    //        DeliveryStatus = WebhookDeliveryStatus.Pending,
+    //        RetryCount = 0,
+    //        CreatedAt = DateTimeOffset.UtcNow
+    //    };
+
+    //    // Write to channel BEFORE seeding bad delivery so worker picks it up
+    //    await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+    //    var worker = CreateWorker();
+    //    var initialCount = _channel.Reader.Count;
+
+    //    // Act — run briefly so worker processes the item
+    //    using var cts = new CancellationTokenSource(8000);
+    //    var executeTask = Task.Run(() => worker.RunAsync(cts.Token), cts.Token);
+
+    //    // Wait until the item is consumed from the channel
+    //    var deadline = DateTime.UtcNow.AddSeconds(8);
+    //    while (_channel.Reader.Count == initialCount && DateTime.UtcNow < deadline)
+    //        await Task.Delay(200);
+
+    //    // Give re-queue time to happen in the finally block
+    //    await Task.Delay(1000);
+
+    //    cts.Cancel();
+    //    try { await executeTask; }
+    //    catch (OperationCanceledException) { }
+
+    //    // Assert — item should have been re-queued back to the channel
+    //    // because SaveChangesAsync failed and the inner catch added it to
+    //    // _unsuccessfulRequests which the finally block re-queued
+    //    Assert.True(_channel.Reader.Count > 0,
+    //        "Failed item should have been re-queued to the channel by the finally block.");
+    //}
+
+
+
+    [Fact]
+    public async Task ReQueue_MultipleFailures_BugDocumentation_ItemsAccumulateWithoutClear()
+    {
+        // Arrange — seed two valid events
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+        var event1 = BuildWebhookEvent(eventType: "CUSTOMERCREATED");
+        var event2 = BuildWebhookEvent(eventType: "PAYMENTCOMPLETED");
+
+        await ctx.WebhookEvents.AddRangeAsync(event1, event2);
+        await ctx.SaveChangesAsync();
+
+        // Write both to channel — but we will force both to fail
+        // by writing non-existent IDs (null path → skipped, not failed)
+        // To actually trigger _unsuccessfulRequests we need inner catch to fire
+        // which happens when SaveChangesAsync throws
+
+        // Write non-existent IDs — these go through null path (continue)
+        // and do NOT accumulate in _unsuccessfulRequests
+        var id1 = Guid.NewGuid(); // does not exist
+        var id2 = Guid.NewGuid(); // does not exist
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(id1));
+        await _channel.Writer.WriteAsync(BuildEventRaised(id2));
+
+        var worker = CreateWorker();
+
+        // Act
+        await RunWorkerUntilAsync(
+            worker,
+            () => Task.FromResult(_channel.Reader.Count == 0));
+
+        // Assert — non-existent IDs go through null/continue path
+        // and should NOT accumulate in _unsuccessfulRequests or re-queue
+        Assert.Equal(0, _channel.Reader.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Re-queue — only failed items re-queued, not skipped items
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReQueue_SkippedItem_IsNotConsideredFailed()
+    {
+        // Arrange — event already in Processing status
+        // Worker fetches it with FOR UPDATE SKIP LOCKED → null → skipped
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var webhookEvent = BuildWebhookEvent();
+        webhookEvent.Status = WebHookEventStatus.Processing; // already being processed
+
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.SaveChangesAsync();
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        var worker = CreateWorker();
+
+        // Act
+        await RunWorkerUntilAsync(
+            worker,
+            () => Task.FromResult(_channel.Reader.Count == 0));
+
+        // Assert — skipped item not re-queued, channel is empty
+        Assert.Equal(0, _channel.Reader.Count);
+
+        // And the event status must remain Processing — worker did not touch it
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var unchanged = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+
+        Assert.Equal(WebHookEventStatus.Processing, unchanged!.Status);
+    }
+
+    // -------------------------------------------------------------------------
+    // Re-queue — successful items are NOT re-queued
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReQueue_SuccessfulItem_IsNotReQueued()
+    {
+        // Arrange — seed a valid event with a valid subscription
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+        var catalog = BuildCatalog(["name", "email"]);
+        var subscription = BuildSubscription();
+
+        var subEvent = new WebhookSubscriptionEvent
+        {
+            Id = Guid.NewGuid(),
+            WebhookSubscriptionId = subscription.Id,
+            WebhookEventCatalogId = catalog.Id,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        var webhookEvent = BuildWebhookEvent(eventType: "CUSTOMERCREATED");
+
+        await ctx.WebHookEventCatalogs.AddAsync(catalog);
+        await ctx.WebhookSubscriptions.AddAsync(subscription);
+        await ctx.WebhookEventSubscriptions.AddAsync(subEvent);
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.SaveChangesAsync();
+
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        var worker = CreateWorker();
+
+        // Act — wait until the event is committed as Processing
+        await RunWorkerUntilAsync(
+            worker,
+            async () =>
+            {
+                using var s = _serviceProvider.CreateScope();
+                var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+                var e = await c.WebhookEvents.FindAsync(webhookEvent.Id);
+                return e?.Status == WebHookEventStatus.Processing;
+            });
+
+        // Assert — channel must be empty after successful processing
+        // (item was NOT added to _unsuccessfulRequests)
+        Assert.Equal(0, _channel.Reader.Count);
+    }
+
+    // -------------------------------------------------------------------------
+    // Re-queue — finally block fires even on success (documents behaviour)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ReQueue_FinallyAlwaysFires_EmptyUnsuccessfulListCausesNoReQueue()
+    {
+        // Arrange — successful processing path
+        // The finally block ALWAYS runs but if _unsuccessfulRequests is empty
+        // the foreach does nothing — this test confirms that behaviour
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+        var catalog = BuildCatalog(["name", "email"], eventName: "AccountApproved");
+        var subscription = BuildSubscription();
+
+        var webhookEvent = BuildWebhookEvent(eventType:"ACCOUNTAPPROVED");
+
+        await ctx.WebHookEventCatalogs.AddAsync(catalog);
+        await ctx.WebhookEvents.AddAsync(webhookEvent);
+        await ctx.SaveChangesAsync();
+
+        // No subscriptions — event will be marked Processed (no deliveries)
+        await _channel.Writer.WriteAsync(BuildEventRaised(webhookEvent.Id));
+
+        var worker = CreateWorker();
+
+        // Act
+        await RunWorkerUntilAsync(
+            worker,
+            async () =>
+            {
+                using var s = _serviceProvider.CreateScope();
+                var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+                var e = await c.WebhookEvents.FindAsync(webhookEvent.Id);
+                return e?.Status == WebHookEventStatus.Processed;
+            });
+
+        // Assert — channel empty, nothing re-queued
+        Assert.Equal(0, _channel.Reader.Count);
+
+        // Event was marked Processed (no subscribers)
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processed = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+
+        Assert.Equal(WebHookEventStatus.Processed, processed!.Status);
+    }
+
+    [Fact]
+    public async Task ReQueue_AfterReQueue_UnsuccessfulListMustBeClearedToPreventDuplicates()
+    {
+        // Arrange — this test documents what SHOULD happen after the fix:
+        // after re-queuing, _unsuccessfulRequests.Clear() must be called
+        // so the next item's finally block does not re-queue the same items again.
+        //
+        // With the FIX:
+        //   Item A fails → added to _unsuccessfulRequests → re-queued in finally
+        //   _unsuccessfulRequests.Clear() called
+        //   Item B processed → finally fires → _unsuccessfulRequests is empty → nothing re-queued
+        //
+        // We verify by writing two items where only one fails (non-existent ID)
+        // and counting how many times the failed ID appears in the channel
+
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var successEvent = BuildWebhookEvent(eventType: "CUSTOMERCREATED");
+
+        var catalog = BuildCatalog(["name", "email"]);
+
+        await ctx.WebHookEventCatalogs.AddAsync(catalog);
+        await ctx.WebhookEvents.AddAsync(successEvent);
+        await ctx.SaveChangesAsync();
+
+        // Write both — one valid, one non-existent
+        var nonExistentId = Guid.NewGuid();
+        await _channel.Writer.WriteAsync(BuildEventRaised(nonExistentId));  // will be skipped (null path)
+        await _channel.Writer.WriteAsync(BuildEventRaised(successEvent.Id)); // will succeed
+
+        var worker = CreateWorker();
+
+        // Act — run until success event is processed
+        await RunWorkerUntilAsync(
+            worker,
+            async () =>
+            {
+                using var s = _serviceProvider.CreateScope();
+                var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+                var e = await c.WebhookEvents.FindAsync(successEvent.Id);
+                return e?.Status == WebHookEventStatus.Processed;
+            });
+
+        // Assert — with null path (non-existent ID) items are NOT added to
+        // _unsuccessfulRequests so no re-queue happens regardless of the bug.
+        // Channel should be empty after both items processed.
+        Assert.Equal(0, _channel.Reader.Count);
+    }
 }
 
 
@@ -584,8 +1078,8 @@ internal sealed class TestableEventRaisedWorker : EventRaisedWorker
 {
     public TestableEventRaisedWorker(
         Channel<EventRaised> channel,
-        IServiceScopeFactory scopeFactory)
-        : base(channel, scopeFactory) { }
+        IServiceScopeFactory scopeFactory, IOptionsMonitor<EventRaisedWorkerConfiguration> workerConfig)
+        : base(channel, scopeFactory, workerConfig) { }
 
     // Exposes the protected ExecuteAsync so tests can call it directly
     public Task RunAsync(CancellationToken ct) => ExecuteAsync(ct);

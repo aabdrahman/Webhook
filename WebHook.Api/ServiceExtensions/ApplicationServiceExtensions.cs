@@ -86,6 +86,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
         services.Configure<WebhookDeliveryWorkerConfiguration>(configuration.GetSection("WebhookDeliveryWorker"));
         services.Configure<RetryDeliveresAfterFailedConfiguration>(configuration.GetSection("RetryDeliveriesAfterFailed"));
+        services.Configure<EventRaisedWorkerConfiguration>(configuration.GetSection(""));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
