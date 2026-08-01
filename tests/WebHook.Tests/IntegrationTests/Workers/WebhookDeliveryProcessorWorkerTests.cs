@@ -82,6 +82,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         {
             opt.DeliveryProcessorIntervalSeconds = 1;
             opt.TotalBatchSize                = 10;
+            opt.DeliveryLockDuration = 60;
         });
 
         _serviceProvider = services.BuildServiceProvider();
@@ -524,27 +525,31 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     public async Task ExecuteAsync_BatchSizeLimit_OnlyProcessesUpToLimit()
     {
         // Arrange — 10 deliveries but batch size is 3
-        using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
-        var deliveries = Enumerable.Range(1, 10)
-            .Select(i => BuildPendingDelivery($"https://partner-{i}.com/webhook"))
-            .ToList();
+            var deliveries = Enumerable.Range(1, 10)
+                .Select(i => BuildPendingDelivery($"https://partner-{i}.com/webhook"))
+                .ToList();
 
-        await ctx.WebhookDeliveries.AddRangeAsync(deliveries);
-        await ctx.SaveChangesAsync();
+            await ctx.WebhookDeliveries.AddRangeAsync(deliveries);
+            await ctx.SaveChangesAsync();
+        }
+        
 
         // Override batch size to 3
-        _serviceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>()
-            .CurrentValue.TotalBatchSize = 3;
+        var currentWorkerConfig = (_serviceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>()).CurrentValue;
+        currentWorkerConfig.TotalBatchSize = 3;
+        currentWorkerConfig.DeliveryProcessorIntervalSeconds = 1;
 
         _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        RewireHttpHandler();
+        RewireHttpHandler(deliveryWorkerConfig: currentWorkerConfig);
 
         var worker = CreateWorker();
 
         // Run for just one tick worth of time
-        using var cts = new CancellationTokenSource(3000);
+        using var cts = new CancellationTokenSource(2000);
         try { await worker.RunAsync(cts.Token); }
         catch (OperationCanceledException) { }
 
@@ -744,7 +749,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     /// current <see cref="_httpHandler"/>. Called after reassigning
     /// <see cref="_httpHandler"/> in tests that need a specific response.
     /// </summary>
-    private void RewireHttpHandler()
+    private void RewireHttpHandler(WebhookDeliveryWorkerConfiguration deliveryWorkerConfig = null)
     {
         // Rebuild the service provider with the updated handler
         var services = new ServiceCollection();
@@ -758,11 +763,26 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
 
-        services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
+        if(deliveryWorkerConfig is null)
         {
-            opt.DeliveryProcessorIntervalSeconds = 1;
-            opt.TotalBatchSize                = 10;
-        });
+            services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
+            {
+                opt.DeliveryProcessorIntervalSeconds = 1;
+                opt.TotalBatchSize = 10;
+                opt.DeliveryLockDuration = 60;
+            });
+        }
+        else if(deliveryWorkerConfig is not null)
+        {
+            services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
+            {
+                opt.DeliveryProcessorIntervalSeconds = deliveryWorkerConfig.DeliveryProcessorIntervalSeconds;
+                opt.TotalBatchSize = deliveryWorkerConfig.TotalBatchSize;
+                opt.DeliveryLockDuration = deliveryWorkerConfig.DeliveryLockDuration;
+
+            });
+        }
+        
 
         _serviceProvider.Dispose();
         _serviceProvider = services.BuildServiceProvider();

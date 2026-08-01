@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Serilog;
 using System.Net;
-using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -13,7 +12,6 @@ using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.Services;
-using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -516,40 +514,32 @@ public sealed class RetryPendingDeliveriesWorkerTests
     [Fact]
     public async Task ExecuteAsync_BatchSizeFromConfiguration_OnlyProcessesUpToLimit()
     {
-        //_serviceProvider = BuildServiceProvider(
-        //            new RetryDeliveresAfterFailedConfiguration
-        //            {
-        //                TotalBatchSize = 3,
-        //                MaximumAttendedCount = 5,
-        //                ThresholdDuration = 30000
-        //            });
-
-        //using var scope = _serviceProvider.CreateScope();
         // Arrange — 10 retryable deliveries but batch size = 3
-        using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
-        var deliveries = Enumerable.Range(1, 10)
-            .Select(i => BuildRetryableDelivery(
-                callbackUrl: $"https://partner-{i}.com/webhook",
-                retryCount: 2))
-            .ToList();
+            var deliveries = Enumerable.Range(1, 10)
+                .Select(i => BuildRetryableDelivery(
+                    callbackUrl: $"https://partner-{i}.com/webhook",
+                    retryCount: 2))
+                .ToList();
 
-        await ctx.WebhookDeliveries.AddRangeAsync(deliveries);
-        await ctx.SaveChangesAsync();
+            await ctx.WebhookDeliveries.AddRangeAsync(deliveries);
+            await ctx.SaveChangesAsync();
+        }
 
         // Override batch size to 3
-        _serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>()
-            .CurrentValue.TotalBatchSize = 3;
-
-        //var configMock = new Mock<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>().Setup(x => x.CurrentValue).Returns(new RetryDeliveresAfterFailedConfiguration() { MaximumAttendedCount = 5, TotalBatchSize = 3, ThresholdDuration = 25000 });
+        var workerConfig = (_serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>()).CurrentValue;
+        workerConfig.TotalBatchSize = 3;
+        workerConfig.RetryFailedDeliveryIntervalSeconds = 1;
 
         _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        RewireHttpHandler();
+        RewireHttpHandler(workerConfig: workerConfig);
 
         var worker = CreateWorker();
 
-        using var cts = new CancellationTokenSource(15000);
+        using var cts = new CancellationTokenSource(2000);
         try { await worker.RunAsync(cts.Token); }
         catch (OperationCanceledException) { }
 
@@ -666,7 +656,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
     // Helper — rewire HTTP handler after reassignment
     // -------------------------------------------------------------------------
 
-    private void RewireHttpHandler()
+    private void RewireHttpHandler(RetryDeliveresAfterFailedConfiguration workerConfig = null)
     {
         var services = new ServiceCollection();
 
@@ -679,12 +669,30 @@ public sealed class RetryPendingDeliveriesWorkerTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
 
-        services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
+        if(workerConfig is null)
         {
-            opt.TotalBatchSize       = 10;
-            opt.MaximumAttendedCount = 5;
-            opt.ThresholdDuration    = 25000;
-        });
+            services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
+            {
+                opt.TotalBatchSize = 10;
+                opt.MaximumAttendedCount = 5;
+                opt.ThresholdDuration = 25000;
+                opt.StaleDeliveryReleaseIntervalSeconds = 1;
+                opt.RetryFailedDeliveryIntervalSeconds = 1;
+            });
+        }
+        else if(workerConfig is not null)
+        {
+            services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
+            {
+                opt.TotalBatchSize = workerConfig.TotalBatchSize;
+                opt.MaximumAttendedCount = workerConfig.MaximumAttendedCount;
+                opt.ThresholdDuration = workerConfig.ThresholdDuration;
+                opt.StaleDeliveryReleaseIntervalSeconds = workerConfig.StaleDeliveryReleaseIntervalSeconds;
+                opt.DeliveryLockDuration = 300;
+                opt.RetryFailedDeliveryIntervalSeconds = workerConfig.RetryFailedDeliveryIntervalSeconds;
+            });
+        }
+        
 
         _serviceProvider.Dispose();
         _serviceProvider = services.BuildServiceProvider();

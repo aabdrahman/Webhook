@@ -16,33 +16,29 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
         _scopeFactory = scopeFactory;
         _optionsMonitor = optionsMonitor;
         _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryProcessorWorker));
-        _timeout = TimeSpan.FromSeconds(optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds);
+        //_timeout = TimeSpan.FromSeconds(optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds);
     }
 
     private ILogger _logger;
-    private TimeSpan _timeout;
+    //private TimeSpan _timeout;
     private Guid workerId;
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information(
-            "WebhookDeliveryProcessorWorker starting. Tick interval: {Interval}s",
-            _timeout.TotalSeconds);
+        _logger.Information("WebhookDeliveryProcessorWorker starting. Tick interval: {0}s", 0);
         workerId = Guid.CreateVersion7(DateTimeOffset.UtcNow);
         return base.StartAsync(cancellationToken);
     }
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.Information(
-            "WebhookDeliveryProcessorWorker stopping at {Time}.",
-            DateTimeOffset.UtcNow);
+        _logger.Information("WebhookDeliveryProcessorWorker stopping at {Time}.", DateTimeOffset.UtcNow);
         return base.StopAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var periodicTimer = new PeriodicTimer(_timeout);
+        using var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(_optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds));
 
         _logger = _logger.ForContext("MethodName", nameof(ExecuteAsync));
 
@@ -57,7 +53,9 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
                 var deliveryProcessor =
                     scope.ServiceProvider.GetRequiredService<WebhookDeliveryProcessorService>();
 
-                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess:_optionsMonitor.CurrentValue.TotalBatchSize, ct: stoppingToken, lockDuration: _optionsMonitor.CurrentValue.DeliveryLockDuration, workerId: workerId.ToString());
+                var processorConfig = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>();
+
+                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess: processorConfig.CurrentValue.TotalBatchSize, ct: stoppingToken, lockDuration: processorConfig.CurrentValue.DeliveryLockDuration, workerId: workerId.ToString());
 
                 _logger.Information("Webhook delivery processing completed.");
             }

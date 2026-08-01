@@ -31,7 +31,7 @@ public class RetryPendingDeliveriesWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using PeriodicTimer periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        using PeriodicTimer periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(_retryDeliveresAfterFailedConfiguration.RetryFailedDeliveryIntervalSeconds));
 
         _logger = _logger.ForContext("MethodName", nameof(ExecuteAsync));
 
