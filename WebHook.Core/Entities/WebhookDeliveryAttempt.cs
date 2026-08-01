@@ -5,7 +5,7 @@ public class WebhookDeliveryAttempt
     public Guid Id { get; set; }
     public string HttpResponse { get; set; }
     public string HttpResponseCode { get; set; }
-    public long Duration { get; set; }
+    public double Duration { get; set; }
     public DateTimeOffset AttemptedAt { get; set; }
     public int AttemptedCount { get; set; }
 

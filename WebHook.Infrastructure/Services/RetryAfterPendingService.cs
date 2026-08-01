@@ -108,7 +108,7 @@ public sealed class RetryAfterPendingService
                             AttemptedCount = 1,
                             HttpResponse = responseContent,
                             HttpResponseCode = httpResponse.StatusCode.ToString(),
-                            Duration = (int)httpDuration
+                            Duration = httpDuration
                         });
                     }
                     else
@@ -126,7 +126,7 @@ public sealed class RetryAfterPendingService
                             AttemptedCount = 1,
                             HttpResponse = responseContent,
                             HttpResponseCode = httpResponse.StatusCode.ToString(),
-                            Duration = (int)httpDuration
+                            Duration = httpDuration
                         });
                        
                     }
@@ -148,7 +148,7 @@ public sealed class RetryAfterPendingService
                         AttemptedCount = 1,
                         HttpResponse = ex.Message,
                         HttpResponseCode = ex.StatusCode.HasValue ? ex.StatusCode.Value.ToString() : "500",
-                        Duration = (int)stopwatch.Elapsed.TotalMilliseconds
+                        Duration = stopwatch.Elapsed.TotalMilliseconds
                     });
                 }
 

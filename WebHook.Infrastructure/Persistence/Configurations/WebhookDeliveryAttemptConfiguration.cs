@@ -10,6 +10,10 @@ internal class WebhookDeliveryAttemptConfiguration : IEntityTypeConfiguration<We
     {
         builder.HasKey(x => x.Id);
 
+        builder.ToTable(table => table.HasCheckConstraint("CK_DeliveryAttempt_DurationGreaterThanZero", "\"Duration\" > 0"));
+
+        builder.ToTable(table => table.HasCheckConstraint("CK_DeliveryAttempt_AttemptedCountGreaterThanZero", "\"AttemptedCount\" > 0"));
+
         builder.Property(x => x.HttpResponse)
             .IsRequired();
 

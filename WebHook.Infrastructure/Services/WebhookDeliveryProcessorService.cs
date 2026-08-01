@@ -141,7 +141,7 @@ public sealed class WebhookDeliveryProcessorService
                     new WebhookDeliveryAttempt()
                     {
                         AttemptedAt = attemptedTime,
-                        Duration = (int)stopWatch.Elapsed.TotalMilliseconds,
+                        Duration = stopWatch.Elapsed.TotalMilliseconds,
                         HttpResponse = responseContent,
                         AttemptedCount = 1,
                         HttpResponseCode = httpResponseCode
