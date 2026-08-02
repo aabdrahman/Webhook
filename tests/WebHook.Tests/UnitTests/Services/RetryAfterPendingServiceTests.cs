@@ -1,16 +1,15 @@
-using MassTransit.Courier.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System.Net;
-using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
-using Xunit;
 
 namespace WebHook.IntegrationTests.Services;
 
@@ -36,6 +35,7 @@ public sealed class RetryAfterPendingServiceTests
     private MockHttpMessageHandler _httpHandler = null!;
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
+    private List<string> _encryptedSecrets = [];
 
     public RetryAfterPendingServiceTests(PostgreSqlFixture fixture)
     {
@@ -60,6 +60,8 @@ public sealed class RetryAfterPendingServiceTests
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -79,6 +81,13 @@ public sealed class RetryAfterPendingServiceTests
                 ""WebHookEventCatalogs""
             RESTART IDENTITY CASCADE;
         ");
+
+        var encryptor = _serviceProvider.GetRequiredService<IEncryptionService>();
+
+        _encryptedSecrets.AddRange
+        (
+            Enumerable.Range(1, 5).Select(i => encryptor.Encrypt(Random.Shared.GetHexString(32)))
+        );
 
         _webHookEventCatalogs = new List<WebHookEventCatalog>()
         {
@@ -113,7 +122,7 @@ public sealed class RetryAfterPendingServiceTests
         var retryAfterService = _serviceProvider
             .GetRequiredService<WebhookDeliveryRetryAfterService>();
 
-        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService);
+        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>());
     }
 
     /// <summary>
@@ -185,7 +194,7 @@ public sealed class RetryAfterPendingServiceTests
         NormalizedEventName = name.ToUpper()
     };
 
-    private static WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
     {
         var entityId = Guid.NewGuid();
 
@@ -196,7 +205,7 @@ public sealed class RetryAfterPendingServiceTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
-            SecretKey = Random.Shared.GetHexString(32),
+            SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };
     }

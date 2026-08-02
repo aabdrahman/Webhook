@@ -151,6 +151,7 @@ public sealed class WebhookDeliveryProcessorService
                     using var httpResponse = await httpClient.SendAsync(httpRequest, requestCts.Token);
                     stopWatch.Stop();
                     var httpDuration = stopWatch.Elapsed.TotalMilliseconds;
+                    _logger.Information("The callback reponds after - {0}ms", httpDuration);
                     responseContent = await httpResponse.Content.ReadAsStringAsync(requestCts.Token);
                     httpResponseCode = ((int)httpResponse.StatusCode).ToString();
 

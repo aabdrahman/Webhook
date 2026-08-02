@@ -7,8 +7,10 @@ using System.Net;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.Services;
@@ -38,6 +40,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
     private MockHttpMessageHandler _httpHandler = null!;
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
+    private List<string> _encryptedSecrets = [];
 
     public RetryPendingDeliveriesWorkerTests(PostgreSqlFixture fixture)
     {
@@ -63,6 +66,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
 
         // Short tick interval so tests do not wait 60 seconds
         services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
@@ -90,6 +95,13 @@ public sealed class RetryPendingDeliveriesWorkerTests
                 ""WebHookEventCatalogs""
             RESTART IDENTITY CASCADE;
         ");
+
+        var encryptor = _serviceProvider.GetRequiredService<IEncryptionService>();
+
+        _encryptedSecrets.AddRange
+        (
+            Enumerable.Range(1, 5).Select(i => encryptor.Encrypt(Random.Shared.GetHexString(32)))
+        );
 
         _webHookEventCatalogs = new List<WebHookEventCatalog>()
         {
@@ -174,7 +186,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
         AvailableFields = subscribedFields.ToDictionary(f => f, f => "string")
     };
 
-    private static WebhookSubscription BuildSubscription(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildSubscription(string entityName, List<Guid> eventIds, string url = "https://example.com/")
     {
         var entityId = Guid.NewGuid();
 
@@ -185,7 +197,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
-            SecretKey = Random.Shared.GetHexString(32),
+            SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };
     }
@@ -668,6 +680,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
 
         if(workerConfig is null)
         {

@@ -3,7 +3,9 @@ using Serilog;
 using System.Diagnostics;
 using System.Text;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Utilities;
 
@@ -14,13 +16,17 @@ public sealed class RetryAfterPendingService
     private readonly RepositoryContext _repositoryContext;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WebhookDeliveryRetryAfterService _retryAfterService;
+    private readonly IEncryptionService _encryptionService;
+    private readonly ISignatureService _signatureService;
 
-    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService)
+    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService, ISignatureService signatureService)
     {
         _repositoryContext = repositoryContext;
-        _logger = Log.ForContext("ClassName", nameof(RetryAfterPendingService));
         _httpClientFactory = httpClientFactory;
         _retryAfterService = retryAfterService;
+        _encryptionService = encryptionService;
+        _signatureService = signatureService;
+        _logger = Log.ForContext("ClassName", nameof(RetryAfterPendingService));
     }
 
     private ILogger _logger;
@@ -72,7 +78,23 @@ public sealed class RetryAfterPendingService
                 await transaction.RollbackAsync(ct);
                 return;
             }
-            
+
+            //After successful locking of the selected deliveries, we now get the metadata necessary for sending webhook to callback url for the deliveries.
+            var deliveryIds = deliveriesToReattmpt.Select(x => x.Id).ToList();
+
+            //Get teh metadata hosted in the otehr tables from database.
+            var deliveriesMetadata = await _repositoryContext.WebhookDeliveries      
+                                                        .Where(x => deliveryIds.Contains(x.Id))
+                                                        .Select(x => new WebhookDeliveryProcessorMetadataDto() { DeliveryId = x.Id, EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, RaisedEventName = x.webhookEvent.EventType.ToUpper() })
+                                                        .ToDictionaryAsync(x => x.DeliveryId, ct);
+
+            //Validate the delivery metadata to ensure all necessary itesms are fetched.
+            if(deliveriesMetadata.Count != deliveryIds.Count)
+            {
+                _logger.Error("An error occurred while fetching metadata. The count of the delivery ids - {0} is not the same as that of the fetced metadata - {1}", deliveryIds.Count, deliveriesMetadata.Count);
+                return; //This is returned and lock not released because there is a seperate worker that releases locked deliveries.
+            }
+
 
             //Instantiate the client factory.
             var httpClient = _httpClientFactory.CreateClient("WebhookDeliveryClient");
@@ -81,14 +103,33 @@ public sealed class RetryAfterPendingService
             foreach (WebhookDelivery delivery in deliveriesToReattmpt)
             {
                 DateTimeOffset attemptedTime = DateTimeOffset.UtcNow;
+
+                if(!deliveriesMetadata.TryGetValue(delivery.Id, out var deliveryMetadata))
+                {
+                    _logger.Error("Delivery metadata does not exists for delivery - {0}", delivery.Id);
+                    continue; //This continues to other delivery in the loop.
+                }
+
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct); //A scoped per-delivery cancellation token created from teh main one. this ensures that each delivery has its own cancellation 
                 try
                 {
                     _logger.Information("Pushing the request to the callback url - {0} - {1}", delivery.CallBackUrl, delivery.RequestPayload);
-                    using var content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json");
-                    using var httpResponse = await httpClient.PostAsync(delivery.CallBackUrl, content, cancellationToken: requestCts.Token);
+
+                    //Create the http request item for the delivery to send to callback url.
+                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(delivery.CallBackUrl))
+                    {
+                        Content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json")
+                    };
+
+                    httpRequest.Headers.Add("X-Webhook-Timestamp", attemptedTime.ToUnixTimeSeconds().ToString());
+                    httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName);
+                    httpRequest.Headers.Add("-Webhook-Signature", _signatureService.GenerateSignature(delivery.RequestPayload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
+
+                    //using var content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json");
+                    //using var httpResponse = await httpClient.PostAsync(delivery.CallBackUrl, content, cancellationToken: requestCts.Token);
+                    using var httpResponse = await httpClient.SendAsync(httpRequest, requestCts.Token);
                     stopwatch.Stop();
                     var httpDuration = stopwatch.Elapsed.TotalMilliseconds;
                     var responseContent = await httpResponse.Content.ReadAsStringAsync();
