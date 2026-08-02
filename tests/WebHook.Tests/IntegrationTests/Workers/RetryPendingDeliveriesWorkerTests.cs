@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Moq;
 using Serilog;
@@ -14,6 +17,8 @@ using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.Services;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -68,6 +73,17 @@ public sealed class RetryPendingDeliveriesWorkerTests
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddSingleton<EmailContentFormatterHelper>();
+
+        var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        services.AddSingleton<IWebHostEnvironment>(environment);
 
         // Short tick interval so tests do not wait 60 seconds
         services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
@@ -682,8 +698,18 @@ public sealed class RetryPendingDeliveriesWorkerTests
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddSingleton<EmailContentFormatterHelper>();
+        var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
 
-        if(workerConfig is null)
+        services.AddSingleton<IWebHostEnvironment>(environment);
+
+        if (workerConfig is null)
         {
             services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
             {
@@ -736,4 +762,22 @@ internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeliver
     /// No background thread, no StartAsync overhead, no 60-second timer wait.
     /// </summary>
     public Task RunAsync(CancellationToken ct) => ExecuteAsync(ct);
+}
+
+public sealed class TestWebHostEnvironment : IWebHostEnvironment
+{
+    public string ApplicationName { get; set; } = string.Empty;
+
+    public string EnvironmentName { get; set; } = Environments.Development;
+
+    public string WebRootPath { get; set; } = string.Empty;
+
+    public IFileProvider WebRootFileProvider { get; set; }
+        = new NullFileProvider();
+
+    public string ContentRootPath { get; set; }
+        = AppContext.BaseDirectory;
+
+    public IFileProvider ContentRootFileProvider { get; set; }
+        = new PhysicalFileProvider(AppContext.BaseDirectory);
 }

@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Net;
 using WebHook.Core.Constants;
@@ -62,6 +65,17 @@ public sealed class RetryAfterPendingServiceTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddSingleton<EmailContentFormatterHelper>();
+
+        var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        services.AddSingleton<IWebHostEnvironment>(environment);
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -94,7 +108,7 @@ public sealed class RetryAfterPendingServiceTests
             BuildCatalogEntity(new List<string>() { "customerId", "customerName" }, "CustomerCreated"),
             BuildCatalogEntity(new List<string>() { "orderId", "orderAmount" }, "OrderPlaced"),
             BuildCatalogEntity(new List<string>() { "paymentId", "paymentStatus" }, "PaymentProcessed"),
-            BuildCatalogEntity(new List<string>() { "shipmentId", "shipmentStatus" }, "ShipmentDispatched"),
+            BuildCatalogEntity(new List<string>() { "shipmentId", "shipmentStatus" }, "ShipmentDispatched")
         };
 
         _webhookSubscriptions = new List<WebhookSubscription>()
@@ -122,7 +136,7 @@ public sealed class RetryAfterPendingServiceTests
         var retryAfterService = _serviceProvider
             .GetRequiredService<WebhookDeliveryRetryAfterService>();
 
-        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>());
+        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>());
     }
 
     /// <summary>

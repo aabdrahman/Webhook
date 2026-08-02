@@ -18,14 +18,18 @@ public sealed class RetryAfterPendingService
     private readonly WebhookDeliveryRetryAfterService _retryAfterService;
     private readonly IEncryptionService _encryptionService;
     private readonly ISignatureService _signatureService;
+    private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
 
-    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService, ISignatureService signatureService)
+    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, 
+                                    WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService, 
+                                    ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper)
     {
         _repositoryContext = repositoryContext;
         _httpClientFactory = httpClientFactory;
         _retryAfterService = retryAfterService;
         _encryptionService = encryptionService;
         _signatureService = signatureService;
+        _emailContentFormatterHelper = emailContentFormatterHelper;
         _logger = Log.ForContext("ClassName", nameof(RetryAfterPendingService));
     }
 
@@ -37,7 +41,7 @@ public sealed class RetryAfterPendingService
 
         try
         {
-            _logger.Information("Begin processing deliveries to retry......");
+            _logger.Information("Begin processing deliveries to retry with parameters: BatchSize - {0}, maximumAttemptedCount - {1}, ThresholdDuration - {2}, WorkerId - {3}, LockDuration - {4}......", totalAttempts, maximumAttemptCount, thresholdDuration, workerId, lockDuration);
 
             //Create the transaction for the select for update
             await using var transaction = await _repositoryContext.Database.BeginTransactionAsync(ct);
@@ -85,7 +89,19 @@ public sealed class RetryAfterPendingService
             //Get teh metadata hosted in the otehr tables from database.
             var deliveriesMetadata = await _repositoryContext.WebhookDeliveries      
                                                         .Where(x => deliveryIds.Contains(x.Id))
-                                                        .Select(x => new WebhookDeliveryProcessorMetadataDto() { DeliveryId = x.Id, EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, RaisedEventName = x.webhookEvent.EventType.ToUpper() })
+                                                        .Select(x => new WebhookDeliveryProcessorMetadataDto() 
+                                                                        { 
+                                                                            DeliveryId = x.Id, 
+                                                                            EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, 
+                                                                            RaisedEventName = x.webhookEvent.EventType.ToUpper(), 
+                                                                            ContactEmail = x.WebhookSubscriptionEvent.webhookSubscription.ContactEmail ?? "",
+                                                                            ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                                            SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                                            AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
+                                                                            FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
+                                                                            FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
+                                                                            EventId = x.WebhookSubscriptionEvent.Id
+                                                                        })
                                                         .ToDictionaryAsync(x => x.DeliveryId, ct);
 
             //Validate the delivery metadata to ensure all necessary itesms are fetched.
@@ -111,6 +127,7 @@ public sealed class RetryAfterPendingService
                 }
 
                 var stopwatch = new Stopwatch();
+                string httpResponseStatusCode = string.Empty;
                 stopwatch.Start();
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct); //A scoped per-delivery cancellation token created from teh main one. this ensures that each delivery has its own cancellation 
                 try
@@ -133,6 +150,7 @@ public sealed class RetryAfterPendingService
                     stopwatch.Stop();
                     var httpDuration = stopwatch.Elapsed.TotalMilliseconds;
                     var responseContent = await httpResponse.Content.ReadAsStringAsync();
+                    httpResponseStatusCode = httpResponse.StatusCode.ToString();
                     _logger.Information("The callback reponds after - {0}ms", stopwatch.Elapsed.TotalMilliseconds);
 
                     if (httpResponse.IsSuccessStatusCode)
@@ -176,6 +194,7 @@ public sealed class RetryAfterPendingService
                 catch (HttpRequestException ex)
                 {
                     _logger.Error(ex, "An erroor ocurred while pushing the webhook.....");
+                    httpResponseStatusCode = ex.StatusCode.HasValue ? ex.StatusCode.Value.ToString() : "500";
                     delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
                     delivery.RetryCount++;
                     delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
@@ -217,9 +236,80 @@ public sealed class RetryAfterPendingService
                     else
                         _logger.Warning("Webhook could not be delivered for delivery - {0}", delivery.Id);
 
-                    if (stopwatch.Elapsed.TotalMilliseconds > thresholdDuration)
+                    DateTimeOffset notificationTimestamp = DateTimeOffset.UtcNow;
+                    //Escalation for the deadletter queue.
+                    if(delivery.DeliveryStatus == WebhookDeliveryStatus.DeadLetter)
                     {
+                        _logger.Information("Getting mail notification content for deadletter queue for delivery - {0}", delivery.Id);
 
+                        if (string.IsNullOrEmpty(deliveryMetadata.ContactEmail))
+                        {
+                            _logger.Warning("No contact email is profiled for the subscription - {0} to escaltae delivery dead letter - {1}", deliveryMetadata.SubscriptionName, deliveryMetadata.DeliveryId);
+                            continue;
+                        }
+
+                        Dictionary<string, string> mailContentParametrs = new Dictionary<string, string>()
+                        {
+                            { "ContactName", deliveryMetadata.ContactName },
+                            { "ContactEmail",deliveryMetadata.ContactEmail },
+                            { "SubscriptionName", deliveryMetadata.SubscriptionName },
+                            { "CallbackUrl", delivery.CallBackUrl },
+                            { "DeliveryId", delivery.Id.ToString() },
+                            { "RetryCount", delivery.RetryCount.ToString() },
+                            { "EventId", deliveryMetadata.EventId.ToString() },
+                            { "EventType", deliveryMetadata.RaisedEventName },
+                            { "MaxRetryCount" , maximumAttemptCount.ToString()},
+                            { "FirstAttemptedAt", deliveryMetadata.FirstAttemptedAt.Value.ToString("R") },
+                            { "LastAttemptedAt", attemptedTime.ToString("R") },
+                            { "NotificationTimestamp", notificationTimestamp.ToString("R") },
+                            { "DeliveryHistoryUrl", "" },
+                            { "SubscriptionManagementUrl", "" },
+                            { "FirstFailureCode", deliveryMetadata?.FirstAttemptedResponseCode?.ToString() ?? "" }
+                        };
+
+                        var mailContentToSend = await _emailContentFormatterHelper.GetEmailContentAsync(NotificationType.DeadLetterNotification, mailContentParametrs);
+
+                        if (string.IsNullOrWhiteSpace(mailContentToSend))
+                        {
+                            _logger.Warning("Mail content for the escalation could not be fetched for delivery - {0}. Mail send abolished....", delivery.Id);
+                            continue;
+                        }
+                    }
+
+                    //Escalation when the HTTP call exceeds the threshold duration.
+                    if (stopwatch.Elapsed.TotalMilliseconds > thresholdDuration && delivery.DeliveryStatus != WebhookDeliveryStatus.DeadLetter)
+                    {
+                        if (string.IsNullOrEmpty(deliveryMetadata.ContactEmail))
+                        {
+                            _logger.Warning("No contact email is profiled for the 4subscription - {0} to escaltae delivery - {1}", deliveryMetadata.SubscriptionName, deliveryMetadata.DeliveryId);
+                            continue;
+                        }
+
+                        Dictionary<string, string> mailContentParameters = new Dictionary<string, string>()
+                        {
+                            { "ContactName", deliveryMetadata.ContactName },
+                            { "ContactEmail",deliveryMetadata.ContactEmail },
+                            { "SubscriptionName", deliveryMetadata.SubscriptionName },
+                            { "CallbackUrl", delivery.CallBackUrl },
+                            { "DeliveryId", delivery.Id.ToString() },
+                            { "EventType", deliveryMetadata.RaisedEventName },
+                            { "ResponseTimeMs", stopwatch.Elapsed.TotalMilliseconds.ToString("N2") },
+                            { "AverageResponseTime", deliveryMetadata.AverageResponseTime.Value.ToString("N2") },
+                            { "ThresholdMs", thresholdDuration.ToString("N2") },
+                            { "HttpStatusCode", httpResponseStatusCode },
+                            { "DetectedAt", attemptedTime.ToString("R") },
+                            { "NotificationTimestamp", notificationTimestamp.ToString("R") },
+                            { "DeliveryHistoryUrl", "" },
+                            { "SubscriptionManagementUrl", "" }
+                        };
+
+                        string? mailContentToSend = await _emailContentFormatterHelper.GetEmailContentAsync(NotificationType.SlowEndpointNotification, mailContentParameters);
+
+                        if (string.IsNullOrWhiteSpace(mailContentToSend))
+                        {
+                            _logger.Warning("Mail content for the escalation could not be fetched for delivery - {0}. Mail send abolished....", delivery.Id);
+                            continue;
+                        }
                     }
                 }
                 catch (Exception ex)
