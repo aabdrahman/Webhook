@@ -141,7 +141,7 @@ public class WebhookEventCatalogControllerTests
         Assert.NotNull(result);
         Assert.False(body.IsSuccessful);
         Assert.NotNull(body);
-        Assert.Equal((int)objResult.StatusCode, (int)HttpStatusCode.Conflict);
+        Assert.Equal((int)HttpStatusCode.Conflict, (int)objResult.StatusCode);
     }
 
     [Fact]

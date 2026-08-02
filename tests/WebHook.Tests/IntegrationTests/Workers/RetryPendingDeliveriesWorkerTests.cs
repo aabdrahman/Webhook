@@ -7,7 +7,9 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Serilog;
 using System.Net;
+using System.Threading.Channels;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
@@ -17,8 +19,6 @@ using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.Services;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.FileProviders;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -68,6 +68,15 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         services.AddHttpClient("WebhookDeliveryClient")
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
+
+        //Channel
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            {
+
+            });
+        });
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
@@ -693,6 +702,15 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         services.AddHttpClient("WebhookDeliveryClient")
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
+
+        //Channel
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            {
+
+            });
+        });
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();

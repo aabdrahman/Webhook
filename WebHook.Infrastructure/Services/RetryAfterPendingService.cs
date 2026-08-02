@@ -2,7 +2,9 @@
 using Serilog;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
 using WebHook.Core.Interfaces.Helpers;
@@ -19,10 +21,11 @@ public sealed class RetryAfterPendingService
     private readonly IEncryptionService _encryptionService;
     private readonly ISignatureService _signatureService;
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
+    private readonly Channel<EmailSenderDto> _emailSenderChannel;
 
-    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, 
-                                    WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService, 
-                                    ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper)
+    public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory,
+                                    WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService,
+                                    ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper, Channel<EmailSenderDto> emailSenderChannel)
     {
         _repositoryContext = repositoryContext;
         _httpClientFactory = httpClientFactory;
@@ -30,6 +33,8 @@ public sealed class RetryAfterPendingService
         _encryptionService = encryptionService;
         _signatureService = signatureService;
         _emailContentFormatterHelper = emailContentFormatterHelper;
+        _emailSenderChannel = emailSenderChannel;
+
         _logger = Log.ForContext("ClassName", nameof(RetryAfterPendingService));
     }
 
@@ -274,6 +279,9 @@ public sealed class RetryAfterPendingService
                             _logger.Warning("Mail content for the escalation could not be fetched for delivery - {0}. Mail send abolished....", delivery.Id);
                             continue;
                         }
+
+                        //Begin formatting the email to queue for processing.
+                        await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback URL Disabled Due to Repeated Delivery Failures", MailRecipients: [deliveryMetadata.ContactEmail]));
                     }
 
                     //Escalation when the HTTP call exceeds the threshold duration.
@@ -310,6 +318,9 @@ public sealed class RetryAfterPendingService
                             _logger.Warning("Mail content for the escalation could not be fetched for delivery - {0}. Mail send abolished....", delivery.Id);
                             continue;
                         }
+
+                        //Begin formatting the email to queue for processing.
+                        await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
                     }
                 }
                 catch (Exception ex)

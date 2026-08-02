@@ -20,7 +20,7 @@ public class EmailService : IEmailService
 
     private ILogger _logger;
 
-    public async Task<bool> SendMailAsync(EmailSenderDto emailSenderItem)
+    public async Task<bool> SendMailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default)
     {
         _logger = _logger.ForContext("MethodName", nameof(SendMailAsync));
 
@@ -33,6 +33,12 @@ public class EmailService : IEmailService
             if (string.IsNullOrEmpty(smtpPassword))
             {
                 _logger.Error("An errror occurred while sending email. No password has been profiled in the environment for send mail.");
+                return false;
+            }
+
+            if(!emailSenderItem.MailRecipients.Any() || emailSenderItem.MailRecipients is null)
+            {
+                _logger.Warning("Cannot proceed to send mail as the recipient is either null or empty....");
                 return false;
             }
 
@@ -55,7 +61,7 @@ public class EmailService : IEmailService
                 mailMessage.To.Add(recipient);
             }
 
-            await smtpClient.SendMailAsync(message: mailMessage);
+            await smtpClient.SendMailAsync(message: mailMessage, cancellationToken: ct);
             _logger.Information("Mail sent successfully....");
             return true;
         }

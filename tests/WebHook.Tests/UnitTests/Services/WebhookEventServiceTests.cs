@@ -368,6 +368,7 @@ public class WebhookEventServiceTests
         Assert.Equal(2, result.ResponseData.Count);
     }
 
+    [Fact]
     public async Task GetWebhookEventsAsync_Should_Filter_By_CorrelationId()
     {
         //Arrange
@@ -391,6 +392,7 @@ public class WebhookEventServiceTests
         Assert.Equal(2, result.ResponseData.Count);
     }
 
+    [Fact]
     public async Task GetWebhookEventsAsync_Should_Filter_By_CreatedAtRange()
     {
         //Arrange

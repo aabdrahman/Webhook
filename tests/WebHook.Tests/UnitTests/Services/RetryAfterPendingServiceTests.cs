@@ -5,7 +5,9 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Net;
+using System.Threading.Channels;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
@@ -61,6 +63,15 @@ public sealed class RetryAfterPendingServiceTests
 
         services.AddHttpClient("WebhookDeliveryClient")
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
+
+        //Channel
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            {
+
+            });
+        });
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
@@ -136,7 +147,7 @@ public sealed class RetryAfterPendingServiceTests
         var retryAfterService = _serviceProvider
             .GetRequiredService<WebhookDeliveryRetryAfterService>();
 
-        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>());
+        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), _serviceProvider.GetRequiredService<Channel<EmailSenderDto>>());
     }
 
     /// <summary>

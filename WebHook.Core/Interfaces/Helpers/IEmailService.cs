@@ -4,5 +4,5 @@ namespace WebHook.Core.Interfaces.Helpers;
 
 public interface IEmailService
 {
-    Task<bool> SendMailAsync(EmailSenderDto emailSenderItem);
+    Task<bool> SendMailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default);
 }
