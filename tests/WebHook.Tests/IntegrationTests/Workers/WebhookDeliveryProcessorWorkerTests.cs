@@ -9,9 +9,11 @@ using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.Services;
@@ -47,6 +49,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     private MockHttpMessageHandler _httpHandler = null!;
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
+    private List<string> _encryptedSecrets = [];
 
     public WebhookDeliveryProcessorWorkerTests(PostgreSqlFixture fixture)
     {
@@ -77,6 +80,10 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
 
+        //Add the signature and encrptor services.
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
+
         // Worker configuration — 1 second tick so timer-based tests are fast
         services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
         {
@@ -90,6 +97,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         // Create schema once, truncate between tests
         using var scope = _serviceProvider.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var encryptor = _serviceProvider.GetRequiredService<IEncryptionService>();
         await ctx.Database.EnsureCreatedAsync();
 
         await ctx.Database.ExecuteSqlRawAsync(@"
@@ -102,6 +110,11 @@ public sealed class WebhookDeliveryProcessorWorkerTests
                 ""WebHookEventCatalogs""
             RESTART IDENTITY CASCADE;
         ");
+
+        _encryptedSecrets.AddRange
+        (
+            Enumerable.Range(1, 5).Select(i => encryptor.Encrypt(Random.Shared.GetHexString(32))).ToList()
+        );
 
         _webHookEventCatalogs = new List<WebHookEventCatalog>()
         {
@@ -175,7 +188,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         NormalizedEventName = name.ToUpper()
     };
 
-    private static WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
     {
         var entityId = Guid.NewGuid();
 
@@ -186,7 +199,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
-            SecretKey = Random.Shared.GetHexString(32),
+            SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };
     }
@@ -762,6 +775,9 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
+
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
 
         if(deliveryWorkerConfig is null)
         {

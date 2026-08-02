@@ -7,7 +7,9 @@ using System.Threading.Channels;
 using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
@@ -38,6 +40,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
     private ServiceProvider _serviceProvider = null!;
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
+    private List<string> _encryptedSecrets = [];
 
     public WebhookDeliveryProcessorServiceTests(PostgreSqlFixture fixture)
     {
@@ -53,13 +56,19 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         var services = new ServiceCollection();
 
+        //Add databse test container service.
         services.AddDbContext<RepositoryContext>(opt =>
             opt.UseNpgsql(_fixture.ConnectionString));
+
+        //Add the signature and encrptor services.
+        services.AddScoped<IEncryptionService, EncryptionService>();
+        services.AddScoped<ISignatureService, SignatureService>();
 
         _serviceProvider = services.BuildServiceProvider();
 
         using var scope = _serviceProvider.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var encryptor = _serviceProvider.GetRequiredService<IEncryptionService>();
 
         await ctx.Database.EnsureCreatedAsync();
 
@@ -74,6 +83,11 @@ public sealed class WebhookDeliveryProcessorServiceTests
                 ""WebHookEventCatalogs""
             RESTART IDENTITY CASCADE;
         ");
+
+        _encryptedSecrets.AddRange
+        (
+            Enumerable.Range(1, 5).Select(i => encryptor.Encrypt(Random.Shared.GetHexString(32))).ToList()
+        );
 
         _webHookEventCatalogs = new List<WebHookEventCatalog>()
         {
@@ -112,7 +126,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         var httpClientFactory = new MockHttpClientFactory(httpHandler);
         var retryAfterService = new WebhookDeliveryRetryAfterService();
-        return new WebhookDeliveryProcessorService(ctx, httpClientFactory, retryAfterService);
+        return new WebhookDeliveryProcessorService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<IEncryptionService>());
     }
 
     private static WebhookEvent BuildWebhookEvent(
@@ -129,7 +143,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
         CreatedAt = DateTimeOffset.UtcNow
     };
 
-    private static WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
     {
         var entityId = Guid.NewGuid();
 
@@ -140,7 +154,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
-            SecretKey = Random.Shared.GetHexString(32),
+            SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };
     }

@@ -1,9 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Serilog;
 using System.Diagnostics;
 using System.Text;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Utilities;
 
@@ -14,12 +17,16 @@ public sealed class WebhookDeliveryProcessorService
     private readonly RepositoryContext _repositoryContext;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly WebhookDeliveryRetryAfterService _retryAfterService;
+    private readonly ISignatureService _signatureService;
+    private readonly IEncryptionService _encryptionService;
 
-    public WebhookDeliveryProcessorService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService)
+    public WebhookDeliveryProcessorService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, ISignatureService signatureService, IEncryptionService encryptionService)
     {
         _repositoryContext = repositoryContext;
         _httpClientFactory = httpClientFactory;
         _retryAfterService = retryAfterService;
+        _signatureService = signatureService;
+        _encryptionService = encryptionService;
     }
 
     private ILogger _logger = Log.ForContext(_className, nameof(WebhookDeliveryProcessorService));
@@ -52,6 +59,7 @@ public sealed class WebhookDeliveryProcessorService
             if (!deliveriesToProcess.Any())
             {
                 _logger.Information("No pending webhook deliveries to process at this time.");
+                await transaction.CommitAsync(ct);
                 return;
             }
 
@@ -77,6 +85,27 @@ public sealed class WebhookDeliveryProcessorService
                 return;
             }
 
+            //Get the header properties from the databse for teh fetched deliveries.
+            var deliveryIds = deliveriesToProcess.Select(x => x.Id).ToList();
+
+            Dictionary<Guid, WebhookDeliveryProcessorMetadataDto> deliveryMetadatas = await _repositoryContext.WebhookDeliveries
+                                                .Where(x => deliveryIds.Contains(x.Id))
+                                                .Select(x => new WebhookDeliveryProcessorMetadataDto() { DeliveryId = x.Id, EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, RaisedEventName = x.webhookEvent.EventType })
+                                                .ToDictionaryAsync(x => x.DeliveryId, ct);
+                                                //.ToListAsync(ct);
+
+            if (!deliveryMetadatas.Any())
+            {
+                _logger.Error("An error occurred when fetching metadata. Metadata item does not contain any value.");
+                return; //This is returned as aanother seperate worker will release this lock and this section will not do any update further.
+            }
+
+            if (deliveryMetadatas.Count != deliveryIds.Count)
+            {
+                _logger.Error("An error occurred while fetching metadata. The count for the metadata - {0} is not the same as the count of the delivery ids fetched - {1}", deliveryMetadatas.Count, deliveryIds.Count);
+                return; //This is returned as another seperate worker will release this lock and this section will not do any update further.
+            }
+
             //Instantiate the named client for http delivery to callback url.
             var httpClient = _httpClientFactory.CreateClient("WebhookDeliveryClient");
 
@@ -85,22 +114,41 @@ public sealed class WebhookDeliveryProcessorService
             {
                 _logger.Information("Beging processing of webhook delivery for - {0}", delivery.Id);
 
+                //WebhookDeliveryProcessorMetadataDto? deliveryMetadata = deliveryMetadatas.FirstOrDefault(x => x.DeliveryId == delivery.Id);
+
+                if(!deliveryMetadatas.TryGetValue(delivery.Id, out var deliveryMetadata))
+                {
+                    _logger.Error("The delivery metadata for the delivery could not be fetched due to unforesseen issues for the delivery - {0}.", delivery.Id);
+                    continue;
+                }
+
                 string urlToCall = delivery.CallBackUrl;
                 string payload = delivery.RequestPayload;
 
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 string responseContent = string.Empty;
                 string httpResponseCode = string.Empty;
-
                 
                 DateTimeOffset attemptedTime = DateTimeOffset.UtcNow;
+
+                //Build the request item to call HTTP
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(urlToCall))
+                {
+                    Content = new StringContent(payload, encoding: Encoding.UTF8, "application/json")
+                };
+
+                httpRequest.Headers.Add("X-Webhook-Timestamp", attemptedTime.ToUnixTimeSeconds().ToString());
+                httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName.ToUpper());
+                httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(payload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
+
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
                 try
                 {
                     _logger.Information("Pushing webhook delivery to call back url - {0}", urlToCall);
                     using var content = new StringContent(payload, encoding: Encoding.UTF8, "application/json");
-                    using HttpResponseMessage httpResponse = await httpClient.PostAsync(urlToCall, content, requestCts.Token);
+                    //using HttpResponseMessage httpResponse = await httpClient.PostAsync(urlToCall, content, requestCts.Token);
+                    using var httpResponse = await httpClient.SendAsync(httpRequest, requestCts.Token);
                     stopWatch.Stop();
                     var httpDuration = stopWatch.Elapsed.TotalMilliseconds;
                     responseContent = await httpResponse.Content.ReadAsStringAsync(requestCts.Token);
