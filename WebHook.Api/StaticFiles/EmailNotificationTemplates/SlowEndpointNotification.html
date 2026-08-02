@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Webhook Endpoint Responding Slowly</title>
+  <style>
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; background-color: #F0F2F5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+    /* Layout */
+    .email-wrapper   { width: 100%; background-color: #F0F2F5; padding: 40px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+    /* Header */
+    .header { background-color: #1A1D23; padding: 32px 40px; }
+    .header-icon { width: 36px; height: 36px; background-color: #D97706; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 36px; text-align: center; }
+    .header-brand   { color: #FFFFFF; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; margin: 0; padding: 0; }
+    .header-tagline { color: #8B929E; font-size: 12px; margin: 0; padding: 0; }
+
+    /* Alert banner */
+    .alert-banner { background-color: #FFFBEB; border-left: 4px solid #D97706; padding: 16px 40px; }
+    .alert-label  { color: #92400E; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px 0; }
+    .alert-title  { color: #1A1D23; font-size: 20px; font-weight: 700; margin: 0; line-height: 1.3; }
+
+    /* Body */
+    .body-content { padding: 32px 40px; }
+    .greeting   { color: #1A1D23; font-size: 15px; margin: 0 0 16px 0; line-height: 1.6; }
+    .body-text  { color: #4A5568; font-size: 14px; line-height: 1.7; margin: 0 0 24px 0; }
+
+    /* Metric highlight */
+    .metric-row { display: flex; gap: 16px; margin: 0 0 24px 0; }
+    .metric-box { flex: 1; background-color: #F7F8FA; border: 1px solid #E2E6EA; border-radius: 6px; padding: 16px 20px; text-align: center; }
+    .metric-value { color: #1A1D23; font-size: 28px; font-weight: 700; line-height: 1; margin: 0 0 4px 0; }
+    .metric-value.warning { color: #D97706; }
+    .metric-label { color: #8B929E; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+
+    /* Detail card */
+    .detail-card { background-color: #F7F8FA; border: 1px solid #E2E6EA; border-radius: 6px; padding: 20px 24px; margin: 0 0 24px 0; }
+    .detail-card-title { color: #8B929E; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 14px 0; }
+    .detail-label { color: #8B929E; font-size: 13px; font-weight: 500; width: 160px; }
+    .detail-value { color: #1A1D23; font-size: 13px; font-weight: 500; word-break: break-all; }
+    .detail-value.mono { font-family: 'Courier New', Courier, monospace; font-size: 12px; background-color: #EDF2F7; padding: 2px 6px; border-radius: 3px; }
+    .badge-warning { display: inline-block; background-color: #FEF3C7; color: #92400E; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+
+    /* Impact bar */
+    .impact-section { background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 16px 20px; margin: 0 0 24px 0; }
+    .impact-title   { color: #92400E; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px 0; }
+    .impact-text    { color: #78350F; font-size: 13px; line-height: 1.6; margin: 0; }
+
+    /* Section title */
+    .section-title { color: #1A1D23; font-size: 13px; font-weight: 700; margin: 0 0 8px 0; }
+
+    /* Checklist */
+    .checklist { list-style: none; padding: 0; margin: 0 0 24px 0; }
+    .checklist li { color: #4A5568; font-size: 13px; line-height: 1.6; padding: 6px 0 6px 22px; position: relative; border-bottom: 1px solid #EDF2F7; }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before { content: '→'; position: absolute; left: 0; top: 6px; color: #D97706; font-weight: 700; font-size: 13px; }
+
+    /* CTA */
+    .cta-section { text-align: center; margin: 0 0 24px 0; }
+    .cta-button  { display: inline-block; background-color: #1A1D23; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 28px; border-radius: 6px; letter-spacing: 0.02em; }
+    .cta-note    { color: #8B929E; font-size: 12px; margin: 10px 0 0 0; }
+
+    /* Notice box */
+    .notice-box { background-color: #F7F8FA; border: 1px solid #E2E6EA; border-radius: 6px; padding: 14px 18px; margin: 0 0 24px 0; }
+    .notice-text { color: #4A5568; font-size: 13px; line-height: 1.6; margin: 0; }
+
+    /* Footer */
+    .divider    { border: none; border-top: 1px solid #E2E6EA; margin: 0; }
+    .footer     { padding: 24px 40px; background-color: #F7F8FA; }
+    .footer-text { color: #8B929E; font-size: 12px; line-height: 1.6; margin: 0 0 8px 0; }
+    .footer-text:last-child { margin: 0; }
+    .footer-text a { color: #4A5568; text-decoration: underline; }
+
+    /* Responsive */
+    @media only screen and (max-width: 620px) {
+      .email-wrapper   { padding: 0 !important; }
+      .email-container { border-radius: 0 !important; }
+      .header, .alert-banner, .body-content, .footer { padding-left: 24px !important; padding-right: 24px !important; }
+      .metric-row  { flex-direction: column; }
+      .detail-row  { flex-direction: column; gap: 4px; }
+      .detail-label { width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-container">
+
+      <!-- Header -->
+      <div class="header">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="vertical-align: middle;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align: middle; padding-right: 12px;">
+                    <div class="header-icon">⏱</div>
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <p class="header-brand">Webhook Notification Service</p>
+                    <p class="header-tagline">Delivery Infrastructure</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td style="text-align: right; vertical-align: middle;">
+              <span style="color: #8B929E; font-size: 12px;">{{NotificationTimestamp}}</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Alert banner -->
+      <div class="alert-banner">
+        <p class="alert-label">⚡ Performance Notice</p>
+        <p class="alert-title">Your Webhook Endpoint Is Responding Slowly</p>
+      </div>
+
+      <!-- Body -->
+      <div class="body-content">
+
+        <p class="greeting">Hi <strong>{{ContactName}}</strong>,</p>
+
+        <p class="body-text">
+          We detected that your webhook endpoint for subscription
+          <strong>{{SubscriptionName}}</strong> is taking longer than expected to respond.
+          This may impact your ability to receive timely event notifications.
+        </p>
+
+        <!-- Metric highlight -->
+        <table width="100%" cellpadding="0" cellspacing="8" border="0" style="margin-bottom: 24px;">
+          <tr>
+            <td style="width: 50%; padding-right: 8px;">
+              <div class="metric-box">
+                <p class="metric-value warning">{{AverageResponseTime}}</p>
+                <p class="metric-label">Avg Response Time</p>
+              </div>
+            </td>
+            <td style="width: 50%; padding-left: 8px;">
+              <div class="metric-box">
+                <p class="metric-value">{{ThresholdMs}}ms</p>
+                <p class="metric-label">Expected Threshold</p>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Delivery details -->
+        <div class="detail-card">
+          <p class="detail-card-title">Endpoint Details</p>
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">Subscription</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value">{{SubscriptionName}}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">Callback URL</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value mono">{{CallbackUrl}}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">Delivery ID</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value mono">{{DeliveryId}}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">Event Type</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value">{{EventType}}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">Response Time</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value warning" style="color: #D97706; font-weight: 700;">{{ResponseTimeMs}}ms</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA; width: 160px;">
+                <span class="detail-label">HTTP Status</span>
+              </td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #E2E6EA;">
+                <span class="detail-value">{{HttpStatusCode}}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; width: 160px;">
+                <span class="detail-label">Detected At</span>
+              </td>
+              <td style="padding: 8px 0;">
+                <span class="detail-value">{{DetectedAt}}</span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Impact -->
+        <div class="impact-section">
+          <p class="impact-title">Why this matters</p>
+          <p class="impact-text">
+            Slow endpoint responses hold up the delivery worker for longer than expected,
+            reducing throughput for all deliveries in the batch. If response times continue
+            to exceed <strong>{{ThresholdMs}}ms</strong>, future deliveries may be marked as
+            failed and enter the retry queue — eventually reaching the Dead Letter Queue if
+            not resolved.
+          </p>
+        </div>
+
+        <!-- What to check -->
+        <p class="section-title">Things to check on your endpoint</p>
+        <ul class="checklist">
+          <li>Your server is not under unusually high load or CPU pressure.</li>
+          <li>Database queries triggered by the webhook handler are not running slowly.</li>
+          <li>Your endpoint acknowledges the webhook quickly (<strong>return 200 first</strong>, process async).</li>
+          <li>No network latency between your server and the webhook service.</li>
+          <li>Timeout settings on your server are not causing the delay.</li>
+        </ul>
+
+        <!-- Notice -->
+        <div class="notice-box">
+          <p class="notice-text">
+            <strong>Delivery was completed successfully</strong> — this notification is a
+            performance warning only. The payload was delivered and your endpoint responded
+            with <strong>{{HttpStatusCode}}</strong>. No action is required to recover this
+            specific delivery, but we recommend investigating the response time to prevent
+            future failures.
+          </p>
+        </div>
+
+        <div class="cta-section">
+          <a href="{{DeliveryHistoryUrl}}" class="cta-button">View Delivery History</a>
+          <p class="cta-note">Review your recent delivery attempts and response times.</p>
+        </div>
+
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Footer -->
+      <div class="footer">
+        <p class="footer-text">
+          You are receiving this because your subscription <strong>{{SubscriptionName}}</strong>
+          is registered with the Webhook Notification Service and this email address
+          (<strong>{{ContactEmail}}</strong>) is listed as the contact.
+        </p>
+        <p class="footer-text">
+          To update your contact email or manage your subscriptions,
+          visit your <a href="{{SubscriptionManagementUrl}}">subscription settings</a>.
+        </p>
+        <p class="footer-text" style="margin-top: 12px; color: #CBD5E0;">
+          Webhook Notification Service &nbsp;·&nbsp; Delivery Infrastructure
+        </p>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
