@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.StaticFiles.Infrastructure;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using WebHook.Api.ServiceExtensions;
 
@@ -52,6 +54,12 @@ app.UseReDoc(opts =>
     opts.SpecUrl("/openapi/v1.json");
     opts.DocumentTitle = "Webhook API v1 Documentation";
     opts.RoutePrefix = "webhookapi/api-docs";
+});
+
+app.UseStaticFiles(new StaticFileOptions()
+{
+   FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "StaticFiles")),
+    RequestPath = "/StaticFiles"
 });
 
 app.UseHttpsRedirection();

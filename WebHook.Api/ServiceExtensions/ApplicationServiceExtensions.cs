@@ -101,6 +101,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ISignatureService, SignatureService>();
 
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddSingleton<EmailContentFormatterHelper>();
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
