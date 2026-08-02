@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Reflection;
 using System.Threading.Channels;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Core.EventContracts.Publishers;
@@ -86,7 +87,8 @@ internal static class ApplicationServiceExtensions
         services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
         services.Configure<WebhookDeliveryWorkerConfiguration>(configuration.GetSection("WebhookDeliveryWorker"));
         services.Configure<RetryDeliveresAfterFailedConfiguration>(configuration.GetSection("RetryDeliveriesAfterFailed"));
-        services.Configure<EventRaisedWorkerConfiguration>(configuration.GetSection(""));
+        services.Configure<EventRaisedWorkerConfiguration>(configuration.GetSection("EventRaisedWorker"));
+        services.Configure<EmailSenderEmailSmtpSettingsConfiguration>(configuration.GetSection("EmailSmtpSettings"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
@@ -99,6 +101,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddScoped<IEmailService, EmailService>();
 
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
         services.AddSingleton<EmailContentFormatterHelper>();
@@ -111,6 +114,7 @@ internal static class ApplicationServiceExtensions
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
     {
+        //Chnanel for raised events
         services.AddSingleton(_ =>
         {
             return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
@@ -118,6 +122,16 @@ internal static class ApplicationServiceExtensions
                 SingleReader = true,
                 SingleWriter = false
                 
+            });
+        });
+
+        //Channel for sending email
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false
             });
         });
     }
