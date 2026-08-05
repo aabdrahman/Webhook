@@ -15,7 +15,6 @@ using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
-using WebhookServices;
 
 namespace WebHook.Api.ServiceExtensions;
 
@@ -89,6 +88,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<RetryDeliveresAfterFailedConfiguration>(configuration.GetSection("RetryDeliveriesAfterFailed"));
         services.Configure<EventRaisedWorkerConfiguration>(configuration.GetSection("EventRaisedWorker"));
         services.Configure<EmailSenderEmailSmtpSettingsConfiguration>(configuration.GetSection("EmailSmtpSettings"));
+        services.Configure<PendingRaisedEventsWorkerConfiguration>(configuration.GetSection("PendingRaisedEventsWorker")); 
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)

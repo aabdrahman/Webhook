@@ -100,14 +100,14 @@ public class WebhookEventServiceTests
     {
         // Arrange
         var (ctx, svc) = GetSut();
-        var createDto = BuildCreateWebhookEventDto();
+        var createDto = BuildCreateWebhookEventDto(eventType: "PaymentProcessed", payload: "{\"paymentId\":\"a1234567\", \"paymentStatus\":\"Successful\"}");
 
         // Act
         var result = await svc.CreateEventAsync(createDto);
 
         // Assert
         Assert.NotNull(result);
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.Equal("Webhook event created successfully.", result.ResponseMessage, ignoreCase: true);
         Assert.Equal(HttpStatusCode.Created, result.HttpStatusCode);
         var createdEvent = await ctx.WebhookEvents.FirstOrDefaultAsync(e => e.CorrelationId == createDto.CorrelationId);
