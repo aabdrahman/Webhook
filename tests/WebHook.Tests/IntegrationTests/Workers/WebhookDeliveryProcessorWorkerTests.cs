@@ -16,7 +16,7 @@ using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
-using WebHook.IntegrationTests.Services;
+using WebHook.Tests.Utilities;
 using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;

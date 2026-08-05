@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Moq;
 using System.Net;
+using System.Text.Json;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Entities;
 using WebHook.Core.EventContracts.Events;
@@ -184,6 +185,49 @@ public class WebhookEventServiceTests
         Assert.StartsWith("Invalid payload for event type.", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
     }
+
+    [Fact]
+    public async Task CreateEventAsync_InvalidRequest_EmptyPayload_Returns400BadRequest()
+    {
+        //Arrange
+        var sut = GetSut();
+        var createDto = BuildCreateWebhookEventDto();
+        createDto.PayLoad = "{}"; // Simulate missing fields in payload
+        _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));
+
+        //Act
+        var result = await sut.svc.CreateEventAsync(createDto);
+
+        //Assert
+        Assert.False(result.IsSuccessful);
+
+        Assert.StartsWith("Invalid payload for event type.", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+    }
+
+    [Fact]
+    public async Task CreateWebhookEventAsync_WhenPayloadIsInvalidJson_ReturnsBadRequest()
+    {
+        //Arrange
+        var sut = GetSut();
+        var createDto = BuildCreateWebhookEventDto();
+        createDto.PayLoad = "{Invalid Payload !!!"; // Simulate missing fields in payload
+        _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));
+
+        // Act
+        var result = await sut.svc.CreateEventAsync(createDto, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ErrorDetail);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData);
+        Assert.Equal("Invalid payload for event type.", result.ResponseMessage);
+
+        Assert.Equal(nameof(JsonException), result.ErrorDetail.ErrorTitle);
+        //Assert.Contains("JSON", result.ErrorDetail.ErrorMessage);
+    }
+
 
     [Fact]
     public async Task GetWebhookEventAsync_CancellationRequested_ThrowsException_Returns500InternalServerError()

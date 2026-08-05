@@ -38,7 +38,7 @@ public class EmailProcessorWorker : BackgroundService
 
             await foreach (var emailItem in _emailSenderChannel.Reader.ReadAllAsync(stoppingToken))
             {
-                await Task.Delay(1000, stoppingToken);
+                await Task.Delay(10000, stoppingToken);
                 using var scope = _serviceScopeFactory.CreateScope();
                 var emailSenderService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 try

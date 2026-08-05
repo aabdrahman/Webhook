@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Moq;
 using Serilog;
 using System.Net;
 using System.Threading.Channels;
@@ -15,6 +16,7 @@ using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
+using WebHook.Tests.Utilities;
 
 namespace WebHook.IntegrationTests.Services;
 
@@ -40,12 +42,37 @@ public sealed class RetryAfterPendingServiceTests
     private MockHttpMessageHandler _httpHandler = null!;
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
+    private readonly Mock<IWebHostEnvironment> _environmentMock;
+    private readonly string _tempDirectory;
+    private readonly string _templateDirectory;
     private List<string> _encryptedSecrets = [];
+    private Channel<EmailSenderDto> _emailSenderChannel = null!;
 
     public RetryAfterPendingServiceTests(PostgreSqlFixture fixture)
     {
         _fixture = fixture;
+
         Log.Logger = new LoggerConfiguration().CreateLogger();
+
+        // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
+        _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        _templateDirectory = Path.Combine(_tempDirectory, "EmailNotificationTemplates");
+
+        Directory.CreateDirectory(_templateDirectory);
+
+        File.WriteAllText(
+            Path.Combine(_templateDirectory, "DeadLetterNotification.html"),
+            "<p>Dear {{ContactName}}, delivery {{DeliveryId}} failed.</p>");
+
+        File.WriteAllText(
+            Path.Combine(_templateDirectory, "SlowEndpointNotification.html"),
+            "<p>{{SubscriptionName}} took {{ResponseTimeMs}}ms</p>");
+
+        // Mock IWebHostEnvironment to point ContentRootPath at our temp dir
+        _environmentMock = new Mock<IWebHostEnvironment>();
+        _environmentMock
+            .Setup(e => e.ContentRootPath)
+            .Returns(_tempDirectory);
     }
 
     // -------------------------------------------------------------------------
@@ -55,6 +82,8 @@ public sealed class RetryAfterPendingServiceTests
     public async Task InitializeAsync()
     {
         _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
+
+        _emailSenderChannel = Channel.CreateUnbounded<EmailSenderDto>();
 
         var services = new ServiceCollection();
 
@@ -72,7 +101,8 @@ public sealed class RetryAfterPendingServiceTests
 
             });
         });
-
+        //services.AddSingleton(_emailSenderChannel);
+        //services.AddSingleton<Channel<EmailSenderDto>>(freshChannel);
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
@@ -109,6 +139,7 @@ public sealed class RetryAfterPendingServiceTests
 
         var encryptor = _serviceProvider.GetRequiredService<IEncryptionService>();
 
+        _encryptedSecrets = [];
         _encryptedSecrets.AddRange
         (
             Enumerable.Range(1, 5).Select(i => encryptor.Encrypt(Random.Shared.GetHexString(32)))
@@ -133,21 +164,34 @@ public sealed class RetryAfterPendingServiceTests
         await ctx.SaveChangesAsync();
     }
 
-    public async Task DisposeAsync() =>
+    public async Task DisposeAsync()
+    {
         await _serviceProvider.DisposeAsync();
+
+        if (Directory.Exists(_tempDirectory))
+            Directory.Delete(_tempDirectory, recursive: true);
+    }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private RetryAfterPendingService CreateSut(RepositoryContext ctx)
+    private RetryAfterPendingService CreateSut(RepositoryContext ctx, MockHttpMessageHandler mockHttpMessageHandler = null)
     {
         var httpClientFactory = _serviceProvider
             .GetRequiredService<IHttpClientFactory>();
+
         var retryAfterService = _serviceProvider
             .GetRequiredService<WebhookDeliveryRetryAfterService>();
 
-        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), _serviceProvider.GetRequiredService<Channel<EmailSenderDto>>());
+        var emailHelper = new EmailContentFormatterHelper(_environmentMock.Object);
+
+        return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(), 
+                                            _serviceProvider.GetRequiredService<ISignatureService>(), emailHelper, //_serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), 
+                                            _serviceProvider.GetRequiredService<Channel<EmailSenderDto>>()
+                                            //Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions())
+                                            //_emailSenderChannel
+                                            );
     }
 
     /// <summary>
@@ -167,8 +211,6 @@ public sealed class RetryAfterPendingServiceTests
         RetryCount               = retryCount,
         NextRetryAt              = DateTimeOffset.UtcNow.AddMinutes(-1), // due in the past
         CreatedAt                = DateTimeOffset.UtcNow.AddHours(-1),
-        WebhookDeliveryAttempts  = new List<WebhookDeliveryAttempt>(),   // prevent NullRef (BUG 4)
-        webhookDeadLetterQueues  = new List<WebhookDeadLetterQueue>(),    // prevent NullRef (BUG 4)
         WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
         webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
 
@@ -219,7 +261,7 @@ public sealed class RetryAfterPendingServiceTests
         NormalizedEventName = name.ToUpper()
     };
 
-    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/", string contactEmail = "noeamil@mail.com")
     {
         var entityId = Guid.NewGuid();
 
@@ -231,7 +273,8 @@ public sealed class RetryAfterPendingServiceTests
             SubscribedFields = [],
             CallbackUrl = url,
             SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
-            WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
+            WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList(),
+            ContactEmail = contactEmail
         };
     }
 
@@ -663,7 +706,7 @@ public sealed class RetryAfterPendingServiceTests
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_ContinuesToNextDelivery()
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestFailed_ContinuesToNextDelivery()
     {
         // Arrange — first URL throws, second URL succeeds
         using var scope    = _serviceProvider.CreateScope();
@@ -694,8 +737,10 @@ public sealed class RetryAfterPendingServiceTests
         using var assertScope = _serviceProvider.CreateScope();
         var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var succ              = await assertCtx.WebhookDeliveries.FindAsync(succDelivery.Id);
+        var failedSucc = await assertCtx.WebhookDeliveries.FindAsync(failDelivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, succ!.DeliveryStatus);
+        Assert.Equal(WebhookDeliveryStatus.Failed, failedSucc!.DeliveryStatus);
     }
 
     // -------------------------------------------------------------------------
@@ -737,5 +782,369 @@ public sealed class RetryAfterPendingServiceTests
             () => sut.RunRetryAfterFirstAttemptAsync(ct: cts.Token));
 
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_StatusChangedToFailed()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        var ex = await Record.ExceptionAsync(
+            () => sut.RunRetryAfterFirstAttemptAsync());
+
+        // Assert
+        Assert.Null(ex);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+        Assert.Equal(WebhookDeliveryStatus.Failed, updated!.DeliveryStatus);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_RetryCountIncremented()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+        var originalCount = delivery.RetryCount;
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+        Assert.Equal(originalCount + 1, updated!.RetryCount);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_NextRetryAtSetInFuture()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+        var beforeCall = DateTimeOffset.UtcNow;
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+        Assert.NotNull(updated!.NextRetryAt);
+        Assert.True(updated.NextRetryAt > beforeCall);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_LockFieldsCleared()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+        //delivery.LockedBy = "worker-1";
+        //delivery.LockedUntil = DateTimeOffset.UtcNow.AddMinutes(5);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert — lock fields cleared so StaleClaimedDeliveryReleaseService
+        // does not incorrectly pick this up as a stale lock
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+        Assert.Null(updated!.LockedBy);
+        Assert.Null(updated.LockedUntil);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_AttemptRecordCreated()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
+            .Where(a => a.WebhookDeliveryId == delivery.Id)
+            .ToListAsync();
+
+        Assert.Single(attempts);
+        Assert.Equal("ServiceUnavailable", attempts[0].HttpResponseCode);
+        Assert.Contains("Connection refused", attempts[0].HttpResponse);
+        Assert.Equal(1, attempts[0].AttemptedCount);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_NoStatusCode_DefaultsTo500()
+    {
+        // Arrange — simulates DNS failure, connection reset — no HTTP status code
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+            new HttpRequestException(
+                "The remote name could not be resolved",
+                inner: null,
+                statusCode: null)); // no HTTP status
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert — defaults to "500" when StatusCode is null
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
+            .Where(a => a.WebhookDeliveryId == delivery.Id)
+            .ToListAsync();
+
+        Assert.Single(attempts);
+        Assert.Equal("500", attempts[0].HttpResponseCode);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_HttpRequestException_ContinuesToNextDelivery()
+    {
+        // Arrange — first URL throws HttpRequestException, second returns 200
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var failDelivery = BuildRetryableDelivery("https://unreachable.com/webhook", retryCount: 2);
+        var succDelivery = BuildRetryableDelivery("https://partner.com/webhook", retryCount: 2);
+
+        await ctx.WebhookDeliveries.AddRangeAsync(failDelivery, succDelivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(responses: new Dictionary<string, HttpStatusCode>
+        {
+            { "https://unreachable.com/webhook", HttpStatusCode.ServiceUnavailable },
+            { "https://partner.com/webhook",     HttpStatusCode.OK                 }
+        });
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        // Act
+        var ex = await Record.ExceptionAsync(
+            () => sut.RunRetryAfterFirstAttemptAsync());
+
+        // Assert — no exception, both deliveries attempted
+        Assert.Null(ex);
+        Assert.Equal(2, _httpHandler.CallCount);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var fail = await assertCtx.WebhookDeliveries.FindAsync(failDelivery.Id);
+        var succ = await assertCtx.WebhookDeliveries.FindAsync(succDelivery.Id);
+
+        Assert.Equal(WebhookDeliveryStatus.Failed, fail!.DeliveryStatus);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, succ!.DeliveryStatus);
+    }
+
+    // -------------------------------------------------------------------------
+    // Validate Dead Letter Item and Threshold Exceeds
+    // -------------------------------------------------------------------------
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_DeadLetter_ChannelIncrease()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToRetry = BuildRetryableDelivery(retryCount: 5);
+
+        await ctx.WebhookDeliveries.AddAsync(deliveryToRetry);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(
+                            new HttpRequestException(
+                            "Connection refused", null, HttpStatusCode.ServiceUnavailable));
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        //Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var failedDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToRetry.Id);
+
+        Assert.NotNull(failedDelivery);
+        Assert.Null(failedDelivery.LockedBy);
+        Assert.Null(failedDelivery.LockedUntil);
+        Assert.Equal(WebhookDeliveryStatus.DeadLetter, failedDelivery.DeliveryStatus);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_WhenResponseExceedsThreshold_DeliverySucceedsAndQueuesNotification()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToRetry = BuildRetryableDelivery(retryCount: 5);
+
+        await ctx.WebhookDeliveries.AddAsync(deliveryToRetry);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK, timespanDelay: 8);
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        //Act
+        await sut.RunRetryAfterFirstAttemptAsync(thresholdDuration: 5);
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var successfulDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToRetry.Id);
+        var channel = assertScope.ServiceProvider.GetRequiredService<Channel<EmailSenderDto>>();
+
+        Assert.NotNull(successfulDelivery);
+        Assert.Null(successfulDelivery.LockedBy);
+        Assert.Null(successfulDelivery.LockedUntil);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, successfulDelivery.DeliveryStatus);
+        Assert.Equal(1, channel.Reader.Count);
+        var emailItem = await channel.Reader.ReadAsync();
+        Assert.NotNull(emailItem);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_ThresholdExceeded_NoContactEmailForSubscription_DeliverySucceedsEmailNotQueued()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+       // WebhookSubscription noEmailSubscription = BuildEntity(entityName: "Invalid Subscription", eventIds: _webHookEventCatalogs.OrderBy(x => Guid.NewGuid()).Select(x => x.Id).ToList(), contactEmail: "");
+        var selectedSubscription = _webhookSubscriptions.OrderBy(x => Guid.NewGuid()).First();
+        selectedSubscription.ContactEmail = "";
+        WebhookDelivery deliveryToRetry = BuildRetryableDelivery(retryCount: 5, subscriptionId: selectedSubscription.WebhookEvents.First().Id);
+
+        ctx.WebhookSubscriptions.Update(selectedSubscription);
+        //await ctx.WebhookSubscriptions.AddAsync(noEmailSubscription);
+        await ctx.WebhookDeliveries.AddAsync(deliveryToRetry);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK, timespanDelay: 8);
+
+        var sut = CreateSut(ctx, _httpHandler);
+
+        //Act
+        await sut.RunRetryAfterFirstAttemptAsync(thresholdDuration: 5);
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var successfulDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToRetry.Id);
+        var channel = assertScope.ServiceProvider.GetRequiredService<Channel<EmailSenderDto>>();
+
+        Assert.NotNull(successfulDelivery);
+        Assert.Null(successfulDelivery.LockedBy);
+        Assert.Null(successfulDelivery.LockedUntil);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, successfulDelivery.DeliveryStatus);
+        Assert.Equal(0, channel.Reader.Count); //This is sufficient
+        //Below is disabled because it is causing the test to listen continuously for item added.
+        //var emailItem = await channel.Reader.ReadAsync();
+        //Assert.Null(emailItem);
+    }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_LockedDeliveries_NotPicked()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var retryAbleDelivery = BuildRetryableDelivery();
+        var lockedDelivery = BuildFirstAttemptDelivery();
+        lockedDelivery.LockedBy = "worker-1";
+        lockedDelivery.LockedUntil = DateTimeOffset.UtcNow.AddSeconds(60);
+
+        await ctx.WebhookDeliveries.AddRangeAsync(retryAbleDelivery, lockedDelivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(ctx, _httpHandler);
+
+        //Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processedDelivery = await assertCtx.WebhookDeliveries.FindAsync(retryAbleDelivery.Id);
+        var unprocessedDelivery = await assertCtx.WebhookDeliveries.FindAsync(lockedDelivery.Id);
+
+        Assert.NotNull(processedDelivery);
+        Assert.NotNull(unprocessedDelivery);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, processedDelivery.DeliveryStatus);
+        Assert.Equal(lockedDelivery.DeliveryStatus, unprocessedDelivery.DeliveryStatus);
     }
 }

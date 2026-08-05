@@ -12,7 +12,7 @@ using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
-using WebHook.IntegrationTests.Services;
+using WebHook.Tests.Utilities;
 
 namespace WebHook.Tests.UnitTests.Services;
 

@@ -1,3 +1,4 @@
+using MassTransit.Internals;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,7 @@ using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
+using WebHook.Tests.Utilities;
 using Xunit;
 
 namespace WebHook.IntegrationTests.Services;
@@ -615,81 +617,207 @@ public sealed class WebhookDeliveryProcessorServiceTests
 
         Assert.Null(ex);
     }
-}
 
-// =============================================================================
-// Test doubles
-// =============================================================================
-
-/// <summary>
-/// A controllable <see cref="HttpMessageHandler"/> for use in tests.
-/// Supports a fixed status code for all requests, or per-URL status codes
-/// via the <paramref name="responses"/> dictionary constructor.
-/// Tracks how many times it was called via <see cref="CallCount"/>.
-/// </summary>
-public sealed class MockHttpMessageHandler : HttpMessageHandler
-{
-    private readonly HttpStatusCode? _fixedStatusCode;
-    private readonly string _responseBody;
-    private readonly Dictionary<string, HttpStatusCode>? _urlResponses;
-
-    public int CallCount { get; private set; }
-
-    /// <summary>Fixed status code returned for every request.</summary>
-    public MockHttpMessageHandler(
-        HttpStatusCode statusCode,
-        string         responseBody = "")
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_AttemptRecordCreated()
     {
-        _fixedStatusCode = statusCode;
-        _responseBody    = responseBody;
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: HttpStatusCode.ServiceUnavailable));
+        var sut = CreateSut(handler, ctx);
+
+        //Act
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryAttempts = await assertCtx.WebhookDeliveryAttempts.Where(x => x.WebhookDeliveryId == delivery.Id).ToListAsync();
+
+        Assert.Single(deliveryAttempts);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable.ToString(), deliveryAttempts[0].HttpResponseCode);
+        Assert.Equal(1, deliveryAttempts[0].AttemptedCount);
+
     }
 
-    /// <summary>Per-URL status codes — key is the base URL of the request.</summary>
-    public MockHttpMessageHandler(Dictionary<string, HttpStatusCode> responses)
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_DeliveryNotLocked()
     {
-        _urlResponses = responses;
-        _responseBody = "";
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: HttpStatusCode.ServiceUnavailable));
+        var sut = CreateSut(handler, ctx);
+
+        //Act
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryRecord = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+        Assert.NotNull(deliveryRecord);
+        Assert.Null(deliveryRecord.LockedBy);
+        Assert.Null(deliveryRecord.LockedUntil);
+
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage  request,
-        CancellationToken   cancellationToken)
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_RetryCountIncrease()
     {
-        CallCount++;
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToProcess = BuildPendingDelivery();
+        int currentRetryCount = deliveryToProcess.RetryCount;
 
-        HttpStatusCode statusCode;
+        await ctx.WebhookDeliveries.AddAsync(deliveryToProcess);
+        await ctx.SaveChangesAsync();
 
-        if (_urlResponses is not null)
-        {
-            // Match on the base URL (scheme + host)
-            var baseUrl = $"{request.RequestUri!.Scheme}://{request.RequestUri.Host}/webhook";
-            statusCode  = _urlResponses.TryGetValue(baseUrl, out var code)
-                ? code
-                : HttpStatusCode.OK;
-        }
-        else
-        {
-            statusCode = _fixedStatusCode!.Value;
-        }
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: HttpStatusCode.ServiceUnavailable));
+        var sut = CreateSut(handler, ctx);
 
-        return Task.FromResult(new HttpResponseMessage(statusCode)
+        //Act
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processedDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToProcess.Id);
+
+        Assert.NotNull(processedDelivery);
+        Assert.Equal(currentRetryCount + 1, processedDelivery.RetryCount);
+    }
+
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_StatusChangedToFailed()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToProcess = BuildPendingDelivery();
+
+        await ctx.WebhookDeliveries.AddAsync(deliveryToProcess);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: HttpStatusCode.ServiceUnavailable));
+        var sut = CreateSut(handler, ctx);
+
+        //Act
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processedDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToProcess.Id);
+
+        Assert.NotNull(processedDelivery);
+        Assert.Equal(WebhookDeliveryStatus.Failed, processedDelivery.DeliveryStatus);
+    }
+
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_NextRetryAtInFuture()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToProcess = BuildPendingDelivery();
+
+        await ctx.WebhookDeliveries.AddAsync(deliveryToProcess);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: HttpStatusCode.ServiceUnavailable));
+        var sut = CreateSut(handler, ctx);
+
+        //Act
+        var beforeCall = DateTimeOffset.UtcNow;
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processedDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToProcess.Id);
+
+        Assert.NotNull(processedDelivery);
+        Assert.True(processedDelivery.NextRetryAt > beforeCall);
+    }
+
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_NoStatusCodeDefaultsTo500()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToProcess = BuildPendingDelivery();
+
+        await ctx.WebhookDeliveries.AddAsync(deliveryToProcess);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(exceptionToThrow: new HttpRequestException(message: "Connection Refused", inner: null, statusCode: null));
+        var sut = CreateSut(handler, ctx);
+
+        //Act
+        var beforeCall = DateTimeOffset.UtcNow;
+        await sut.ProcessPendingDeliveriesAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var processedDelivery = await assertCtx.WebhookDeliveries.FindAsync(deliveryToProcess.Id);
+        var deliveryAttempts = await assertCtx.WebhookDeliveryAttempts.Where(x => x.WebhookDeliveryId == processedDelivery.Id).ToListAsync();
+
+        Assert.NotNull(processedDelivery);
+        Assert.Single(deliveryAttempts);
+        Assert.Equal("500", deliveryAttempts[0].HttpResponseCode);
+    }
+
+    [Fact]
+    public async Task ProcessPendingDeliveriesAsync_HttpRequestException_ContinuesToNextDelivery()
+    {
+        // Arrange — first URL throws HttpRequestException, second returns 200
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var failDelivery = BuildPendingDelivery("https://unreachable.com/webhook");
+        var succDelivery = BuildPendingDelivery("https://partner.com/webhook");
+
+        await ctx.WebhookDeliveries.AddRangeAsync(failDelivery, succDelivery);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(responses: new Dictionary<string, HttpStatusCode>
         {
-            Content = new StringContent(_responseBody)
+            { "https://unreachable.com/webhook", HttpStatusCode.ServiceUnavailable },
+            { "https://partner.com/webhook",     HttpStatusCode.OK                 }
         });
+
+        var sut = CreateSut(handler, ctx);
+
+        // Act
+        var ex = await Record.ExceptionAsync(
+            () => sut.ProcessPendingDeliveriesAsync());
+
+        // Assert — no exception, both deliveries attempted
+        Assert.Null(ex);
+        Assert.Equal(2, handler.CallCount);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var fail = await assertCtx.WebhookDeliveries.FindAsync(failDelivery.Id);
+        var succ = await assertCtx.WebhookDeliveries.FindAsync(succDelivery.Id);
+
+        Assert.Equal(WebhookDeliveryStatus.Failed, fail!.DeliveryStatus);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, succ!.DeliveryStatus);
     }
-}
 
-/// <summary>
-/// A minimal <see cref="IHttpClientFactory"/> that always returns an
-/// <see cref="HttpClient"/> backed by the provided <see cref="MockHttpMessageHandler"/>.
-/// </summary>
-public sealed class MockHttpClientFactory : IHttpClientFactory
-{
-    private readonly MockHttpMessageHandler _handler;
-
-    public MockHttpClientFactory(MockHttpMessageHandler handler) =>
-        _handler = handler;
-
-    public HttpClient CreateClient(string name = "") =>
-        new HttpClient(_handler);
 }
