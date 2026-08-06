@@ -1,11 +1,8 @@
-using MassTransit.Internals;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using System.Net;
-using System.Threading.Channels;
-using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Core.Interfaces.Helpers;
@@ -15,7 +12,6 @@ using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
 using WebHook.Tests.Utilities;
-using Xunit;
 
 namespace WebHook.IntegrationTests.Services;
 

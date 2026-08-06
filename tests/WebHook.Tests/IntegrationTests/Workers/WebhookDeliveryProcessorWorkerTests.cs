@@ -686,7 +686,10 @@ public sealed class WebhookDeliveryProcessorWorkerTests
                 .Where(a => a.WebhookDeliveryId == delivery.Id)
                 .ToListAsync();
 
-            Assert.Single(attempts); // exactly one attempt per delivery — no duplicates
+            //Assert.Single(attempts, $"The delivery attempt count is: {attempts.Count} for delivery: {delivery.Id}",); // exactly one attempt per delivery — no duplicates
+            Assert.Single(attempts);
+            Assert.True(attempts.Count == 1, $"Attempt for delivery: {delivery.Id} has total count: {attempts.Count}");
+
         }
 
         // Total HTTP calls == total deliveries — no delivery was called twice

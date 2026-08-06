@@ -641,6 +641,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
                 .Where(a => a.WebhookDeliveryId == delivery.Id)
                 .ToListAsync();
 
+            //Assert.Single(attempts, $"Attempt delivery count - {attempts.Count} for delievry - {delivery.Id}");
             Assert.Single(attempts);
         }
 
