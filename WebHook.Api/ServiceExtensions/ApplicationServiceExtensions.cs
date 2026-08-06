@@ -88,7 +88,8 @@ internal static class ApplicationServiceExtensions
         services.Configure<RetryDeliveresAfterFailedConfiguration>(configuration.GetSection("RetryDeliveriesAfterFailed"));
         services.Configure<EventRaisedWorkerConfiguration>(configuration.GetSection("EventRaisedWorker"));
         services.Configure<EmailSenderEmailSmtpSettingsConfiguration>(configuration.GetSection("EmailSmtpSettings"));
-        services.Configure<PendingRaisedEventsWorkerConfiguration>(configuration.GetSection("PendingRaisedEventsWorker")); 
+        services.Configure<PendingRaisedEventsWorkerConfiguration>(configuration.GetSection("PendingRaisedEventsWorker"));
+        services.Configure<DeadLetterManualRetryConfiguration>(configuration.GetSection("DeadLetterManualRetry"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
@@ -97,6 +98,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
         services.AddScoped<IWebhookEventService, WebhookEventService>();
         services.AddScoped<IWebhookSubscriptionEventService, WebhookSubscriptionEventService>();
+        services.AddScoped<IDeadLetterQueueService, DeadLetterQueueService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
