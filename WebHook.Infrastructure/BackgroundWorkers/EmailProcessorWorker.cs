@@ -38,7 +38,7 @@ public class EmailProcessorWorker : BackgroundService
 
             await foreach (var emailItem in _emailSenderChannel.Reader.ReadAllAsync(stoppingToken))
             {
-                await Task.Delay(10000, stoppingToken);
+                await Task.Delay(_emailProcessorWorkerConfiguration.ProcessingDelayInMilliSeconds, stoppingToken);
                 using var scope = _serviceScopeFactory.CreateScope();
                 var emailSenderService = scope.ServiceProvider.GetRequiredService<IEmailService>();
                 try
@@ -70,7 +70,7 @@ public class EmailProcessorWorker : BackgroundService
 
         if(_emailSenderChannel.Reader.Count > 0)
         {
-            await foreach (var emailItem in _emailSenderChannel.Reader.ReadAllAsync(cancellationToken))
+            while (_emailSenderChannel.Reader.TryRead(out var emailItem))
             {
                 await Task.Delay(1000, cancellationToken);
                 using var scope = _serviceScopeFactory.CreateScope();
@@ -87,6 +87,23 @@ public class EmailProcessorWorker : BackgroundService
                     continue;
                 }
             }
+            //await foreach (var emailItem in _emailSenderChannel.Reader.ReadAllAsync(cancellationToken))
+            //{
+            //    await Task.Delay(1000, cancellationToken);
+            //    using var scope = _serviceScopeFactory.CreateScope();
+            //    var emailSenderService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+            //    try
+            //    {
+            //        var result = await emailSenderService.SendMailAsync(emailItem);
+
+            //        _logger.Information("Mail sending returns - {0}", result);
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        _logger.Error(ex, "An error occurred while processing email sender in channel...");
+            //        continue;
+            //    }
+            //}
         }
 
         await base.StopAsync(cancellationToken);
