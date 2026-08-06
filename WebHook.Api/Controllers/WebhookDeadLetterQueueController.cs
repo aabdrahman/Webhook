@@ -43,6 +43,7 @@ public class WebhookDeadLetterQueueController : ControllerBase
     /// Retrieves all dead letter items created for a delivery.
     /// </summary>
     /// <param name="deliveryId">
+    /// <paramref name="token"/>
     /// The unique identifier of the webhook deivery id.
     /// </param>
     /// <returns>

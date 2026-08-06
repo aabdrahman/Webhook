@@ -408,7 +408,7 @@ public class WebhookSubscriptionTests : IDisposable
 
         Assert.NotNull(fetchResult);
         Assert.NotNull(fetchResult.ResponseData);
-        Assert.True(fetchResult.ResponseData.Any(x => x.Name == createEntity.SubscriberName));
+        Assert.Contains(fetchResult.ResponseData, x => x.Name == createEntity.SubscriberName);
     }
 
     [Fact]

@@ -178,7 +178,7 @@ public class WebhookSubscriptionControllerTests
         Assert.Equal(StatusCodes.Status200OK, objResult.StatusCode);
         Assert.True(body.IsSuccessful);
         Assert.NotNull(body.ResponseData);
-        Assert.True(body.ResponseData.Name.Equals(subscription.Name, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(body.ResponseData.Name, subscription.Name, ignoreCase: true);
     }
 
     [Fact]
