@@ -90,6 +90,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<EmailSenderEmailSmtpSettingsConfiguration>(configuration.GetSection("EmailSmtpSettings"));
         services.Configure<PendingRaisedEventsWorkerConfiguration>(configuration.GetSection("PendingRaisedEventsWorker"));
         services.Configure<DeadLetterManualRetryConfiguration>(configuration.GetSection("DeadLetterManualRetry"));
+        services.Configure<EmailProcessorWorkerConfiguration>(configuration.GetSection("EmailProcessorWorker"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)

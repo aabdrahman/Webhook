@@ -51,7 +51,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
                 return GenericResponse<string>.Failure("Operation Failed.", "Dead Letter queue already retried.", HttpStatusCode.Conflict);
             }
 
-            if(deadLeterToRetry.webhookDelivery.DeliveryStatus != WebhookDeliveryStatus.Failed)
+            if(deadLeterToRetry.webhookDelivery.DeliveryStatus != WebhookDeliveryStatus.DeadLetter)
             {
                 _logger.Warning("The linked delivery to the dead letter queue record: {0} has an invalid sttaus: {1}.", deadLeterToRetry.Id, deadLeterToRetry.webhookDelivery.DeliveryStatus.ToString());
                 return GenericResponse<string>.Failure("Operation Failed.", $"Could not proceed. Delivery Status: {deadLeterToRetry.webhookDelivery.DeliveryStatus.ToString()}", HttpStatusCode.BadRequest);

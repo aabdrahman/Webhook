@@ -17,6 +17,13 @@ namespace WebHook.Api.Controllers;
 public class WebhookSubscriptionController : ControllerBase
 {
     private readonly IWebhookSubscriptionService _webhookSubscriptionService;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookSubscriptionController"/> class.
+    /// </summary>
+    /// <param name="webhookSubscriptionService">
+    /// The interface of the service responsible for handling webhook subscription operations.
+    /// </param>
     public WebhookSubscriptionController(IWebhookSubscriptionService webhookSubscriptionService)
     {
         _webhookSubscriptionService = webhookSubscriptionService;

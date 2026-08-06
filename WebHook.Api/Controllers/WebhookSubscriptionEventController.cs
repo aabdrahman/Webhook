@@ -24,6 +24,12 @@ public class WebhookSubscriptionEventController : ControllerBase
 {
     private readonly IWebhookSubscriptionEventService _webhookSubscriptionEventService;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookSubscriptionEventController"/> class.
+    /// </summary>
+    /// <param name="webhookSubscriptionEventService">
+    /// The interface of the service responsible for handling webhook subscription event operations.
+    /// </param>
     public WebhookSubscriptionEventController(IWebhookSubscriptionEventService webhookSubscriptionEventService)
     {
         _webhookSubscriptionEventService = webhookSubscriptionEventService;

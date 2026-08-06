@@ -22,6 +22,12 @@ public class WebhookEventCatalogController : ControllerBase
     private const string _methodName = "MethodName";
     private const string _className = "ClassName";
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="WebhookEventCatalogController"/> class.
+    /// </summary>
+    /// <param name="webhookEventCatalogService">
+    /// The interface of the service responsible for handling webhook event catalog operations.
+    /// </param>
     public WebhookEventCatalogController(IWebhookEventCatalogService webhookEventCatalogService)
     {
         _webhookEventCatalogService = webhookEventCatalogService;
