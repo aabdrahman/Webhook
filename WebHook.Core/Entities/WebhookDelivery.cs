@@ -17,6 +17,9 @@ public class WebhookDelivery
     public string? LockedBy { get; set; }
     public DateTimeOffset? LockedUntil { get; set; }
 
+    //Dead Letter Fields
+    public int RetryCycle { get; set; }
+
     //RELATIONSHIPS
     //------------One to many relationship with webhook subscription
     //public Guid WebhookSubscriptionId { get; set; }

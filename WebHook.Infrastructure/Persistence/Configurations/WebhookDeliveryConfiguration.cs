@@ -39,6 +39,10 @@ internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<We
             .HasConversion<string>()
             .IsRequired();
 
+        builder.Property(x => x.RetryCycle)
+            .HasDefaultValue(1)
+            .IsRequired();
+
         //Relationships
         builder.HasMany(x => x.WebhookDeliveryAttempts)
             .WithOne(x => x.webhookDelivery)
@@ -49,16 +53,6 @@ internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<We
             .WithOne(x => x.webhookDelivery)
             .HasForeignKey(x => x.WebhookDeliveryId)
             .OnDelete(DeleteBehavior.NoAction);
-
-        //builder.HasOne(x => x.webHookEventCatalog)
-        //    .WithMany(x => x.WebhookDeliveries)
-        //    .HasForeignKey(x => x.WebhookEventCatalogId)
-        //    .OnDelete(DeleteBehavior.NoAction);
-
-        //builder.HasOne(x => x.webhookSubscription)
-        //    .WithMany(x => x.WebhookDeliveries)
-        //    .HasForeignKey(x => x.WebhookSubscriptionId)
-        //    .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(x => x.WebhookSubscriptionEvent)
             .WithMany(x => x.WebhookDeliveries)

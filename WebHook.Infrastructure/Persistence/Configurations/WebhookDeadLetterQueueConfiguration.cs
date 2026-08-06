@@ -14,7 +14,18 @@ internal sealed class WebhookDeadLetterQueueConfiguration : IEntityTypeConfigura
 
         builder.Property(x => x.Reason)
             .IsRequired()
-            .HasMaxLength(250);
+            .HasMaxLength(500);
+
+        builder.Property(x => x.RetriedBy)
+            .IsRequired(false)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.RetriedAt)
+            .IsRequired(false);
+
+        builder.Property(x => x.RetryJustification)
+            .IsRequired(false)
+            .HasMaxLength(500);
 
         builder.HasOne(x => x.webhookDelivery)
             .WithMany(x => x.webhookDeadLetterQueues)
