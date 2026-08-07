@@ -1,9 +1,11 @@
 ﻿using MassTransit;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Reflection;
 using System.Threading.Channels;
 using WebHook.Core.DataTransferObjects.EmailSender;
+using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Core.EventContracts.Publishers;
@@ -164,5 +166,47 @@ internal static class ApplicationServiceExtensions
             PooledConnectionLifetime = TimeSpan.FromSeconds(120),
             EnableMultipleHttp2Connections = true
         });
+    }
+
+    internal static void ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
+    {
+        int minPasswordLength = configuration.GetValue<int>("UserSettingsConfiguration:MinimumPasswordLength");
+        var maxFailedAuthenticationAttempt = configuration.GetValue<int>("UserSettingsConfiguration:MaximumAuthenticationAttempt");
+
+        if (minPasswordLength == 0 || minPasswordLength == default(int))
+        {
+            throw new ArgumentNullException("Cannot proceeed as the maximum password length is not yet defined.");
+        }
+
+        if(maxFailedAuthenticationAttempt == 0 ||  maxFailedAuthenticationAttempt == default(int))
+        {
+            throw new ArgumentNullException("Cannot proceed as the maximum failed authentication attemot is not defined yet.");
+        }
+
+        services.AddIdentity<User, Role>(opts =>
+        {
+            //Password setttings configuration
+            opts.Password.RequireDigit = true;
+            opts.Password.RequireLowercase = true;
+            opts.Password.RequireUppercase = true;
+            opts.Password.RequireNonAlphanumeric = true;
+            opts.Password.RequiredLength = minPasswordLength;
+
+            //User configuration
+            opts.User.RequireUniqueEmail = true;
+            
+
+            //Signin configuration for user
+            opts.SignIn.RequireConfirmedEmail = false;
+            opts.SignIn.RequireConfirmedAccount = false;
+            opts.SignIn.RequireConfirmedPhoneNumber = false;
+
+            //Lockout settings configuration
+            opts.Lockout.MaxFailedAccessAttempts = maxFailedAuthenticationAttempt;
+            opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromDays(36525); //Maximum possible timespan. This ensures users are locked ou indefinitely 
+
+        })
+        .AddEntityFrameworkStores<RepositoryContext>()
+        .AddDefaultTokenProviders();
     }
 }

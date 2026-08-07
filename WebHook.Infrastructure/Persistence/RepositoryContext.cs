@@ -1,11 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 using WebHook.Core.Entities;
 using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Data_Persistence;
 
-public class RepositoryContext : DbContext
+public class RepositoryContext : IdentityDbContext<User, Role, Guid>
 {
     public DbSet<WebHookEventCatalog> WebHookEventCatalogs { get; set; }
     public DbSet<WebhookDeadLetterQueue> WebhookDeadLetterQueues { get; set; }
@@ -29,6 +32,8 @@ public class RepositoryContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.ApplyConfigurationsFromAssembly(assembly: Assembly.GetExecutingAssembly());
     }
 }

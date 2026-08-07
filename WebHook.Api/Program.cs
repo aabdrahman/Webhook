@@ -20,6 +20,7 @@ Log.Logger = new LoggerConfiguration()
                     .CreateLogger();
 
 builder.Services.ConfigureDatabaseConnection(builder.Configuration);
+builder.Services.ConfigureIdentity(builder.Configuration);
 
 builder.Services.AddControllers();
 builder.Services.ConfigureApplicationServices();
