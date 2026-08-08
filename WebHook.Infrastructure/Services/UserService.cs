@@ -11,7 +11,7 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
-internal class UserService : IUserService
+public sealed class UserService : IUserService
 {
     private readonly UserManager<User> _userManager;
     private readonly RepositoryContext _repositoryContext;
@@ -37,21 +37,25 @@ internal class UserService : IUserService
             _logger.Information("Creating User with details - {0}", createUser);
 
             //Validate that email is unique.
-            var isUserExists = await _repositoryContext.Users.AnyAsync(x => x.NormalizedEmail == createUser.EmailAddress.ToUpper() || x.NormalizedUserName == createUser.UserName.ToUpper(), ct);
+            //var isUserExists = await _repositoryContext.Users.AnyAsync(x => x.NormalizedEmail == createUser.EmailAddress.ToUpper() || x.NormalizedUserName == createUser.UserName.ToUpper(), ct);
 
-            var validationResult = await _repositoryContext.Users.Select(x => new
-            {
-                UserNameExists =  _repositoryContext.Users.Any(x => x.NormalizedUserName == createUser.UserName.ToUpper()),
-                EmailExists = _repositoryContext.Users.Any(x => x.NormalizedEmail == createUser.EmailAddress.ToUpper())
-            }).FirstOrDefaultAsync(ct);
+            //var validationResult = await _repositoryContext.Users.Select(x => new
+            //{
+            //    UserNameExists =  _repositoryContext.Users.Any(x => x.NormalizedUserName == createUser.UserName.ToUpper()),
+            //    EmailExists = _repositoryContext.Users.Any(x => x.NormalizedEmail == createUser.EmailAddress.ToUpper())
+            //}).FirstOrDefaultAsync(ct);
 
-            if (validationResult is not null && validationResult.EmailExists)
+            var existingUserWithEmail = await _userManager.FindByEmailAsync(createUser.EmailAddress);
+
+            if (existingUserWithEmail is not null)
             {
                 _logger.Warning("User with email already exists - {0}", createUser.EmailAddress);
                 return GenericResponse<string>.Failure("Operation Failed.", "User with email alraady exists.", HttpStatusCode.Conflict);
             }
 
-            if(validationResult is not null && validationResult.UserNameExists)
+            var existingUserWithUserName = await _userManager.FindByNameAsync(createUser.UserName);
+
+            if (existingUserWithUserName is not null)
             {
                 _logger.Warning("User with username already exists.");
                 return GenericResponse<string>.Failure("Operation Failed.", "Username already taken.", HttpStatusCode.Conflict);
@@ -75,18 +79,18 @@ internal class UserService : IUserService
             if (!setRolesResult.Succeeded)
             {
                 _logger.Warning("Role could not be added to the created user.", setRolesResult.Errors.ToList());
-                return GenericResponse<string>.Success("Operation Successful", "User created.", HttpStatusCode.Created);
+                return GenericResponse<string>.Success("Operation Successful.", "User created.", HttpStatusCode.Created);
             }
 
             //Roles successfully created for the user. returning success response.
             _logger.Information("User created successfully an droles successfully maintained for user");
-            return GenericResponse<string>.Success("Operation Successful", "User created successfully.", HttpStatusCode.Created);
+            return GenericResponse<string>.Success("Operation Successful.", "User created successfully.", HttpStatusCode.Created);
 
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while creating user.");
-            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while creating user..", HttpStatusCode.InternalServerError, 
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while creating user.", HttpStatusCode.InternalServerError, 
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
     }
