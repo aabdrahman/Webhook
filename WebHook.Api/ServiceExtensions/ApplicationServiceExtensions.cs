@@ -229,6 +229,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IWebhookEventService, WebhookEventService>();
         services.AddScoped<IWebhookSubscriptionEventService, WebhookSubscriptionEventService>();
         services.AddScoped<IDeadLetterQueueService, DeadLetterQueueService>();
+        services.AddScoped<IAuthenticationService,  AuthenticationService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
