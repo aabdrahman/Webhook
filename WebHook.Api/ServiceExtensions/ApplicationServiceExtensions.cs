@@ -1,9 +1,16 @@
 ﻿using MassTransit;
+using MassTransit.Configuration;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using Npgsql;
 using System.Reflection;
+using System.Text;
 using System.Threading.Channels;
+using System.Xml.XPath;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -36,12 +43,131 @@ internal static class ApplicationServiceExtensions
         //    });
         //});
 
-        services.AddSwaggerGen(opts =>
+        var securityScheme = new OpenApiSecurityScheme()
+        {
+            Description = "Kindly enter your bearer token here in the format: Bearer <token>",
+            Name = "Authorization",
+            In = ParameterLocation.Header,
+            Scheme = "bearer",
+            Type = SecuritySchemeType.Http,
+            BearerFormat = "JWT",
+            //Reference = new BaseOpenApiReference        // ← add this
+            //{
+            //    Type = ReferenceType.SecurityScheme,
+            //    Id = "Bearer"
+            //}
+        };
+
+        services.AddOpenApi(opts =>
         {
             var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-            opts.IncludeXmlComments(xmlPath);
+
+            if (File.Exists(xmlPath))
+            {
+                var xmlPathDocument = new XPathDocument(xmlPath);
+                var navigator = xmlPathDocument.CreateNavigator();
+
+                opts.AddOperationTransformer((operation, context, cancellationToken) =>
+                {
+                    if (context.Description.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor actionDescriptor)
+                    {
+                        var method = actionDescriptor.MethodInfo;
+
+                        // Construct the exact XML path syntax for the method: M:Namespace.Class.Method
+                        var methodNodePath = $"/doc/members/member[@name='M:{method.DeclaringType?.FullName}.{method.Name}']";
+                        var methodNode = navigator.SelectSingleNode(methodNodePath);
+
+                        if (methodNode != null)
+                        {
+                            // Fetch the <summary> block contents
+                            var summaryNode = methodNode.SelectSingleNode("summary");
+                            if (summaryNode != null)
+                            {
+                                // Clean up spacing and assign it to the OpenAPI Operation Summary
+                                operation.Summary = summaryNode.Value.Trim();
+                            }
+                        }
+                    }
+
+                    return Task.CompletedTask;
+                });
+            }
+
+            opts.AddDocumentTransformer((document, context, cancellationToken) =>
+            {
+                // 1. Initialize Info if it's completely missing
+                if (document.Info == null)
+                {
+                    document.Info = new OpenApiInfo();
+                }
+
+                document.Info.Title = "Webhook API";
+                document.Info.Version = "v1";
+
+                // 2. Safely check Components before touching Schemas or SecuritySchemes
+                if (document.Components == null)
+                {
+                    document.Components = new OpenApiComponents();
+                }
+
+                // 3. Loop through Paths safely
+                if (document.Paths != null)
+                {
+                    foreach (var path in document.Paths)
+                    {
+                        // Ensure operations exist before touching them
+                        if (path.Value?.Operations == null) continue;
+
+                        // Your transformation logic here...
+                    }
+                }
+
+                return Task.CompletedTask;
+            });
+
+            //opts.AddDocumentTransformer((document, context, cancellationToken) =>
+            //{
+            //    // Define the Bearer Security Scheme
+            //    var securityScheme = new OpenApiSecurityScheme
+            //    {
+            //        Type = SecuritySchemeType.Http,
+            //        Scheme = JwtBearerDefaults.AuthenticationScheme, // "bearer"
+            //        BearerFormat = "JWT",
+            //        In = ParameterLocation.Header,
+            //        Description = "Enter your JWT token in the format: Bearer {token}"
+            //    };
+
+            //    // Add the scheme to the document's components
+            //    document.Components ??= new OpenApiComponents();
+            //    document.Components.SecuritySchemes.Add(JwtBearerDefaults.AuthenticationScheme, securityScheme);
+
+            //    // Apply a global security requirement to all endpoints
+            //    var requirement = new OpenApiSecurityRequirement
+            //    {
+            //        [new OpenApiSecuritySchemeReference("Bearer")] = new List<string>()
+            //    };
+
+            //    foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations.Values))
+            //    {
+            //        operation.Security.Add(requirement);
+            //    }
+
+            //    return Task.CompletedTask;
+            //});
         });
+
+        //services.AddSwaggerGen(opts =>
+        //{
+
+        //    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        //    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
+        //    opts.IncludeXmlComments(xmlPath);
+
+        //    opts.AddSecurityDefinition("Bearer", securityScheme);
+           
+        //});
 
     }
 
@@ -93,6 +219,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<PendingRaisedEventsWorkerConfiguration>(configuration.GetSection("PendingRaisedEventsWorker"));
         services.Configure<DeadLetterManualRetryConfiguration>(configuration.GetSection("DeadLetterManualRetry"));
         services.Configure<EmailProcessorWorkerConfiguration>(configuration.GetSection("EmailProcessorWorker"));
+        services.Configure<JwtSettingsConfiguration>(configuration.GetSection("JwtSettings"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
@@ -208,5 +335,48 @@ internal static class ApplicationServiceExtensions
         })
         .AddEntityFrameworkStores<RepositoryContext>()
         .AddDefaultTokenProviders();
+    }
+
+    internal static void ConfigureApplicationJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
+    {
+        var jwtConfigSetings = configuration.GetSection("JwtSettings");
+        var applicationSecretKey = Environment.GetEnvironmentVariable("webhook_secret_key") ?? throw new ArgumentNullException("Webhook Jwt Secret key is not yet defined. Key to define with: 'webhook_secret_key'. ");
+
+        services.AddAuthentication(opts =>
+        {
+            opts.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            opts.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        }).AddJwtBearer(opts =>
+        {
+            TokenValidationParameters tokenValidationParameter = new TokenValidationParameters()
+            {
+                //Token validationn properties
+                ClockSkew = TimeSpan.Zero,
+                ValidateAudience = true,
+                ValidateIssuer = true,
+                ValidateIssuerSigningKey = true,
+                ValidateLifetime = true,
+
+                //Token issuing values
+                ValidAudiences = jwtConfigSetings["ValidAudiences"]?.Split(";", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+                ValidIssuer = jwtConfigSetings["ValidIssuer"] ?? throw new ArgumentNullException("Valid Issuer is not yet defined for the application in the appsettings file."),
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(applicationSecretKey))
+            };
+
+            opts.TokenValidationParameters = tokenValidationParameter;
+        });
+    }
+
+    internal static void ConfigureApplicationAuthorization(this IServiceCollection services)
+    {
+        services.AddAuthorization(opts =>
+        {
+            
+        });
+    }
+
+    internal static void ConfigureApplicationGlobalExceptionHandler(this IServiceCollection services)
+    {
+        services.AddExceptionHandler<GlobalExceptionHandler>();
     }
 }

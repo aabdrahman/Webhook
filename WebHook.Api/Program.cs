@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.StaticFiles.Infrastructure;
 using Microsoft.Extensions.FileProviders;
+using Scalar.AspNetCore;
 using Serilog;
 using WebHook.Api.ServiceExtensions;
 
@@ -30,10 +32,17 @@ builder.Services.ConfigureApplicationChannels();
 builder.Services.ConfigureApplicationWorkers();
 builder.Services.ConfigureHttpClient();
 
+//Authentication and Authorization 
+builder.Services.ConfigureApplicationJwtAuthentication(builder.Configuration);
+builder.Services.ConfigureApplicationAuthorization();
+
+//Global exception handler
+builder.Services.ConfigureApplicationGlobalExceptionHandler();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.ConfigureSwagger();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+//builder.Services.AddOpenApi();
 
 
 var app = builder.Build();
@@ -42,13 +51,17 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(opts =>
+    {
+        opts.WithPreferredScheme(JwtBearerDefaults.AuthenticationScheme);
+    });
 }
 
-app.UseSwaggerUI(opts =>
-{
-    opts.RoutePrefix = "webhookapi";
-    opts.SwaggerEndpoint("/openapi/v1.json", "Webhook API V1");
-});
+//app.UseSwaggerUI(opts =>
+//{
+//    opts.RoutePrefix = "webhookapi";
+//    opts.SwaggerEndpoint("/openapi/v1.json", "Webhook API V1");
+//});
 
 app.UseReDoc(opts =>
 {
@@ -63,8 +76,14 @@ app.UseStaticFiles(new StaticFileOptions()
     RequestPath = "/StaticFiles"
 });
 
+app.UseExceptionHandler(opts =>
+{
+    
+});
+
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
