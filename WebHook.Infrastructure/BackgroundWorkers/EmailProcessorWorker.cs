@@ -68,25 +68,23 @@ public class EmailProcessorWorker : BackgroundService
 
         _logger.Information("Email sender worker is stopping....");
 
-        if(_emailSenderChannel.Reader.Count > 0)
+        while (_emailSenderChannel.Reader.TryRead(out var emailItem))
         {
-            while (_emailSenderChannel.Reader.TryRead(out var emailItem))
+            await Task.Delay(1000, cancellationToken);
+            using var scope = _serviceScopeFactory.CreateScope();
+            var emailSenderService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+            try
             {
-                await Task.Delay(1000, cancellationToken);
-                using var scope = _serviceScopeFactory.CreateScope();
-                var emailSenderService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                try
-                {
-                    var result = await emailSenderService.SendMailAsync(emailItem);
+                var result = await emailSenderService.SendMailAsync(emailItem);
 
-                    _logger.Information("Mail sending returns - {0}", result);
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(ex, "An error occurred while processing email sender in channel...");
-                    continue;
-                }
+                _logger.Information("Mail sending returns - {0}", result);
             }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "An error occurred while processing email sender in channel...");
+                continue;
+            }
+
             //await foreach (var emailItem in _emailSenderChannel.Reader.ReadAllAsync(cancellationToken))
             //{
             //    await Task.Delay(1000, cancellationToken);
