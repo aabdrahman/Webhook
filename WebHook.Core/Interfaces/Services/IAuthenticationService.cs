@@ -5,5 +5,5 @@ namespace WebHook.Core.Interfaces.Services;
 
 public interface IAuthenticationService
 {
-    
+    Task<GenericResponse<TokenDto>> LoginUserAsync(LoginUserDto loginUserDetails, CancellationToken ct = default);
 }
