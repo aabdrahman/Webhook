@@ -74,13 +74,22 @@ public sealed class UserService : IUserService
             }
 
             //Begin setting the roles for user.
-            IdentityResult setRolesResult = await _userManager.AddToRoleAsync(userToCreate, "USER");
-
-            if (!setRolesResult.Succeeded)
+            try
             {
-                _logger.Warning("Role could not be added to the created user.", setRolesResult.Errors.ToList());
+                IdentityResult setRolesResult = await _userManager.AddToRoleAsync(userToCreate, "USER");
+
+                if (!setRolesResult.Succeeded)
+                {
+                    _logger.Warning("Role could not be added to the created user.", setRolesResult.Errors.ToList());
+                    return GenericResponse<string>.Success("Operation Successful.", "User created.", HttpStatusCode.Created);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "An error occurred adding role to user.");
                 return GenericResponse<string>.Success("Operation Successful.", "User created.", HttpStatusCode.Created);
             }
+           
 
             //Roles successfully created for the user. returning success response.
             _logger.Information("User created successfully an droles successfully maintained for user");

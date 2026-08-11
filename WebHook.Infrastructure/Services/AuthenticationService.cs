@@ -95,7 +95,13 @@ public sealed class AuthenticationService : IAuthenticationService
 
             string token = await GenerateToken();
 
-            await _userManager.UpdateAsync(_loggedInUser);
+            var updateUserResult = await _userManager.UpdateAsync(_loggedInUser);
+
+            if (!updateUserResult.Succeeded)
+            {
+                _logger.Warning("User details could not be saved successfully after token geenration. rrors - {0}", updateUserResult.Errors);
+                return GenericResponse<TokenDto>.Failure(null, "An error occurred eprforming operation.", HttpStatusCode.InternalServerError);
+            }
 
             var tokenDetails = new TokenDto(accessToken: token, refreshToken: _loggedInUser.RefreshToken);
 
@@ -106,7 +112,7 @@ public sealed class AuthenticationService : IAuthenticationService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred performing user login request.");
-            return GenericResponse<TokenDto>.Failure(null, "An error occurred", HttpStatusCode.InternalServerError);
+            return GenericResponse<TokenDto>.Failure(null, "An error occurred.", HttpStatusCode.InternalServerError);
         }
     }
 

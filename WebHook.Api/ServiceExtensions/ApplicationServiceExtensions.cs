@@ -333,6 +333,7 @@ internal static class ApplicationServiceExtensions
             //Lockout settings configuration
             opts.Lockout.MaxFailedAccessAttempts = maxFailedAuthenticationAttempt;
             opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromDays(36525); //Maximum possible timespan. This ensures users are locked ou indefinitely 
+            opts.Lockout.AllowedForNewUsers = true; //This ensures that new users are created with lockout enabled.
 
         })
         .AddEntityFrameworkStores<RepositoryContext>()
