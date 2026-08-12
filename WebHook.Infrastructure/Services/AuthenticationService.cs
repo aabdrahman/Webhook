@@ -57,20 +57,40 @@ public sealed class AuthenticationService : IAuthenticationService
                                 "User with username does not exists - {0}", loginUserDetails.UserNameOrEmailAddress
                     );
 
-                return GenericResponse<TokenDto>.Failure(null, loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "Invalid Credentials" : "Invalid Credentials",
+                return GenericResponse<TokenDto>.Failure(null, loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "Invalid Credentials." : "Invalid Credentials.",
                     HttpStatusCode.NotFound);
             }
 
-            bool isPasswordValid = await _userManager.CheckPasswordAsync(userToAuthenticate, loginUserDetails.Password);
+            //This is disabled because the identity provider provides default failed lockout increment in signin manager which is not available when this is enabled.
+            //bool isPasswordValid = await _userManager.CheckPasswordAsync(userToAuthenticate, loginUserDetails.Password);
 
-            if (!isPasswordValid)
-            {
-                _logger.Warning("User details does not matchthe provided passwrd - {0}", loginUserDetails.UserNameOrEmailAddress);
-                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.NotFound);
-            }
+            //if (!isPasswordValid)
+            //{
+            //    _logger.Warning("User details does not match the provided password - {0}", loginUserDetails.UserNameOrEmailAddress);
+            //    return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.NotFound);
+            //}
 
             _logger.Information("User details successfully validated. Begin user system signin operation");
             SignInResult signinResult = await _signInManager.CheckPasswordSignInAsync(userToAuthenticate, loginUserDetails.Password, true);
+
+            if (signinResult.RequiresTwoFactor)
+            {
+                _logger.Warning("Invalid User created - {0}, {1}. User created with 2FA enabled.", userToAuthenticate.NormalizedEmail, userToAuthenticate.NormalizedUserName);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Profile. Contact Admin.", HttpStatusCode.Conflict);
+            }
+
+            if (signinResult.IsLockedOut)
+            {
+                _logger.Warning("User could not be signed in successfully. Is locked out - {0}, Is Not Allowed - {1}", signinResult.IsLockedOut, signinResult.IsNotAllowed);
+                return GenericResponse<TokenDto>.Failure(null, "User profiled locked out. Kindly contact admin or reset your password.", HttpStatusCode.BadRequest);
+            }
+
+
+            if (signinResult.IsNotAllowed)
+            {
+                _logger.Warning("User could not be signed in successfully. Is locked out - {0}, Is Not Allowed - {1}", signinResult.IsLockedOut, signinResult.IsNotAllowed);
+                return GenericResponse<TokenDto>.Failure(null, "User could not be logged in. Kindly contact admin.", HttpStatusCode.BadRequest);
+            }
 
             if (!signinResult.Succeeded)
             {
@@ -78,11 +98,6 @@ public sealed class AuthenticationService : IAuthenticationService
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            if(signinResult.IsNotAllowed || signinResult.IsLockedOut)
-            {
-                _logger.Warning("User could not be signed in successfully. Is locked out - {0}, Is Not Alowed - {1}", signinResult.IsLockedOut, signinResult.IsNotAllowed);
-                return GenericResponse<TokenDto>.Failure(null, "User profiled locked out. Kindly contact admin or reset your password.", HttpStatusCode.BadRequest);
-            }
 
             _logger.Information("User signed in successfully. Begin token generation for user.");
             _loggedInUser = userToAuthenticate;
