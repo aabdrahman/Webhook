@@ -27,10 +27,14 @@ builder.Services.ConfigureIdentity(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.ConfigureApplicationServices();
 builder.Services.AddConfigurationModels(builder.Configuration);
+
 //builder.Services.ConfigureMassTransit();
 builder.Services.ConfigureApplicationChannels();
 builder.Services.ConfigureApplicationWorkers();
 builder.Services.ConfigureHttpClient();
+
+//Data protection API
+builder.Services.AddDataProtectionService();
 
 //Authentication and Authorization 
 builder.Services.ConfigureApplicationJwtAuthentication(builder.Configuration);

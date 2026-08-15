@@ -235,6 +235,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IOtpGenerator, OtpGenerator>();
+        services.AddScoped<IApplicationHasher, ApplicationHasher>();
 
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
         services.AddSingleton<EmailContentFormatterHelper>();
@@ -380,5 +382,13 @@ internal static class ApplicationServiceExtensions
     internal static void ConfigureApplicationGlobalExceptionHandler(this IServiceCollection services)
     {
         services.AddExceptionHandler<GlobalExceptionHandler>();
+    }
+
+    internal static void AddDataProtectionService(this IServiceCollection services)
+    {
+        services.AddDataProtection(opts =>
+        {
+            
+        });
     }
 }
