@@ -132,6 +132,56 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
 
+    public async Task<GenericResponse<string>> ChangePasswordAsync(ChangePasswordDto changePasswordRequest, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(ChangePasswordAsync));
+
+        try
+        {
+            _logger.Information("Change password request for - {0}", changePasswordRequest);
+
+            User? userToModifyPassword = await _userManager.FindByEmailAsync(changePasswordRequest.UserNameOrEmailAddress);
+
+            if(userToModifyPassword is null)
+            {
+                _logger.Warning("User with email does not exist - {0}", changePasswordRequest.UserNameOrEmailAddress);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            //bool isOldPasswordCorrect = await _userManager.CheckPasswordAsync(userToModifyPassword, changePasswordRequest.OldPassword);
+
+            //if (!isOldPasswordCorrect)
+            //{
+            //    _logger.Warning("Change password request could not be completed for user: {0}, {1}. Invalid old password provided.", userToModifyPassword.Id, userToModifyPassword.NormalizedEmail);
+            //    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Password provided.", HttpStatusCode.BadRequest);
+            //}
+
+            IdentityResult setPasswordResult = await _userManager.ChangePasswordAsync(userToModifyPassword, changePasswordRequest.OldPassword, changePasswordRequest.NewPassword);
+            if (!setPasswordResult.Succeeded)
+            {
+                _logger.Warning("Identity Server could not process change password request. Error - {0}", setPasswordResult.Errors.ToList());
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            userToModifyPassword.RefreshToken = "";
+            IdentityResult updateRecordResult = await _userManager.UpdateAsync(userToModifyPassword);
+
+            if (!updateRecordResult.Succeeded)
+            {
+                _logger.Warning("Refresh token could not be revoked for the user: {0}. Error - {1}", userToModifyPassword.NormalizedEmail, updateRecordResult.Errors.ToList());
+            }
+
+            _logger.Information("Password Change processed successfullyfor user - {0}", userToModifyPassword.NormalizedEmail);
+            return GenericResponse<string>.Success("Operation Successful.", "Password updated successfully.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred performing user password change.");
+            return GenericResponse<string>.Failure("Operation Failed.", "Operation could not be completed.", HttpStatusCode.InternalServerError);
+        }
+
+    }
 
     //-------------------------------------------------
     // Utility operation class sccoped methods.

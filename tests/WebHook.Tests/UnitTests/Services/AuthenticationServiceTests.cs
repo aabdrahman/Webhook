@@ -134,6 +134,14 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         UserName = username
     };
 
+    private ChangePasswordDto BuildPasswordChangeRequest(string emailAddress = "test@mail.com", string oldPassword = DefaultPassword, string newPassword = "NewPassword@12345") => new ChangePasswordDto()
+    {
+        UserNameOrEmailAddress = emailAddress,
+        OldPassword = oldPassword,
+        NewPassword = newPassword,
+        ConfirmNewPassword = newPassword
+    };
+
     private Infrastructure.Services.AuthenticationService CreateSut()
     {
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
@@ -422,4 +430,77 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.True(loggedInUser.LockoutEnd.Value > DateTimeOffset.UtcNow);
     }
 
+
+    [Fact]
+    public async Task ChangePasswordAsync_EmailNotExist_Returns400BadRequest()
+    {
+        //Arrange
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ChangePasswordAsync(BuildPasswordChangeRequest(emailAddress: "usereamil@exampl.com"));
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_ValidRequest_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var changePasswordRequest = BuildPasswordChangeRequest(emailAddress: seedResult.email);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ChangePasswordAsync(changePasswordRequest, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Password updated successfully.", result.ResponseMessage, ignoreCase: true);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+        User? modifiedUser = await usermanager.FindByEmailAsync(changePasswordRequest.UserNameOrEmailAddress);
+        Assert.NotNull(modifiedUser);
+        bool isPasswordChanged = await usermanager.CheckPasswordAsync(modifiedUser, changePasswordRequest.NewPassword);
+        Assert.True(isPasswordChanged, "Password not changed.");
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_InvalidRequest_IncorrectOldPassword_Returns400BadRequest()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var sut = CreateSut();
+        var changePasswordRequest = BuildPasswordChangeRequest(emailAddress: seedResult.email, oldPassword: "Tested@1290");
+
+        //Act
+        var result = await sut.ChangePasswordAsync(changePasswordRequest, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+        User? modifiedUser = await usermanager.FindByEmailAsync(changePasswordRequest.UserNameOrEmailAddress);
+        Assert.NotNull(modifiedUser);
+        bool isPasswordChanged = await usermanager.CheckPasswordAsync(modifiedUser, DefaultPassword);
+        Assert.True(isPasswordChanged, "Password was changed.");
+    }
 }
