@@ -218,21 +218,21 @@ public sealed class AuthenticationService : IAuthenticationService
             if(requestingUser is null)
             {
                 _logger.Warning("User with details does not exist - {0}", requestOtp.UserNameOrEmailAddress);
-                return GenericResponse<string>.Failure("Opearion Failed.", "User with details does not exist.", HttpStatusCode.NotFound);
+                return GenericResponse<string>.Failure("Operation Failed.", "User with details does not exist.", HttpStatusCode.NotFound);
             }
 
             string generatedOTP = _otpGenerator.GenerateOtp(_otpettingsOptionsMonitor.CurrentValue.OtpToGenerateLength, _otpettingsOptionsMonitor.CurrentValue.MaximumOtpLength);
             if (string.IsNullOrEmpty(generatedOTP))
             {
                 _logger.Warning("OTP could not be generated.");
-                return GenericResponse<string>.Failure("Operation Faield.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
+                return GenericResponse<string>.Failure("Operation Failed.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
             }
 
             string hashedOTP = await _applicationHasher.HashSecret(generatedOTP);
             if (string.IsNullOrEmpty(hashedOTP))
             {
                 _logger.Warning("An error occurred while hashing the OTP. Hash returns - {0}", hashedOTP);
-                return GenericResponse<string>.Failure("Operation Faield.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
+                return GenericResponse<string>.Failure("Operation Failed.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
             }
 
             OtpVerification otpVerification = new OtpVerification()

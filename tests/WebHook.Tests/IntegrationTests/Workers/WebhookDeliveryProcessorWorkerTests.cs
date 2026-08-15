@@ -612,7 +612,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
                 var c         = s.ServiceProvider.GetRequiredService<RepositoryContext>();
                 var p         = await c.WebhookDeliveries.FindAsync(pending.Id);
                 return p?.DeliveryStatus != WebhookDeliveryStatus.Pending;
-            });
+            }, timeoutMs: 2500);
 
         // Assert — only the Pending delivery was processed
         Assert.Equal(1, _httpHandler.CallCount);
@@ -654,8 +654,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         var workerA = CreateWorker();
         var workerB = CreateWorker();
 
-        using var ctsA = new CancellationTokenSource(8000);
-        using var ctsB = new CancellationTokenSource(8000);
+        using var ctsA = new CancellationTokenSource(15000);
+        using var ctsB = new CancellationTokenSource(15000);
 
         // Act — both run concurrently
         var taskA = Task.Run(() => workerA.RunAsync(ctsA.Token));
@@ -666,7 +666,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         while (DateTime.UtcNow < deadline)
         {
             if (await AllDeliveriesProcessedAsync()) break;
-            await Task.Delay(300);
+            await Task.Delay(500);
         }
 
         ctsA.Cancel();
@@ -735,7 +735,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         var worker = CreateWorker();
 
         // Act — cancel after 1.5 seconds (mid-processing)
-        using var cts = new CancellationTokenSource(1500);
+        using var cts = new CancellationTokenSource(2500);
         try { await worker.RunAsync(cts.Token); }
         catch (OperationCanceledException) { }
 

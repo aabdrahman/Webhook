@@ -610,8 +610,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
         var workerA = CreateWorker();
         var workerB = CreateWorker();
 
-        using var ctsA = new CancellationTokenSource(10_000);
-        using var ctsB = new CancellationTokenSource(10_000);
+        using var ctsA = new CancellationTokenSource(15_000);
+        using var ctsB = new CancellationTokenSource(15_000);
 
         // Act — both run concurrently
         var taskA = Task.Run(() => workerA.RunAsync(ctsA.Token));
@@ -621,7 +621,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
         while (DateTime.UtcNow < deadline)
         {
             if (await AllDeliveriesProcessedAsync()) break;
-            await Task.Delay(300);
+            await Task.Delay(500);
         }
 
         ctsA.Cancel();

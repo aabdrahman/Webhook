@@ -1,23 +1,28 @@
 ﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
 using Moq;
 using System.Net;
+using System.Threading.Channels;
+using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.EventContracts.Events;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
-using static MassTransit.ValidationResultExtensions;
 
 namespace WebHook.Tests.UnitTests.Services;
 
@@ -27,8 +32,12 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     private readonly Mock<UserManager<User>> _userManagerMock;
     private readonly Mock<SignInManager<User>> _signinManagerMock;
     private readonly Mock<IOptionsMonitor<JwtSettingsConfiguration>> _settingsConfigMock;
-
+    private readonly Mock<IOtpGenerator> _otpGeneratorMock;
+    private readonly Mock<IApplicationHasher> _applicationHasherMock;
     private readonly PostgreSqlFixture _postgreSqlFixture;
+    private readonly Mock<IWebHostEnvironment> _environmentMock;
+    private readonly string _tempDirectory;
+    private readonly string _templateDirectory;
 
     private ServiceProvider _serviceProvider = null;
 
@@ -48,6 +57,22 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         _userManagerMock = CreateUserManagerMock();
         _signinManagerMock = CreateSignInManagerMock(_userManagerMock);
         _settingsConfigMock = new Mock<IOptionsMonitor<JwtSettingsConfiguration>>();
+        _otpGeneratorMock = new Mock<IOtpGenerator>();
+        _applicationHasherMock = new Mock<IApplicationHasher>();
+
+        // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
+        _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        _templateDirectory = Path.Combine(_tempDirectory, "EmailNotificationTemplates");
+
+        Directory.CreateDirectory(_templateDirectory);
+
+        File.WriteAllText(
+            Path.Combine(_templateDirectory, "DeadLetterNotification.html"),
+            "<p>Dear {{ContactName}}, delivery {{DeliveryId}} failed.</p>");
+
+        File.WriteAllText(
+            Path.Combine(_templateDirectory, "SlowEndpointNotification.html"),
+            "<p>{{SubscriptionName}} took {{ResponseTimeMs}}ms</p>");
 
     }
 
@@ -61,12 +86,44 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             opts.UseNpgsql(connectionString: _postgreSqlFixture.ConnectionString);
         });
 
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false
+
+            });
+        });
+
+        var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        services.AddSingleton<IWebHostEnvironment>(environment);
+
         services.Configure<JwtSettingsConfiguration>(opts =>
         {
             opts.ValidIssuer = "";
             opts.ValidAudiences = "";
             opts.RefreshTokenExpirationAfterInSeconds = 3600;
             opts.TokenExpirationAfterInSeconds = 1800;
+        });
+
+        services.Configure<OtpSettingsConfiguration>(opts =>
+        {
+            opts.OtpToGenerateLength = 6;
+            opts.MaximumOtpLength = 12;
+        });
+
+        services.Configure<TokenValidationConfiguration>(opts =>
+        {
+            opts.OtpExpirationAfterInSeconds = 1200;
+            opts.OtpOperationTokenExpiresAFterInSceonds = 2400;
         });
 
         services.AddLogging();
@@ -101,6 +158,10 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<Core.Interfaces.Services.IAuthenticationService, Infrastructure.Services.AuthenticationService>();
+        services.AddScoped<IOtpGenerator, OtpGenerator>();
+        services.AddScoped<IApplicationHasher, ApplicationHasher>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<EmailContentFormatterHelper>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -144,16 +205,18 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         ConfirmNewPassword = newPassword
     };
 
-    private Infrastructure.Services.AuthenticationService CreateSut()
+    private Infrastructure.Services.AuthenticationService CreateSut(IOtpGenerator otpGenerator = null, IApplicationHasher applicationHasher = null)
     {
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
         return new Infrastructure.Services.AuthenticationService(
             _serviceProvider.GetRequiredService<UserManager<User>>(), ctx,
             _serviceProvider.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), _serviceProvider.GetRequiredService<SignInManager<User>>(),
-            _serviceProvider.GetRequiredService<IOtpGenerator>(), _serviceProvider.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), _serviceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
-            _serviceProvider.GetRequiredService<IApplicationHasher>(), _serviceProvider.GetRequiredService<IEmailService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>()
+            otpGenerator ?? _serviceProvider.GetRequiredService<IOtpGenerator>(), _serviceProvider.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), _serviceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
+            applicationHasher ?? _serviceProvider.GetRequiredService<IApplicationHasher>(), _serviceProvider.GetRequiredService<IEmailService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>()
             );
     }
+
+    private RequestOtpDto BuildOtpRequest(string usernameoremail = "test@mail.com", OtpPurpose purpose = OtpPurpose.PasswordReset) => new RequestOtpDto() { Purpose = purpose, UserNameOrEmailAddress = usernameoremail };
 
     private LoginUserDto BuildLoginEntity(string usernameoremail = "", string password = DefaultPassword)
     {
@@ -509,5 +572,173 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.NotNull(modifiedUser);
         bool isPasswordChanged = await usermanager.CheckPasswordAsync(modifiedUser, DefaultPassword);
         Assert.True(isPasswordChanged, "Password was changed.");
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_CancellationRequested_Returns500InternalServerError()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var request = BuildOtpRequest();
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.RequestOtpAsync(ct: cts.Token, requestOtp: request);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("An error occurred requesting for OTP. Kindly retry.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_ValidRequest_UserEmail_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(usernameoremail: seedResult.email);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("OTP sent successfully.", result.ResponseMessage, ignoreCase: true);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var otpConfig = assertScope.ServiceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>();
+
+        var user = await usermanager.FindByEmailAsync(request.UserNameOrEmailAddress);
+        Assert.NotNull(user);
+        List<OtpVerification> otps = await assertCtx.OtpVerifications.Where(x => x.UserId == user.Id).ToListAsync();
+        Assert.Single(otps);
+        var userOtp = otps.First();
+        Assert.True(userOtp.CreatedAt < userOtp.ExpiresAt);
+        Assert.Equal(otpConfig.CurrentValue.OtpExpirationAfterInSeconds, (userOtp.ExpiresAt - userOtp.CreatedAt).TotalSeconds, tolerance: 5);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_ValidRequest_UserName_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(usernameoremail: seedResult.userName);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("OTP sent successfully.", result.ResponseMessage, ignoreCase: true);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var otpConfig = assertScope.ServiceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>();
+
+        var user = await usermanager.FindByNameAsync(request.UserNameOrEmailAddress);
+        Assert.NotNull(user);
+        List<OtpVerification> otps = await assertCtx.OtpVerifications.Where(x => x.UserId == user.Id).ToListAsync();
+        Assert.Single(otps);
+        var userOtp = otps.First();
+        Assert.True(userOtp.CreatedAt < userOtp.ExpiresAt);
+        Assert.Equal(otpConfig.CurrentValue.OtpExpirationAfterInSeconds, (userOtp.ExpiresAt - userOtp.CreatedAt).TotalSeconds, tolerance: 5);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_InValidRequest_UserNameNotExist_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(usernameoremail: "testeduser123");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User with details does not exist.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_InValidRequest_EmailNotExist_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(usernameoremail: "testuser@mail.com");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User with details does not exist.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_ValidRequest_OtpGenerationFailedReturnsFailed()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(seedResult.email);
+
+        _otpGeneratorMock.Setup(x => x.GenerateOtp(It.IsAny<int>(), It.IsAny<int>())).Returns("");
+        _applicationHasherMock.Setup(x => x.HashSecret(It.IsAny<string>())).ReturnsAsync("hashed-secret");
+        var sut = CreateSut(otpGenerator: _otpGeneratorMock.Object, applicationHasher: _applicationHasherMock.Object);
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(request);
+        Assert.NotNull(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Operation could not be completed. Kindly retry.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RequestOtpAsync_ValidRequest_HashingFailedReturnsFailed()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var request = BuildOtpRequest(seedResult.email);
+
+        _otpGeneratorMock.Setup(x => x.GenerateOtp(It.IsAny<int>(), It.IsAny<int>())).Returns("123456");
+        _applicationHasherMock.Setup(x => x.HashSecret(It.IsAny<string>())).ReturnsAsync("");
+        var sut = CreateSut(otpGenerator: _otpGeneratorMock.Object, applicationHasher: _applicationHasherMock.Object);
+
+        //Act
+        var result = await sut.RequestOtpAsync(request, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(request);
+        Assert.NotNull(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Operation could not be completed. Kindly retry.", result.ResponseMessage, ignoreCase: true);
     }
 }
