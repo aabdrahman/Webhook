@@ -1,6 +1,4 @@
-﻿
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 using WebHook.Core.Entities;
@@ -17,6 +15,8 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
     public DbSet<WebhookDeliveryAttempt> WebhookDeliveryAttempts { get; set; }
     public DbSet<WebhookSubscriptionEvent> WebhookEventSubscriptions { get; set; }
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
+    public DbSet<OtpOperationToken> OtpOperationTokens { get; set; }
+    public DbSet<OtpVerification> OtpVerifications { get; set; }
 
     public RepositoryContext(DbContextOptions<RepositoryContext> options) : base(options)
     {

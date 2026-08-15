@@ -1,9 +1,7 @@
 ﻿using MassTransit;
-using MassTransit.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
@@ -220,6 +218,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<DeadLetterManualRetryConfiguration>(configuration.GetSection("DeadLetterManualRetry"));
         services.Configure<EmailProcessorWorkerConfiguration>(configuration.GetSection("EmailProcessorWorker"));
         services.Configure<JwtSettingsConfiguration>(configuration.GetSection("JwtSettings"));
+        services.Configure<TokenValidationConfiguration>(configuration.GetSection("TokenValidation"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)

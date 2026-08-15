@@ -1,6 +1,4 @@
-﻿
-
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 
 namespace WebHook.Core.Entities;
 
@@ -22,4 +20,8 @@ public class User : IdentityUser<Guid>
 
     //Relationship with the subscriptions created by the user
     public ICollection<WebhookSubscription> WebhookSubscriptions { get; set; } = [];
+
+    //Relationship with the otp verificatiosn
+    public ICollection<OtpVerification> OtpVerifications { get; set; } = [];
+    public ICollection<OtpOperationToken> OtpOperationTokens { get; set; } = [];
 }
