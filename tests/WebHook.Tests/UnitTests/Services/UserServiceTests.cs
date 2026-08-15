@@ -148,6 +148,10 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         return (dto.EmailAddress, dto.UserName);
     }
 
+    private UserDeactivationRequestDto BuildUserDeactivateRequest(string usernameoremail = "test@mail.com", string justification = "This is for test purpose.") => new UserDeactivationRequestDto() { UserNameOrEmailAddress = usernameoremail, DeactivationJustification = justification };
+
+    private ReactivateUserRequestDto BuildUserReactivationRequest(string usernameoremail = "test@mail.com") => new ReactivateUserRequestDto() { UserNameOrEmailAddress = usernameoremail };
+
     private UserService GetSut()
     {
         return new UserService(new RepositoryContext(_dbContextOptions), _userManagerMock.Object);
@@ -495,5 +499,313 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
         Assert.Equal("An error occurred while creating user.", result.ResponseMessage, ignoreCase: true);
         Assert.NotNull(result.ErrorDetail);
+    }
+
+    [Fact]
+    public async Task DeactivateUserProfileAsync_ValidRequest_EmailAddressProvided_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var userDeactivateRequest = BuildUserDeactivateRequest(usernameoremail: seedResult.email);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.DeactivateUserProfileAsync(userDeactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User profile successfully deactivated.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var userManager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+        var deactivatedUser = await userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.NormalizedEmail.Contains(userDeactivateRequest.UserNameOrEmailAddress.ToUpper()));
+        Assert.NotNull(deactivatedUser);
+        Assert.False(deactivatedUser.IsActive);
+        Assert.NotNull(deactivatedUser.DeletedAt);
+        Assert.NotNull(deactivatedUser.DeactivationJustification);
+        Assert.Equal(userDeactivateRequest.DeactivationJustification, deactivatedUser.DeactivationJustification, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task DeactivateUserProfileAsync_ValidRequest_UsernameProvided_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var userDeactivateRequest = BuildUserDeactivateRequest(usernameoremail: seedResult.userName);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.DeactivateUserProfileAsync(userDeactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User profile successfully deactivated.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var userManager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+        var deactivatedUser = await userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.NormalizedUserName.Contains(userDeactivateRequest.UserNameOrEmailAddress.ToUpper()));
+        Assert.NotNull(deactivatedUser);
+        Assert.False(deactivatedUser.IsActive);
+        Assert.NotNull(deactivatedUser.DeletedAt);
+        Assert.NotNull(deactivatedUser.DeactivationJustification);
+        Assert.Equal(userDeactivateRequest.DeactivationJustification, deactivatedUser.DeactivationJustification, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task DeactivateUserProfileAsync_EmailNotExist_Returns404NotFound()
+    {
+        //Arrange
+        var userDeactivateRequest = BuildUserDeactivateRequest(usernameoremail: "user@example.com");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.DeactivateUserProfileAsync(userDeactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.StartsWith("User with details does not exist -", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(userDeactivateRequest.UserNameOrEmailAddress, result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DeactivateUserProfileAsync_UsernameNotExist_Returns404NotFound()
+    {
+        //Arrange
+        var userDeactivateRequest = BuildUserDeactivateRequest(usernameoremail: "testuser101");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.DeactivateUserProfileAsync(userDeactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.StartsWith("User with details does not exist -", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(userDeactivateRequest.UserNameOrEmailAddress, result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_ValidEmail_UserActive_Returns409Conflict()
+    {
+        //Arrange
+        var seedUserResult = await SeedUserAsync();
+        var reactivateRequest = BuildUserReactivationRequest(seedUserResult.email);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ReactivateUserProfileAsync(reactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User profile is currently active.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.Conflict, result.HttpStatusCode);
+
+        using var scope = _serviceProvider.CreateScope();
+        var usermanager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var userFromDb = await usermanager.FindByEmailAsync(reactivateRequest.UserNameOrEmailAddress);
+
+        Assert.NotNull(userFromDb);
+        Assert.True(userFromDb.IsActive);
+        Assert.Null(userFromDb.DeletedAt);
+        Assert.Null(userFromDb.DeactivationJustification);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_ValidUsername_UserActive_Returns409Conflict()
+    {
+        //Arrange
+        var seedUserResult = await SeedUserAsync();
+        var reactivateRequest = BuildUserReactivationRequest(seedUserResult.userName);
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ReactivateUserProfileAsync(reactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User profile is currently active.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.Conflict, result.HttpStatusCode);
+
+        using var scope = _serviceProvider.CreateScope();
+        var usermanager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var userFromDb = await usermanager.FindByNameAsync(reactivateRequest.UserNameOrEmailAddress);
+
+        Assert.NotNull(userFromDb);
+        Assert.True(userFromDb.IsActive);
+        Assert.Null(userFromDb.DeletedAt);
+        Assert.Null(userFromDb.DeactivationJustification);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_ValidEmail_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var deactivateRequest = BuildUserDeactivateRequest(usernameoremail: seedResult.email);
+
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+            var deactivateResult = await userService.DeactivateUserProfileAsync(deactivateRequest);
+            Assert.NotNull(deactivateResult);
+            Assert.True(deactivateResult.IsSuccessful);
+        }
+
+        var reactivateRequest = BuildUserReactivationRequest(usernameoremail: seedResult.email);
+        //var sut = CreateSut();
+
+        //Act
+        using (var reactivationScope = _serviceProvider.CreateScope())
+        {
+            var userService = reactivationScope.ServiceProvider.GetRequiredService<IUserService>(); 
+            var result = await userService.ReactivateUserProfileAsync(reactivateRequest);
+
+            //Assert
+            Assert.NotNull(result);
+            Assert.True(result.IsSuccessful, result.ResponseMessage);
+            Assert.NotNull(result.ResponseData);
+            Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+            Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+            Assert.Equal("User profile successfully reactivated.", result.ResponseMessage, ignoreCase: true);
+        }
+        
+
+        
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var deactivatedUser = await usermanager.FindByEmailAsync(reactivateRequest.UserNameOrEmailAddress);
+
+        Assert.NotNull(deactivatedUser);
+        Assert.True(deactivatedUser.IsActive);
+        Assert.NotNull(deactivatedUser.DeactivationJustification);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_ValidUsername_Returns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var deactivateRequest = BuildUserDeactivateRequest(usernameoremail: seedResult.userName);
+
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+            var deactivateResult = await userService.DeactivateUserProfileAsync(deactivateRequest);
+            Assert.NotNull(deactivateResult);
+            Assert.True(deactivateResult.IsSuccessful);
+        }
+        
+
+
+        var reactivateRequset = BuildUserReactivationRequest(usernameoremail: seedResult.userName);
+        //var sut = CreateSut();
+
+        //Act
+        using (var reactivationScope = _serviceProvider.CreateScope())
+        {
+            var reactivationUserService = reactivationScope.ServiceProvider.GetRequiredService<IUserService>();
+
+            var result = await reactivationUserService.ReactivateUserProfileAsync(reactivateRequset, CancellationToken.None);
+
+            //Assert
+            Assert.NotNull(result);
+            Assert.True(result.IsSuccessful, result.ResponseMessage);
+            Assert.NotNull(result.ResponseData);
+            Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+            Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+            Assert.Equal("User profile successfully reactivated.", result.ResponseMessage, ignoreCase: true);
+        }
+
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var deactivatedUser = await usermanager.FindByNameAsync(reactivateRequset.UserNameOrEmailAddress);
+
+        Assert.NotNull(deactivatedUser);
+        Assert.True(deactivatedUser.IsActive);
+        Assert.NotNull(deactivatedUser.DeactivationJustification);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_EmailNotExist_Returns404NotFound()
+    {
+        //Arrange
+        var userReactivateRequest = BuildUserReactivationRequest(usernameoremail: "user@example.com");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ReactivateUserProfileAsync(userReactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User with provided details does not exist.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_UsernameNotExist_Returns404NotFound()
+    {
+        //Arrange
+        var userReactivateRequest = BuildUserReactivationRequest(usernameoremail: "testuser101");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ReactivateUserProfileAsync(userReactivateRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User with provided details does not exist.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task ReactivateUserProfileAsync_CancellationRequested_Returns500InternalServerError()
+    {
+        //Arrange
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var reactivationRequest = BuildUserReactivationRequest();
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ReactivateUserProfileAsync(reactivationRequest, cts.Token);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.Equal("An error occurred while deactivating user profile. Kindly retry.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
     }
 }

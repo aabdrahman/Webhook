@@ -55,6 +55,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired(false)
             .HasMaxLength(500);
 
+        builder.HasQueryFilter(x => x.IsActive);
+
         //Realtonship with subscriptions
         builder.HasMany(x => x.WebhookSubscriptions)
             .WithOne(x => x.CreatedByUser)

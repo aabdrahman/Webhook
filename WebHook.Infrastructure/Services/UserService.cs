@@ -103,4 +103,98 @@ public sealed class UserService : IUserService
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
     }
+
+    public async Task<GenericResponse<string>> DeactivateUserProfileAsync(UserDeactivationRequestDto userDeactivationRequest, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(DeactivateUserProfileAsync));
+
+        try
+        {
+            _logger.Information("Deactivate User profile request - {0}", userDeactivationRequest);
+
+            User? userToDeactivate = userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
+                                        await _userManager.FindByEmailAsync(userDeactivationRequest.UserNameOrEmailAddress) :
+                                        await _userManager.FindByNameAsync(userDeactivationRequest.UserNameOrEmailAddress);
+
+            if(userToDeactivate is null)
+            {
+                _logger.Warning(userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exist - {0}" : "User with provided user name does not exist - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+                return GenericResponse<string>.Failure("Operation Failed.", $"User with details does not exist - {userDeactivationRequest.UserNameOrEmailAddress}", HttpStatusCode.NotFound);
+            }
+
+            userToDeactivate.IsActive = false;
+            userToDeactivate.DeactivationJustification = userDeactivationRequest.DeactivationJustification;
+            userToDeactivate.DeletedAt = DateTimeOffset.UtcNow;
+            userToDeactivate.DeletedByUserId = "";
+            IdentityResult deactivateResult = await _userManager.UpdateAsync(userToDeactivate);
+
+            if (!deactivateResult.Succeeded)
+            {
+                _logger.Warning("User profile could not be deactivated. Errors - {0}", deactivateResult.Errors.ToList());
+                return GenericResponse<string>.Failure("Operation Failed.", "User profile could not be deactivated. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            _logger.Information("User profile successfully deactivated - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+            return GenericResponse<string>.Success("Operation Successful.", "User profile successfully deactivated.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while deactivating user profile.");
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while deactivating user profile. Kindly retry.", HttpStatusCode.InternalServerError);
+        }
+    }
+
+    public async Task<GenericResponse<string>> ReactivateUserProfileAsync(ReactivateUserRequestDto reactivateUser, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(ReactivateUserProfileAsync));
+        try
+        {
+            _logger.Information("Reactivate User Profile request - {0}", reactivateUser);
+
+            var userToReactivateQuery = _userManager.Users.IgnoreQueryFilters();
+
+            if(reactivateUser.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase))
+            {
+                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedEmail.Contains(reactivateUser.UserNameOrEmailAddress.ToUpper()));
+            }
+            else
+            {
+                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedUserName.Contains(reactivateUser.UserNameOrEmailAddress.ToUpper()));
+            }
+
+            User? userToReactivate = await userToReactivateQuery.FirstOrDefaultAsync(ct);
+
+            if(userToReactivate is null)
+            {
+                _logger.Warning("User profile with details - {0} does not exist.", reactivateUser.UserNameOrEmailAddress);
+                return GenericResponse<string>.Failure("Operation Failed.", "User with provided details does not exist.", HttpStatusCode.NotFound);
+            }
+
+            if (userToReactivate.IsActive)
+            {
+                _logger.Warning("User profile with identifier - {0} is already active. Current Status - {0}", reactivateUser.UserNameOrEmailAddress, userToReactivate.IsActive);
+                return GenericResponse<string>.Failure("Operation Failed.", "User profile is currently active.", HttpStatusCode.Conflict);
+            }
+
+            userToReactivate.IsActive = true;
+            IdentityResult reactivateResult = await _userManager.UpdateAsync(userToReactivate);
+
+            if (!reactivateResult.Succeeded)
+            {
+                _logger.Warning("User profile could not be reactivated by the system identity provider. Errors - {0}", reactivateResult.Errors.ToList());
+                return GenericResponse<string>.Failure("Operation Failed.", "User profile deactivation failed. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            _logger.Information("User with profile identifier - {0} has been successfully reactivated.", reactivateUser.UserNameOrEmailAddress);
+            return GenericResponse<string>.Success("Operation Successful.", "User profile successfully reactivated.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while reactivating user profile.");
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while deactivating user profile. Kindly retry.", HttpStatusCode.InternalServerError);
+        }
+
+    }
 }
