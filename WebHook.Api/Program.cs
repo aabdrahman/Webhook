@@ -57,7 +57,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference(opts =>
     {
-        opts.WithPreferredScheme(JwtBearerDefaults.AuthenticationScheme);
+        //opts.WithPreferredScheme(JwtBearerDefaults.AuthenticationScheme); //Disabled beacuase of warning as it is to be obsolete soon.
+        opts.AddPreferredSecuritySchemes(JwtBearerDefaults.AuthenticationScheme);
     });
 }
 

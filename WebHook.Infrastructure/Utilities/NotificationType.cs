@@ -3,5 +3,6 @@
 public enum NotificationType
 {
     DeadLetterNotification,
-    SlowEndpointNotification
+    SlowEndpointNotification,
+    SendOtpNotification
 }

@@ -11,9 +11,11 @@ using System.Net;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
 using static MassTransit.ValidationResultExtensions;
 
@@ -145,7 +147,12 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     private Infrastructure.Services.AuthenticationService CreateSut()
     {
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        return new Infrastructure.Services.AuthenticationService(_serviceProvider.GetRequiredService<UserManager<User>>(), ctx, _serviceProvider.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), _serviceProvider.GetRequiredService<SignInManager<User>>());
+        return new Infrastructure.Services.AuthenticationService(
+            _serviceProvider.GetRequiredService<UserManager<User>>(), ctx,
+            _serviceProvider.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), _serviceProvider.GetRequiredService<SignInManager<User>>(),
+            _serviceProvider.GetRequiredService<IOtpGenerator>(), _serviceProvider.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), _serviceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
+            _serviceProvider.GetRequiredService<IApplicationHasher>(), _serviceProvider.GetRequiredService<IEmailService>(), _serviceProvider.GetRequiredService<EmailContentFormatterHelper>()
+            );
     }
 
     private LoginUserDto BuildLoginEntity(string usernameoremail = "", string password = DefaultPassword)
@@ -164,10 +171,10 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         return (dto.EmailAddress, dto.UserName);
     }
 
-    private Infrastructure.Services.AuthenticationService GetSut()
-    {
-        return new Infrastructure.Services.AuthenticationService(_userManagerMock.Object, new RepositoryContext(_dbContextOptions), _settingsConfigMock.Object, _signinManagerMock.Object);
-    }
+    //private Infrastructure.Services.AuthenticationService GetSut()
+    //{
+    //    return new Infrastructure.Services.AuthenticationService(_userManagerMock.Object, new RepositoryContext(_dbContextOptions), _settingsConfigMock.Object, _signinManagerMock.Object);
+    //}
 
     private Mock<UserManager<User>> CreateUserManagerMock()
     {

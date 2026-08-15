@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Password Reset Request</title>
+  <style>
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; background-color: #F0F2F5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+    /* Layout */
+    .email-wrapper   { width: 100%; background-color: #F0F2F5; padding: 40px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+    /* Header */
+    .header          { background-color: #1A1D23; padding: 32px 40px; }
+    .header-icon     { width: 36px; height: 36px; background-color: #3B82F6; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 36px; text-align: center; }
+    .header-brand    { color: #FFFFFF; font-size: 16px; font-weight: 600; letter-spacing: 0.02em; margin: 0; padding: 0; }
+    .header-tagline  { color: #8B929E; font-size: 12px; margin: 0; padding: 0; }
+
+    /* Alert banner */
+    .alert-banner    { background-color: #EFF6FF; border-left: 4px solid #3B82F6; padding: 16px 40px; }
+    .alert-label     { color: #1D4ED8; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px 0; }
+    .alert-title     { color: #1A1D23; font-size: 20px; font-weight: 700; margin: 0; line-height: 1.3; }
+
+    /* Body */
+    .body-content    { padding: 32px 40px; }
+    .greeting        { color: #1A1D23; font-size: 15px; margin: 0 0 16px 0; line-height: 1.6; }
+    .body-text       { color: #4A5568; font-size: 14px; line-height: 1.7; margin: 0 0 24px 0; }
+
+    /* OTP box */
+    .otp-container   { text-align: center; margin: 0 0 28px 0; }
+    .otp-label       { color: #8B929E; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px 0; }
+    .otp-box         { display: inline-block; background-color: #F7F8FA; border: 2px dashed #CBD5E0; border-radius: 8px; padding: 20px 40px; }
+    .otp-code        { color: #1A1D23; font-size: 40px; font-weight: 800; letter-spacing: 12px; font-family: 'Courier New', Courier, monospace; line-height: 1; margin: 0; }
+    .otp-expiry      { color: #E53E3E; font-size: 12px; font-weight: 600; margin: 10px 0 0 0; letter-spacing: 0.02em; }
+
+    /* Expiry detail card */
+    .detail-card     { background-color: #F7F8FA; border: 1px solid #E2E6EA; border-radius: 6px; padding: 16px 20px; margin: 0 0 24px 0; }
+    .detail-row-text { color: #4A5568; font-size: 13px; line-height: 1.6; margin: 0 0 6px 0; }
+    .detail-row-text:last-child { margin: 0; }
+    .detail-row-text strong { color: #1A1D23; }
+
+    /* Warning box */
+    .warning-box     { background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 14px 18px; margin: 0 0 24px 0; }
+    .warning-title   { color: #92400E; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 6px 0; }
+    .warning-text    { color: #78350F; font-size: 13px; line-height: 1.6; margin: 0; }
+
+    /* Divider */
+    .divider         { border: none; border-top: 1px solid #E2E6EA; margin: 0; }
+
+    /* Footer */
+    .footer          { padding: 24px 40px; background-color: #F7F8FA; }
+    .footer-text     { color: #8B929E; font-size: 12px; line-height: 1.6; margin: 0 0 8px 0; }
+    .footer-text:last-child { margin: 0; }
+    .footer-text a   { color: #4A5568; text-decoration: underline; }
+
+    /* Responsive */
+    @media only screen and (max-width: 620px) {
+      .email-wrapper   { padding: 0 !important; }
+      .email-container { border-radius: 0 !important; }
+      .header, .alert-banner, .body-content, .footer { padding-left: 24px !important; padding-right: 24px !important; }
+      .otp-code        { font-size: 28px !important; letter-spacing: 8px !important; }
+      .otp-box         { padding: 16px 24px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-container">
+
+      <!-- Header -->
+      <div class="header">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="vertical-align: middle;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align: middle; padding-right: 12px;">
+                    <div class="header-icon">🔐</div>
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <p class="header-brand">Webhook Notification Service</p>
+                    <p class="header-tagline">Account Security</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td style="text-align: right; vertical-align: middle;">
+              <span style="color: #8B929E; font-size: 12px;">{{NotificationTimestamp}}</span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Alert banner -->
+      <div class="alert-banner">
+        <p class="alert-label">🔑 Password Reset</p>
+        <p class="alert-title">You requested a password reset</p>
+      </div>
+
+      <!-- Body -->
+      <div class="body-content">
+
+        <p class="greeting">Hi <strong>{{FirstName}}</strong>,</p>
+
+        <p class="body-text">
+          We received a request to reset the password for your account associated
+          with <strong>{{EmailAddress}}</strong>. Use the one-time code below to
+          complete your password reset.
+        </p>
+
+        <!-- OTP Code -->
+        <div class="otp-container">
+          <p class="otp-label">Your one-time password</p>
+          <div class="otp-box">
+            <p class="otp-code">{{OtpCode}}</p>
+            <p class="otp-expiry">⏱ Expires in {{ExpiresInMinute}} minutes</p>
+          </div>
+        </div>
+
+        <!-- Request details -->
+        <div class="detail-card">
+          <p class="detail-row-text">
+            <strong>Requested at:</strong> &nbsp; {{RequestedAt}}
+          </p>
+          <!--<p class="detail-row-text">
+            <strong>Expires at:</strong> &nbsp; {{ExpiresAt}}
+          </p>-->
+          <!--<p class="detail-row-text">
+            <strong>IP Address:</strong> &nbsp; {{RequestIpAddress}}
+          </p>-->
+        </div>
+
+        <!-- Security warning -->
+        <div class="warning-box">
+          <p class="warning-title">⚠ Did not request this?</p>
+          <p class="warning-text">
+            If you did not request a password reset, ignore this email — your
+            password will not change and this code will expire automatically in
+            10 minutes. If you are concerned your account may be compromised,
+            please contact support immediately.
+          </p>
+        </div>
+
+        <p class="body-text" style="font-size: 13px; color: #8B929E;">
+          For your security, never share this code with anyone. Our team will
+          never ask you for your OTP.
+        </p>
+
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Footer -->
+      <div class="footer">
+        <p class="footer-text">
+          This email was sent to <strong>{{EmailAddress}}</strong> because a
+          password reset was requested for your account.
+        </p>
+        <p class="footer-text">
+          If you need help, contact us at
+          <a href="mailto:{{SupportEmail}}">{{SupportEmail}}</a>.
+        </p>
+        <p class="footer-text" style="margin-top: 12px; color: #CBD5E0;">
+          Webhook Notification Service &nbsp;·&nbsp; Account Security
+        </p>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

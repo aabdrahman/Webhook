@@ -7,12 +7,16 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.Services;
 
@@ -22,15 +26,31 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly RepositoryContext _repositoryContext;
     private readonly JwtSettingsConfiguration _jwtSettingsConfiguration;
     private readonly SignInManager<User> _signInManager;
+    private readonly IOtpGenerator _otpGenerator;
+    private readonly IOptionsMonitor<OtpSettingsConfiguration> _otpettingsOptionsMonitor;
+    private readonly IOptionsMonitor<TokenValidationConfiguration> _tokenValidationOptionsMonitor;
+    private readonly IApplicationHasher _applicationHasher;
+    private readonly IEmailService _emailService;
+    private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
 
-    public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext, IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager)
+    public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
+                                IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
+                                IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
+                                IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher, 
+                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper)
     {
         _userManager = userManager;
         _repositoryContext = repositoryContext;
         _jwtSettingsConfiguration = jwtSettingsOptionsMonitor.CurrentValue;
         _signInManager = signInManager;
+        _otpGenerator = otpGenerator;
+        _otpettingsOptionsMonitor = otpettingsOptionsMonitor;
+        _tokenValidationOptionsMonitor = tokenValidationOptionsMonitor;
+        _applicationHasher = applicationHasher;
+        _emailService = emailService;
 
         _logger = Log.ForContext(_className, nameof(AuthenticationService));
+        _emailContentFormatterHelper = emailContentFormatterHelper;
     }
 
     private Serilog.ILogger _logger;
@@ -179,6 +199,111 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             _logger.Error(ex, "An error occurred performing user password change.");
             return GenericResponse<string>.Failure("Operation Failed.", "Operation could not be completed.", HttpStatusCode.InternalServerError);
+        }
+
+    }
+
+    public async Task<GenericResponse<string>> RequestOtpAsync(RequestOtpDto requestOtp, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(RequestOtpAsync));
+
+        try
+        {
+            _logger.Information("Request OTP - {0}", requestOtp);
+
+            User? requestingUser = requestOtp.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
+                                   await  _userManager.FindByEmailAsync(requestOtp.UserNameOrEmailAddress) :
+                                    await _userManager.FindByNameAsync(requestOtp.UserNameOrEmailAddress);
+
+            if(requestingUser is null)
+            {
+                _logger.Warning("User with details does not exist - {0}", requestOtp.UserNameOrEmailAddress);
+                return GenericResponse<string>.Failure("Opearion Failed.", "User with details does not exist.", HttpStatusCode.NotFound);
+            }
+
+            string generatedOTP = _otpGenerator.GenerateOtp(_otpettingsOptionsMonitor.CurrentValue.OtpToGenerateLength, _otpettingsOptionsMonitor.CurrentValue.MaximumOtpLength);
+            if (string.IsNullOrEmpty(generatedOTP))
+            {
+                _logger.Warning("OTP could not be generated.");
+                return GenericResponse<string>.Failure("Operation Faield.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
+            }
+
+            string hashedOTP = await _applicationHasher.HashSecret(generatedOTP);
+            if (string.IsNullOrEmpty(hashedOTP))
+            {
+                _logger.Warning("An error occurred while hashing the OTP. Hash returns - {0}", hashedOTP);
+                return GenericResponse<string>.Failure("Operation Faield.", "Operation could not be completed. Kindly retry.", HttpStatusCode.FailedDependency);
+            }
+
+            OtpVerification otpVerification = new OtpVerification()
+            {
+                UserId = requestingUser.Id,
+                Purpose = requestOtp.Purpose,
+                OtpHash = hashedOTP,
+                ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(_tokenValidationOptionsMonitor.CurrentValue.OtpExpirationAfterInSeconds)
+            };
+
+            await _repositoryContext.OtpVerifications.AddAsync(otpVerification, ct);
+            await _repositoryContext.SaveChangesAsync(ct);
+
+            //Begin sending email operation
+            string subject = requestOtp.Purpose switch
+            {
+                OtpPurpose.PasswordReset => "Password Reset Request",
+                _ => ""
+            };
+
+            string label = requestOtp.Purpose switch
+            {
+                OtpPurpose.PasswordReset => "Password Reset",
+                _ => ""
+            };
+
+            string title = requestOtp.Purpose switch
+            {
+                OtpPurpose.PasswordReset => "You requested a password reset",
+                _ => ""
+            };
+
+            string description = requestOtp.Purpose switch
+            {
+                OtpPurpose.PasswordReset => "We received a request to reset the password for your account...",
+                _ => ""
+            };
+
+            Dictionary<string, string> emailTemplateParameter = new Dictionary<string, string>()
+            {
+                { "NotificationTimestamp", DateTimeOffset.UtcNow.ToLocalTime().ToString("F") },
+                { "FirstName", requestingUser.FirstName  },
+                { "EmailAddress", requestingUser.NormalizedEmail!.ToLower() },
+                { "OtpCode", generatedOTP },
+                { "RequestedAt", otpVerification.CreatedAt.ToLocalTime().ToString("F") },
+                { "ExpiresAt", otpVerification.ExpiresAt.ToLocalTime().ToString("F")  },
+                { "SupportEmail", "support@webhook.com" },
+                { "OtpExpiryMinutes", TimeSpan.FromSeconds(_tokenValidationOptionsMonitor.CurrentValue.OtpExpirationAfterInSeconds).Minutes.ToString("G") },
+                { "OtpPurposeLabel", label },
+                { "OtpPurposeTitle", title },
+                { "OtpPurposeDescription", description }
+            };
+
+            string? emailContent = await _emailContentFormatterHelper.GetEmailContentAsync(NotificationType.SendOtpNotification, emailTemplateParameter);
+            bool queueEmailResult = false;
+
+            if (!string.IsNullOrEmpty(emailContent))
+            {
+                EmailSenderDto emailSenderItem = new EmailSenderDto(MailContent: emailContent, Subject: subject, MailRecipients: [requestingUser.NormalizedEmail!], IsHtml: true);
+                queueEmailResult = await _emailService.SendMailAsync(emailSenderItem, ct);
+            }
+
+
+            _logger.Information("User OTP requested successfully. Requested OTP - {0}. Queue Email response: {1}. Email COntent Generated - {2}", generatedOTP, queueEmailResult, !string.IsNullOrEmpty(emailContent));
+            return GenericResponse<string>.Success("Operation Successful.", "OTP sent successfully.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while requesting for OTP.");
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred requesting for OTP. Kindly retry.", HttpStatusCode.InternalServerError);
         }
 
     }

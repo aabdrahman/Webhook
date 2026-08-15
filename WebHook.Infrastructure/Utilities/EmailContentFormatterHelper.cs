@@ -19,7 +19,8 @@ public class EmailContentFormatterHelper
     private static readonly IReadOnlyDictionary<NotificationType, string> emailTemplates = new Dictionary<NotificationType, string>()
     {
         { NotificationType.DeadLetterNotification, "DeadLetterNotification.html" },
-        { NotificationType.SlowEndpointNotification, "SlowEndpointNotification.html" }
+        { NotificationType.SlowEndpointNotification, "SlowEndpointNotification.html" },
+        { NotificationType.SendOtpNotification, "OtpNotification.html" }
     };
 
     public async Task<string?> GetEmailContentAsync(NotificationType emailType, Dictionary<string, string> parameters)

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace WebHook.Core.Entities.ConfigurationModels;
+﻿namespace WebHook.Core.Entities.ConfigurationModels;
 
 public class TokenValidationConfiguration
 {

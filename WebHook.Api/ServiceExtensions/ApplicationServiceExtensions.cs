@@ -219,6 +219,7 @@ internal static class ApplicationServiceExtensions
         services.Configure<EmailProcessorWorkerConfiguration>(configuration.GetSection("EmailProcessorWorker"));
         services.Configure<JwtSettingsConfiguration>(configuration.GetSection("JwtSettings"));
         services.Configure<TokenValidationConfiguration>(configuration.GetSection("TokenValidation"));
+        services.Configure<OtpSettingsConfiguration>(configuration.GetSection("OtpSettings"));
     }
 
     internal static void ConfigureApplicationServices(this IServiceCollection services)
