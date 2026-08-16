@@ -231,6 +231,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IDeadLetterQueueService, DeadLetterQueueService>();
         services.AddScoped<IAuthenticationService,  AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IOtpService, OtpService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
