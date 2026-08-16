@@ -48,7 +48,7 @@ public sealed class OtpService : IOtpService
         {
             _logger.Information("Revoke all ununsed otps for user - {0}", userId);
 
-            int totalUpdatedRecords = await _repositoryContext.OtpVerifications.Where(x => !x.IsConsumed && !x.ConsumedAt.HasValue && x.UserId!.Value == userId)
+            int totalUpdatedRecords = await _repositoryContext.OtpVerifications.Where(x => !x.IsConsumed && !x.ConsumedAt.HasValue && x.UserId!.Value == userId && x.ExpiresAt > DateTimeOffset.UtcNow)
                                                         .ExecuteUpdateAsync(setter => setter.SetProperty(ot => ot.RevokedAt, DateTimeOffset.UtcNow), cancellationToken: ct);
 
             _logger.Information("All user unverified tokens revoked successfully. Total revoked tokens: {0}", totalUpdatedRecords);
@@ -80,7 +80,7 @@ public sealed class OtpService : IOtpService
                 return GenericResponse<OtpVerificationDto>.Failure(null, "OTP Verification Failed. Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            OtpVerification? linkedUserOtp = await _repositoryContext.OtpVerifications.OrderByDescending(x => x.ConsumedAt).FirstOrDefaultAsync(
+            OtpVerification? linkedUserOtp = await _repositoryContext.OtpVerifications.OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(
                                                                                                 x => !x.RevokedAt.HasValue && !x.IsConsumed && x.UserId!.Value == linkedUser.Id && x.ExpiresAt > DateTimeOffset.UtcNow && !x.ValidatedAt.HasValue,
                                                                                                 cancellationToken: ct);
 
