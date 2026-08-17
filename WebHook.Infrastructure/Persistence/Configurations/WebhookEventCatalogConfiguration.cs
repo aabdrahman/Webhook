@@ -35,7 +35,7 @@ public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<
             .HasDefaultValue(true);
 
         builder.Property(x => x.AvailableFields)
-            .HasConversion(v => JsonSerializer.Serialize(v, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ?? "", 
+            .HasConversion(v => JsonSerializer.Serialize(v, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ?? "",
                             v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ?? new Dictionary<string, string>())
             .HasColumnType("jsonb")
             .IsRequired();

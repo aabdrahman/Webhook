@@ -6,22 +6,22 @@ internal sealed class CallBackUrlValidatorAttribute : ValidationAttribute
 {
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
-        if(value is null)
+        if (value is null)
         {
             return new ValidationResult("No Call Back Url provided.");
         }
 
-        if(value is not string url)
+        if (value is not string url)
         {
             return new ValidationResult("The provided value is not of string type.");
         }
 
-        if(!Uri.TryCreate(url, UriKind.Absolute, out var uri)) 
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             return new ValidationResult("The provided call back url is not valid.");
         }
 
-        if(uri.Scheme != Uri.UriSchemeHttps)
+        if (uri.Scheme != Uri.UriSchemeHttps)
         {
             return new ValidationResult("Only HTTPS call back urls are supported.");
         }

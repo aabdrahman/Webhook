@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi.Reader;
 using Moq;
 using System.Net;
 using WebHook.Api.Controllers;
@@ -205,7 +203,7 @@ public class WebhookSubscriptionControllerTests
     {
         //Arrange
         var expectedResponse = GenericResponse<string>.Failure("Operation Failed.", "Subscription id does not exist.", HttpStatusCode.NotFound);
-        
+
         _webhookSubscriptionServiceMock.Setup(ws => ws.DeleteWebhookSubscriptionAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(expectedResponse);
 
 
@@ -344,7 +342,7 @@ public class WebhookSubscriptionControllerTests
         Assert.NotNull(body);
         Assert.False(body.IsSuccessful);
         Assert.Equal(StatusCodes.Status400BadRequest, objResult.StatusCode);
-        
+
     }
 
     [Fact]

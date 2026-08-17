@@ -1,11 +1,7 @@
-﻿using MassTransit.Courier.Contracts;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Infrastructure.Data_Persistence;
@@ -38,28 +34,28 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
     // IAsyncLifetime — fresh state per test
     // -------------------------------------------------------------------------
 
-        public async Task InitializeAsync()
-        {
-            _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
+    public async Task InitializeAsync()
+    {
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
 
-            var services = new ServiceCollection();
+        var services = new ServiceCollection();
 
-            services.AddDbContext<RepositoryContext>(opt =>
-                opt.UseNpgsql(_fixture.ConnectionString));
+        services.AddDbContext<RepositoryContext>(opt =>
+            opt.UseNpgsql(_fixture.ConnectionString));
 
-            services.AddHttpClient("WebhookDeliveryClient")
-                    .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
+        services.AddHttpClient("WebhookDeliveryClient")
+                .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
 
-            services.AddScoped<WebhookDeliveryRetryAfterService>();
+        services.AddScoped<WebhookDeliveryRetryAfterService>();
 
-            _serviceProvider = services.BuildServiceProvider();
+        _serviceProvider = services.BuildServiceProvider();
 
-            using var scope = _serviceProvider.CreateScope();
-            var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
-            await ctx.Database.EnsureCreatedAsync();
+        await ctx.Database.EnsureCreatedAsync();
 
-            await ctx.Database.ExecuteSqlRawAsync(@"
+        await ctx.Database.ExecuteSqlRawAsync(@"
                 TRUNCATE TABLE
                     ""WebhookDeadLetterQueues"",
                     ""WebhookDeliveryAttempts"",
@@ -71,7 +67,7 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
                 RESTART IDENTITY CASCADE;
             ");
 
-            _webHookEventCatalogs = new List<WebHookEventCatalog>()
+        _webHookEventCatalogs = new List<WebHookEventCatalog>()
             {
                 BuildCatalogEntity(new List<string>() { "customerId", "customerName" }, "CustomerCreated"),
                 BuildCatalogEntity(new List<string>() { "orderId", "orderAmount" }, "OrderPlaced"),
@@ -79,89 +75,89 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
                 BuildCatalogEntity(new List<string>() { "shipmentId", "shipmentStatus" }, "ShipmentDispatched"),
             };
 
-            _webhookSubscriptions = new List<WebhookSubscription>()
+        _webhookSubscriptions = new List<WebhookSubscription>()
             {
                 BuildEntity("Subscription A", eventIds: _webHookEventCatalogs.OrderBy(x => x.Id).Select(x => x.Id).ToList()),
                 BuildEntity("Subscription B", eventIds: _webHookEventCatalogs.OrderBy(x => x.Id).Select(x => x.Id).ToList())
             };
 
-            await ctx.WebHookEventCatalogs.AddRangeAsync(_webHookEventCatalogs);
-            await ctx.WebhookSubscriptions.AddRangeAsync(_webhookSubscriptions);
-            await ctx.SaveChangesAsync();
-        }                   
+        await ctx.WebHookEventCatalogs.AddRangeAsync(_webHookEventCatalogs);
+        await ctx.WebhookSubscriptions.AddRangeAsync(_webhookSubscriptions);
+        await ctx.SaveChangesAsync();
+    }
 
-        public async Task DisposeAsync() =>
-            await _serviceProvider.DisposeAsync();
+    public async Task DisposeAsync() =>
+        await _serviceProvider.DisposeAsync();
 
-        // -------------------------------------------------------------------------
-        // Helpers
-        // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
-        private (RepositoryContext ctx, StaleClaimedDeliveryReleaseService svc) CreateSut()
+    private (RepositoryContext ctx, StaleClaimedDeliveryReleaseService svc) CreateSut()
+    {
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        return (ctx, new StaleClaimedDeliveryReleaseService(ctx));
+    }
+
+    /// <summary>
+    /// Builds a delivery that IS stale — locked, in Processing, lock expired.
+    /// </summary>
+    private WebhookDelivery BuildStaleDelivery(
+        string callbackUrl = "https://partner.com/webhook",
+        string payload = @"{""customerId"":""123""}",
+        int retryCount = 2,
+        WebhookDeliveryStatus status = WebhookDeliveryStatus.Processing, Guid? subscriptionId = null, double expiredAgeInSeconds = 700, string lockedBy = "worker-1") => new()
         {
-            var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-            return (ctx, new StaleClaimedDeliveryReleaseService(ctx));
-        }
+            Id = Guid.NewGuid(),
+            CallBackUrl = callbackUrl,
+            RequestPayload = payload,
+            DeliveryStatus = status,
+            RetryCount = retryCount,
+            NextRetryAt = DateTimeOffset.UtcNow.AddMinutes(-1), // due in the past
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+            WebhookDeliveryAttempts = new List<WebhookDeliveryAttempt>(),   // prevent NullRef (BUG 4)
+            webhookDeadLetterQueues = new List<WebhookDeadLetterQueue>(),    // prevent NullRef (BUG 4)
+            WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
+            webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
+            LockedBy = lockedBy,
+            LockedUntil = DateTimeOffset.UtcNow.AddSeconds(-expiredAgeInSeconds)
+        };
 
-        /// <summary>
-        /// Builds a delivery that IS stale — locked, in Processing, lock expired.
-        /// </summary>
-        private WebhookDelivery BuildStaleDelivery(
-            string callbackUrl = "https://partner.com/webhook",
-            string payload = @"{""customerId"":""123""}",
-            int retryCount = 2,
-            WebhookDeliveryStatus status = WebhookDeliveryStatus.Processing, Guid? subscriptionId = null, double expiredAgeInSeconds = 700, string lockedBy = "worker-1") => new()
-            {
-                Id = Guid.NewGuid(),
-                CallBackUrl = callbackUrl,
-                RequestPayload = payload,
-                DeliveryStatus = status,
-                RetryCount = retryCount,
-                NextRetryAt = DateTimeOffset.UtcNow.AddMinutes(-1), // due in the past
-                CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
-                WebhookDeliveryAttempts = new List<WebhookDeliveryAttempt>(),   // prevent NullRef (BUG 4)
-                webhookDeadLetterQueues = new List<WebhookDeadLetterQueue>(),    // prevent NullRef (BUG 4)
-                WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
-                webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
-                LockedBy = lockedBy,
-                LockedUntil = DateTimeOffset.UtcNow.AddSeconds(-expiredAgeInSeconds)
-            };
+    /// <summary>
+    /// Builds a delivery whose lock has NOT yet expired — still legitimately
+    /// in-flight.
+    /// </summary>
+    private WebhookDelivery BuildActiveLockDelivery(string payload = @"{""customerId"":""123""}", Guid? subscriptionId = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        CallBackUrl = "https://partner.com/webhook",
+        RequestPayload = @"{""customerId"":""123""}",
+        DeliveryStatus = WebhookDeliveryStatus.Processing,
+        RetryCount = 1,
+        LockedBy = "worker-1",
+        LockedUntil = DateTimeOffset.UtcNow.AddMinutes(5), // still valid
+        CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+        WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
+        webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
+    };
 
-            /// <summary>
-            /// Builds a delivery whose lock has NOT yet expired — still legitimately
-            /// in-flight.
-            /// </summary>
-            private WebhookDelivery BuildActiveLockDelivery(string payload = @"{""customerId"":""123""}", Guid? subscriptionId = null) => new()
-            {
-                Id = Guid.NewGuid(),
-                CallBackUrl = "https://partner.com/webhook",
-                RequestPayload = @"{""customerId"":""123""}",
-                DeliveryStatus = WebhookDeliveryStatus.Processing,
-                RetryCount = 1,
-                LockedBy = "worker-1",
-                LockedUntil = DateTimeOffset.UtcNow.AddMinutes(5), // still valid
-                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
-                WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
-                webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
-            };
-
-            /// <summary>
-            /// Builds a delivery with no lock — already released or never claimed.
-            /// </summary>
-            private WebhookDelivery BuildUnlockedDelivery(
-                WebhookDeliveryStatus status = WebhookDeliveryStatus.Pending, string payload = @"{""customerId"":""123""}", Guid? subscriptionId = null) => new()
-                {
-                    Id = Guid.NewGuid(),
-                    CallBackUrl = "https://partner.com/webhook",
-                    RequestPayload = @"{""customerId"":""123""}",
-                    DeliveryStatus = status,
-                    RetryCount = 0,
-                    LockedBy = null,
-                    LockedUntil = null,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
-                    webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
-                };
+    /// <summary>
+    /// Builds a delivery with no lock — already released or never claimed.
+    /// </summary>
+    private WebhookDelivery BuildUnlockedDelivery(
+        WebhookDeliveryStatus status = WebhookDeliveryStatus.Pending, string payload = @"{""customerId"":""123""}", Guid? subscriptionId = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            CallBackUrl = "https://partner.com/webhook",
+            RequestPayload = @"{""customerId"":""123""}",
+            DeliveryStatus = status,
+            RetryCount = 0,
+            LockedBy = null,
+            LockedUntil = null,
+            CreatedAt = DateTimeOffset.UtcNow,
+            WebhookSubscriptionEventId = subscriptionId.HasValue ? subscriptionId.Value : _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
+            webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
+        };
 
     private static WebhookEvent BuildWebhookEvent(
         Guid? id = null,
@@ -177,32 +173,32 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        private static WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
+    private static WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
+    {
+        Id = Guid.NewGuid(),
+        EventName = name,
+        IsActive = true,
+        Description = $"Test Event Catalog: {name}",
+        CreatedAt = DateTimeOffset.UtcNow,
+        AvailableFields = availableFields.ToDictionary(f => f, f => "string"),
+        NormalizedEventName = name.ToUpper()
+    };
+
+    private static WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    {
+        var entityId = Guid.NewGuid();
+
+        return new WebhookSubscription()
         {
-            Id = Guid.NewGuid(),
-            EventName = name,
+            Id = entityId,
+            Name = entityName,
             IsActive = true,
-            Description = $"Test Event Catalog: {name}",
-            CreatedAt = DateTimeOffset.UtcNow,
-            AvailableFields = availableFields.ToDictionary(f => f, f => "string"),
-            NormalizedEventName = name.ToUpper()
+            SubscribedFields = [],
+            CallbackUrl = url,
+            SecretKey = Random.Shared.GetHexString(32),
+            WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };
-
-        private static WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
-        {
-            var entityId = Guid.NewGuid();
-
-            return new WebhookSubscription()
-            {
-                Id = entityId,
-                Name = entityName,
-                IsActive = true,
-                SubscribedFields = [],
-                CallbackUrl = url,
-                SecretKey = Random.Shared.GetHexString(32),
-                WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
-            };
-        }
+    }
 
 
     // -------------------------------------------------------------------------

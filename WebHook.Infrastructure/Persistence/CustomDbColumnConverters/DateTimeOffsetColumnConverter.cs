@@ -6,6 +6,6 @@ internal class DateTimeOffsetColumnConverter : ValueConverter<DateTimeOffset, Da
 {
     public DateTimeOffsetColumnConverter() : base(c => c.ToUniversalTime(), c => c)
     {
-        
+
     }
 }

@@ -2,7 +2,7 @@
 
 public record class WebhookSubscriptionEventDto
 {
-    public Guid SubscriptionId {  get; init; }
+    public Guid SubscriptionId { get; init; }
 
     public string SubscriptionName { get; init; }
 }

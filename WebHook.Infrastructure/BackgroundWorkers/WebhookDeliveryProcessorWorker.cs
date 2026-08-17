@@ -12,7 +12,8 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<WebhookDeliveryWorkerConfiguration> _optionsMonitor;
 
-    public WebhookDeliveryProcessorWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<WebhookDeliveryWorkerConfiguration> optionsMonitor)    {
+    public WebhookDeliveryProcessorWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<WebhookDeliveryWorkerConfiguration> optionsMonitor)
+    {
         _scopeFactory = scopeFactory;
         _optionsMonitor = optionsMonitor;
         _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryProcessorWorker));

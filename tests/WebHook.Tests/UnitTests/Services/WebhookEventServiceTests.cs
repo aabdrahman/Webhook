@@ -40,7 +40,7 @@ public class WebhookEventServiceTests
     {
         var context = new RepositoryContext(_contextOptions);
         var svc = new WebhookEventService(context, _applicationPublisherMock.Object);
-        return (context, svc);  
+        return (context, svc);
     }
 
     private WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
@@ -56,12 +56,12 @@ public class WebhookEventServiceTests
 
     private CreateWebhookEventDto BuildCreateWebhookEventDto(string eventType = "CustomerCreated", string payload = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}",
                                                             string source = "TestSource", Guid? correlationId = null) => new CreateWebhookEventDto()
-    {
-        EventType = eventType,
-        PayLoad = payload,
-        Source = source,
-        CorrelationId = correlationId ?? Guid.NewGuid()
-    };
+                                                            {
+                                                                EventType = eventType,
+                                                                PayLoad = payload,
+                                                                Source = source,
+                                                                CorrelationId = correlationId ?? Guid.NewGuid()
+                                                            };
 
     private void SeedEventCatalog(RepositoryContext ctx, List<WebHookEventCatalog> webhookEventCatalogs)
     {
@@ -69,17 +69,17 @@ public class WebhookEventServiceTests
         ctx.SaveChanges();
     }
 
-    private WebhookEvent BuildWebhookEventEntity(string eventType = "CustomerCreated", string payload = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}", 
+    private WebhookEvent BuildWebhookEventEntity(string eventType = "CustomerCreated", string payload = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}",
                                                 string source = "TestSource", Guid? correlationId = null) => new WebhookEvent()
-    {
-        Id = Guid.NewGuid(),
-        EventType = eventType,
-        PayLoad = payload,
-        Source = source,
-        CorrelationId = correlationId ?? Guid.NewGuid(),
-        Status = WebHook.Core.Constants.WebHookEventStatus.Pending,
-        CreatedAt = DateTimeOffset.UtcNow
-    };
+                                                {
+                                                    Id = Guid.NewGuid(),
+                                                    EventType = eventType,
+                                                    PayLoad = payload,
+                                                    Source = source,
+                                                    CorrelationId = correlationId ?? Guid.NewGuid(),
+                                                    Status = WebHook.Core.Constants.WebHookEventStatus.Pending,
+                                                    CreatedAt = DateTimeOffset.UtcNow
+                                                };
 
     [Fact]
     public async Task CreateEventAsync_ShouldReturnFailure_WhenEventTypeNotInCatalog()
@@ -181,7 +181,7 @@ public class WebhookEventServiceTests
 
         //Assert
         Assert.False(result.IsSuccessful);
-        
+
         Assert.StartsWith("Invalid payload for event type.", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
     }

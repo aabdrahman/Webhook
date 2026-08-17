@@ -1,5 +1,4 @@
 ﻿using Serilog;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using WebHook.Core.Interfaces.Helpers;
@@ -83,7 +82,7 @@ public sealed class SignatureService : ISignatureService
         {
             _logger.Error(ex, "An error occurred validating timestamp for: {0}. WIndow: {1}", timeStamp, toleranceWindowInMinutes);
             return false;
-            
+
         }
     }
     ///<inheritdoc />

@@ -19,12 +19,12 @@ public sealed class ApplicationPublisher : IApplicationPublisher
 
     public async Task QueueEventRaised(EventRaised eventRaised, CancellationToken ct = default)
     {
-        if(await _eventRaisedChannel.Writer.WaitToWriteAsync())
+        if (await _eventRaisedChannel.Writer.WaitToWriteAsync())
         {
             await _eventRaisedChannel.Writer.WriteAsync(eventRaised, ct);
 
             _logger.ForContext("MethodName", nameof(EventRaised)).Information("Event Raised Item Queued successfully - {0}", eventRaised);
-            
+
         }
     }
 }

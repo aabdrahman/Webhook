@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.StaticFiles.Infrastructure;
 using Microsoft.Extensions.FileProviders;
 using Scalar.AspNetCore;
 using Serilog;
@@ -14,10 +13,10 @@ string logFromConfig = builder.Configuration.GetValue<string>("");
 string logFilePath = string.IsNullOrWhiteSpace(logFromConfig) ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "log-.txt") : Path.Combine(logFromConfig, "log-.txt");
 
 Log.Logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()   
+                    .MinimumLevel.Debug()
                     .Enrich.FromLogContext()
                     .WriteTo.File(path: logFilePath, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true,
-                                    fileSizeLimitBytes: 5_000_000, restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Verbose, 
+                                    fileSizeLimitBytes: 5_000_000, restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Verbose,
                                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.ffff zzzz} || {Level:u3}] || [{ClassName}].[{MethodName}] - {Message:lj}{NewLine}{Exception}{NewLine}")
                     .CreateLogger();
 
@@ -77,13 +76,13 @@ app.UseReDoc(opts =>
 
 app.UseStaticFiles(new StaticFileOptions()
 {
-   FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "StaticFiles")),
+    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "StaticFiles")),
     RequestPath = "/StaticFiles"
 });
 
 app.UseExceptionHandler(opts =>
 {
-    
+
 });
 
 app.UseHttpsRedirection();

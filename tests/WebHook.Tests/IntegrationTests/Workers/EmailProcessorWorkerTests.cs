@@ -36,8 +36,8 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
     // -------------------------------------------------------------------------
 
     private Channel<EmailSenderDto> _channel = null!;
-    private ServiceProvider         _serviceProvider = null!;
-    private Mock<IEmailService>     _emailServiceMock = null!;
+    private ServiceProvider _serviceProvider = null!;
+    private Mock<IEmailService> _emailServiceMock = null!;
 
     // -------------------------------------------------------------------------
     // IAsyncLifetime — fresh state per test
@@ -46,7 +46,7 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
     public Task InitializeAsync()
     {
         // Fresh channel and mock per test — no cross-test contamination
-        _channel          = Channel.CreateUnbounded<EmailSenderDto>();
+        _channel = Channel.CreateUnbounded<EmailSenderDto>();
         _emailServiceMock = new Mock<IEmailService>();
 
         // Default — SendMailAsync returns true
@@ -90,7 +90,7 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
             _serviceProvider.GetRequiredService<IOptionsMonitor<EmailProcessorWorkerConfiguration>>());
 
     private static EmailSenderDto BuildEmailDto(
-        string subject   = "Test Subject",
+        string subject = "Test Subject",
         string recipient = "subscriber@partner.com") => new(MailContent: "<p>Test body</p>", Subject: subject, MailRecipients: new List<string> { recipient }, IsHtml: true);
 
     /// <summary>
@@ -98,8 +98,8 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
     /// </summary>
     private static async Task RunWorkerUntilAsync(
         TestableEmailProcessorWorker worker,
-        Func<Task<bool>>             condition,
-        int                          timeoutMs = 10_000)
+        Func<Task<bool>> condition,
+        int timeoutMs = 10_000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
 
@@ -508,8 +508,8 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
 internal sealed class TestableEmailProcessorWorker : EmailProcessorWorker
 {
     public TestableEmailProcessorWorker(
-        Channel<EmailSenderDto>                          channel,
-        IServiceScopeFactory                             scopeFactory,
+        Channel<EmailSenderDto> channel,
+        IServiceScopeFactory scopeFactory,
         IOptionsMonitor<EmailProcessorWorkerConfiguration> options)
         : base(channel, scopeFactory, options) { }
 

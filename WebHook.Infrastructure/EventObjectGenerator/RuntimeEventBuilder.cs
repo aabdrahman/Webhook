@@ -80,7 +80,7 @@ public static class RuntimeEventBuilder
 
     public static Dictionary<string, Type> GetPropertyTypes(Dictionary<string, string> keyValuePairProperties)
     {
-        if(keyValuePairProperties is null)
+        if (keyValuePairProperties is null)
         {
             throw new ArgumentNullException(nameof(keyValuePairProperties), "Key-value pair properties cannot be null.");
         }

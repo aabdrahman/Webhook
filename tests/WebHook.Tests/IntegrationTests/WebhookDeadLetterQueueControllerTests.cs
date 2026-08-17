@@ -2,11 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Serilog;
 using System.Net;
+using WebHook.Api.Controllers;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
 using WebHook.Core.Interfaces.Services;
-using WebHook.Api.Controllers;
-using Xunit;
 
 namespace WebHook.UnitTests.Controllers;
 
@@ -34,7 +33,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         Log.Logger = new LoggerConfiguration().CreateLogger();
 
         _serviceMock = new Mock<IDeadLetterQueueService>();
-        _sut         = new WebhookDeadLetterQueueController(_serviceMock.Object);
+        _sut = new WebhookDeadLetterQueueController(_serviceMock.Object);
     }
 
     // -------------------------------------------------------------------------
@@ -45,7 +44,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
 
     private static RequestManualRetryDto BuildRetryRequest(Guid? deadLetterId = null, Guid? deliveryId = null, string justification = "Endpoint is now healthy.") => new()
     {
-        DeadLetterId       = deadLetterId ?? Guid.NewGuid(),
+        DeadLetterId = deadLetterId ?? Guid.NewGuid(),
         RetryJustification = justification,
         DeliveryId = deliveryId ?? Guid.NewGuid()
     };
@@ -59,7 +58,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
     {
         // Arrange
         var deliveryId = Guid.NewGuid();
-        var items      = new List<DeadLetterQueueDto> { BuildDlqDto(), BuildDlqDto() };
+        var items = new List<DeadLetterQueueDto> { BuildDlqDto(), BuildDlqDto() };
 
         _serviceMock
             .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
@@ -67,7 +66,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(items, "Dead letter queues fetched successfully.", HttpStatusCode.OK));
 
         // Act
-        var result       = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeedLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -106,7 +105,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
     {
         // Arrange
         var deliveryId = Guid.NewGuid();
-        var item       = BuildDlqDto();
+        var item = BuildDlqDto();
 
         _serviceMock
             .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
@@ -114,9 +113,9 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(new List<DeadLetterQueueDto> { item }, "OK", HttpStatusCode.OK));
 
         // Act
-        var result       = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeedLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
-        var body         = objectResult!.Value as GenericResponse<IReadOnlyList<DeadLetterQueueDto>>;
+        var body = objectResult!.Value as GenericResponse<IReadOnlyList<DeadLetterQueueDto>>;
 
         // Assert
         Assert.NotNull(body.ResponseData);
@@ -140,7 +139,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure(null, "Dead Letter queue items do not exist.", HttpStatusCode.NotFound));
 
         // Act
-        var result       = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeedLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -169,7 +168,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure(null, "An unexpected error occurred.", HttpStatusCode.InternalServerError));
 
         // Act
-        var result       = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeedLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -188,7 +187,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
             .ThrowsAsync(new InvalidOperationException("Unexpected fault."));
 
         // Act
-        var result       = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeedLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert — exception caught, returns 500, does not propagate
@@ -222,7 +221,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
     {
         // Arrange
         var deliveryId = Guid.NewGuid();
-        using var cts  = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         _serviceMock
             .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, cts.Token))
@@ -254,7 +253,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success("Operation Successful.", "Manual retry requested successfully.", HttpStatusCode.OK));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -302,7 +301,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure("Operation Failed.", "Dead Letter with Id does not exist.", HttpStatusCode.NotFound));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -329,7 +328,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure("Operation Failed.", "Dead Letter queue already retried.", HttpStatusCode.Conflict));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -353,7 +352,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure("Operation Failed.", "Could not proceed. Delivery Status: Delivered", HttpStatusCode.BadRequest));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -377,7 +376,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure("Operation Failed.", "Retry cycle already exceeded.", HttpStatusCode.UnprocessableEntity));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -401,7 +400,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure("Operation Failed.", "An unexpected error occurred.", HttpStatusCode.InternalServerError));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -420,7 +419,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
             .ThrowsAsync(new InvalidOperationException("Unexpected fault."));
 
         // Act
-        var result       = await _sut.RequestManualRetry(request);
+        var result = await _sut.RequestManualRetry(request);
         var objectResult = result as ObjectResult;
 
         // Assert — caught by controller catch block
@@ -453,7 +452,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
     public async Task RequestManualRetry_CancellationTokenForwardedToService()
     {
         // Arrange
-        var request   = BuildRetryRequest();
+        var request = BuildRetryRequest();
         using var cts = new CancellationTokenSource();
 
         _serviceMock

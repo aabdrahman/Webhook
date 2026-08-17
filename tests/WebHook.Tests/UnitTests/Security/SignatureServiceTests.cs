@@ -1,6 +1,4 @@
-﻿using Microsoft.VisualBasic;
-using Serilog;
-using System.Reflection;
+﻿using Serilog;
 using WebHook.Infrastructure.Security;
 
 namespace WebHook.Tests.UnitTests.Security;
@@ -94,7 +92,7 @@ public class SignatureServiceTests
     {
         //Arrange
         string payload = @"{""eventType"":""CustomerCreated""}";
-        
+
         string encryptionKey = "default-secret";
         string encryptionKey2 = "custom-secret";
 

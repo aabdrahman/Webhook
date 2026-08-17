@@ -164,7 +164,7 @@ internal static class ApplicationServiceExtensions
         //    opts.IncludeXmlComments(xmlPath);
 
         //    opts.AddSecurityDefinition("Bearer", securityScheme);
-           
+
         //});
 
     }
@@ -174,17 +174,17 @@ internal static class ApplicationServiceExtensions
         services.AddMassTransit(opts =>
         {
 
-            
+
 
             opts.UsingInMemory((context, config) =>
             {
-                
+
                 config.ConfigureEndpoints(context);
             });
         });
     }
 
-    internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration) 
+    internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<RepositoryContext>(opts =>
         {
@@ -199,9 +199,9 @@ internal static class ApplicationServiceExtensions
 
             opts.UseNpgsql(dataSource.Build(), v => v.SetPostgresVersion(18, 0))
                 .EnableSensitiveDataLogging()
-                .LogTo(Serilog.Log.Information, 
-                        new[] { DbLoggerCategory.Database.Command.Name }, 
-                        minimumLevel: LogLevel.Information, 
+                .LogTo(Serilog.Log.Information,
+                        new[] { DbLoggerCategory.Database.Command.Name },
+                        minimumLevel: LogLevel.Information,
                         options: Microsoft.EntityFrameworkCore.Diagnostics.DbContextLoggerOptions.SingleLine
                  );
         });
@@ -229,7 +229,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IWebhookEventService, WebhookEventService>();
         services.AddScoped<IWebhookSubscriptionEventService, WebhookSubscriptionEventService>();
         services.AddScoped<IDeadLetterQueueService, DeadLetterQueueService>();
-        services.AddScoped<IAuthenticationService,  AuthenticationService>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IOtpService, OtpService>();
 
@@ -258,7 +258,7 @@ internal static class ApplicationServiceExtensions
             {
                 SingleReader = true,
                 SingleWriter = false
-                
+
             });
         });
 
@@ -310,7 +310,7 @@ internal static class ApplicationServiceExtensions
             throw new ArgumentNullException("Cannot proceeed as the maximum password length is not yet defined.");
         }
 
-        if(maxFailedAuthenticationAttempt == 0 ||  maxFailedAuthenticationAttempt == default(int))
+        if (maxFailedAuthenticationAttempt == 0 || maxFailedAuthenticationAttempt == default(int))
         {
             throw new ArgumentNullException("Cannot proceed as the maximum failed authentication attemot is not defined yet.");
         }
@@ -326,7 +326,7 @@ internal static class ApplicationServiceExtensions
 
             //User configuration
             opts.User.RequireUniqueEmail = true;
-            
+
 
             //Signin configuration for user
             opts.SignIn.RequireConfirmedEmail = false;
@@ -377,7 +377,7 @@ internal static class ApplicationServiceExtensions
     {
         services.AddAuthorization(opts =>
         {
-            
+
         });
     }
 
@@ -390,7 +390,7 @@ internal static class ApplicationServiceExtensions
     {
         services.AddDataProtection(opts =>
         {
-            
+
         });
     }
 }

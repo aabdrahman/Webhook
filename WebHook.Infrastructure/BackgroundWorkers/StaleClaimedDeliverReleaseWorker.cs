@@ -55,7 +55,7 @@ public class StaleClaimedDeliverReleaseWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.Error(ex, "An error occurred whle processing stale delievries background worker....");
-                
+
             }
         }
     }

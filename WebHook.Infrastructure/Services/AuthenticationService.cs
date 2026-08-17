@@ -36,7 +36,7 @@ public sealed class AuthenticationService : IAuthenticationService
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
-                                IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher, 
+                                IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher,
                                 IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper)
     {
         _userManager = userManager;
@@ -71,7 +71,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 await _userManager.FindByEmailAsync(loginUserDetails.UserNameOrEmailAddress) :
                 await _userManager.FindByNameAsync(loginUserDetails.UserNameOrEmailAddress);
 
-            if(userToAuthenticate is null)
+            if (userToAuthenticate is null)
             {
                 _logger.Warning(loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exists - {0}" :
                                 "User with username does not exists - {0}", loginUserDetails.UserNameOrEmailAddress
@@ -162,7 +162,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
             User? userToModifyPassword = await _userManager.FindByEmailAsync(changePasswordRequest.UserNameOrEmailAddress);
 
-            if(userToModifyPassword is null)
+            if (userToModifyPassword is null)
             {
                 _logger.Warning("User with email does not exist - {0}", changePasswordRequest.UserNameOrEmailAddress);
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -212,10 +212,10 @@ public sealed class AuthenticationService : IAuthenticationService
             _logger.Information("Request OTP - {0}", requestOtp);
 
             User? requestingUser = requestOtp.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
-                                   await  _userManager.FindByEmailAsync(requestOtp.UserNameOrEmailAddress) :
+                                   await _userManager.FindByEmailAsync(requestOtp.UserNameOrEmailAddress) :
                                     await _userManager.FindByNameAsync(requestOtp.UserNameOrEmailAddress);
 
-            if(requestingUser is null)
+            if (requestingUser is null)
             {
                 _logger.Warning("User with details does not exist - {0}", requestOtp.UserNameOrEmailAddress);
                 return GenericResponse<string>.Failure("Operation Failed.", "User with details does not exist.", HttpStatusCode.NotFound);

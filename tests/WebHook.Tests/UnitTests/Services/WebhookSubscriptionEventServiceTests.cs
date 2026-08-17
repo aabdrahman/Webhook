@@ -10,7 +10,7 @@ namespace WebHook.Tests.UnitTests.Services;
 public class WebhookSubscriptionEventServiceTests : IDisposable
 {
     private readonly DbContextOptions<RepositoryContext> _repositoryDbContextOptions;
-    
+
 
     public WebhookSubscriptionEventServiceTests()
     {
@@ -23,7 +23,7 @@ public class WebhookSubscriptionEventServiceTests : IDisposable
 
         using var ctx = new RepositoryContext(_repositoryDbContextOptions);
         ctx.Database.EnsureCreated();
-        
+
         ctx.WebHookEventCatalogs.AddRange(webhookEventCatalogs);
         ctx.SaveChanges();
     }
@@ -164,7 +164,7 @@ public class WebhookSubscriptionEventServiceTests : IDisposable
         cts.Cancel();
 
         //Act
-        var result = await sut.svc.UnsubscribeFromEventAsync(Guid.NewGuid(), "test" , cts.Token);
+        var result = await sut.svc.UnsubscribeFromEventAsync(Guid.NewGuid(), "test", cts.Token);
 
         //Assert
         Assert.NotNull(result);
@@ -196,7 +196,7 @@ public class WebhookSubscriptionEventServiceTests : IDisposable
         //Arrange
         var sut = GetSut();
         var subscriptionEntity = BuildEntity("Test Entity", eventIds: webhookEventCatalogs.OrderBy(x => x.Id).Select(x => x.Id).Take(Random.Shared.Next(1, 2)).ToList());
-        
+
 
         //Act
         var result = await sut.svc.UnsubscribeFromEventAsync(subscriptionEntity.Id, "test");
@@ -354,7 +354,7 @@ public class WebhookSubscriptionEventServiceTests : IDisposable
         //Arrange
 
         var sut = GetSut();
-        var eventsToAdd = webhookEventCatalogs.Where(x => !x.EventName.Contains("CustomerCreated", StringComparison.OrdinalIgnoreCase)).OrderBy(x => x.Id).Take(Random.Shared.Next(1, webhookEventCatalogs.Count-1)).ToList();
+        var eventsToAdd = webhookEventCatalogs.Where(x => !x.EventName.Contains("CustomerCreated", StringComparison.OrdinalIgnoreCase)).OrderBy(x => x.Id).Take(Random.Shared.Next(1, webhookEventCatalogs.Count - 1)).ToList();
         var subscriptionEntity = BuildEntity("Test Entity", eventIds: eventsToAdd.Select(x => x.Id).ToList());
 
         await sut.ctx.WebhookSubscriptions.AddAsync(subscriptionEntity);

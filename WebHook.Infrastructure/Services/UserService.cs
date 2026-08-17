@@ -89,7 +89,7 @@ public sealed class UserService : IUserService
                 _logger.Error(ex, "An error occurred adding role to user.");
                 return GenericResponse<string>.Success("Operation Successful.", "User created.", HttpStatusCode.Created);
             }
-           
+
 
             //Roles successfully created for the user. returning success response.
             _logger.Information("User created successfully an droles successfully maintained for user");
@@ -99,7 +99,7 @@ public sealed class UserService : IUserService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while creating user.");
-            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while creating user.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while creating user.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
     }
@@ -116,7 +116,7 @@ public sealed class UserService : IUserService
                                         await _userManager.FindByEmailAsync(userDeactivationRequest.UserNameOrEmailAddress) :
                                         await _userManager.FindByNameAsync(userDeactivationRequest.UserNameOrEmailAddress);
 
-            if(userToDeactivate is null)
+            if (userToDeactivate is null)
             {
                 _logger.Warning(userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exist - {0}" : "User with provided user name does not exist - {0}", userDeactivationRequest.UserNameOrEmailAddress);
                 return GenericResponse<string>.Failure("Operation Failed.", $"User with details does not exist - {userDeactivationRequest.UserNameOrEmailAddress}", HttpStatusCode.NotFound);
@@ -154,7 +154,7 @@ public sealed class UserService : IUserService
 
             var userToReactivateQuery = _userManager.Users.IgnoreQueryFilters();
 
-            if(reactivateUser.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase))
+            if (reactivateUser.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase))
             {
                 userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedEmail.Contains(reactivateUser.UserNameOrEmailAddress.ToUpper()));
             }
@@ -165,7 +165,7 @@ public sealed class UserService : IUserService
 
             User? userToReactivate = await userToReactivateQuery.FirstOrDefaultAsync(ct);
 
-            if(userToReactivate is null)
+            if (userToReactivate is null)
             {
                 _logger.Warning("User profile with details - {0} does not exist.", reactivateUser.UserNameOrEmailAddress);
                 return GenericResponse<string>.Failure("Operation Failed.", "User with provided details does not exist.", HttpStatusCode.NotFound);

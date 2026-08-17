@@ -1,10 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
-using System.Text;
 using WebHook.Core.DataTransferObjects.WebhookEventCatalog;
 using WebHook.Core.Entities;
 using WebHook.Infrastructure.Data_Persistence;
@@ -120,7 +116,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
     {
         // Arrange
         var (_, svc) = GetSut();
-        var dto = BuildCreateCatalogDto(["name", "balance"],"AccountApproved");
+        var dto = BuildCreateCatalogDto(["name", "balance"], "AccountApproved");
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -230,7 +226,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         var modified = await operationParameters.ctx.WebHookEventCatalogs.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == eventCatalogEntity.Id);
         Assert.NotNull(modified);
         Assert.True(modified.IsActive);
-        
+
     }
 
     [Fact]
@@ -288,7 +284,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.False(result.IsSuccessful);
         Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
     }
-    
+
     [Fact]
     public async Task GetAllEventCatalogAsync_WithBothActiveAndInactiveRecords_ReturnsAllRecordsAnd200()
     {

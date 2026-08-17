@@ -36,7 +36,7 @@ public class EmailService : IEmailService
                 return false;
             }
 
-            if(!emailSenderItem.MailRecipients.Any() || emailSenderItem.MailRecipients is null)
+            if (!emailSenderItem.MailRecipients.Any() || emailSenderItem.MailRecipients is null)
             {
                 _logger.Warning("Cannot proceed to send mail as the recipient is either null or empty....");
                 return false;

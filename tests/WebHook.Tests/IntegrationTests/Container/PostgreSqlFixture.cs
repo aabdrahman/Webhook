@@ -1,5 +1,4 @@
 using Testcontainers.PostgreSql;
-using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 

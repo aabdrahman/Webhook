@@ -58,7 +58,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
         _logger = _logger.ForContext(_methodName, nameof(CreateNewEventCatalogAsync));
         try
         {
-           _logger.Information("Create new event catalog - {0}", createEventCatalogDto);
+            _logger.Information("Create new event catalog - {0}", createEventCatalogDto);
 
             //Validate the available fields dictionary to ensure that the values are of the correct type (string, int, bool, guid, datetime, float, decimal or double). If any value is not of the correct type, return a failure response.
             if (!createEventCatalogDto.AvailableFields.All(kvp => kvp.Value.ToLower() == "string" || kvp.Value == "int" ||
@@ -141,7 +141,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
 
             WebHookEventCatalog? webHookEventCatalogToPerformOperation = await _repositoryContext.WebHookEventCatalogs.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == EventCatalogId, ct);
 
-            if(webHookEventCatalogToPerformOperation is null)
+            if (webHookEventCatalogToPerformOperation is null)
             {
                 _logger.Information("Web Event Catalog with provided Id does not exist - {0}", EventCatalogId);
                 return GenericResponse<string>.Failure("Operation Failed", "Event Catalog with provided id does not exist.", HttpStatusCode.NotFound);
@@ -203,7 +203,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
         {
             _logger.Error(ex, "An error occurred fetching event catalog");
             return GenericResponse<IReadOnlyList<EventCatalogDto>>.Failure(null, "An errror occurred fetching event catalog. please retry later.", HttpStatusCode.InternalServerError, new ErrorDetail() { ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "", ErrorTitle = ex.GetType().Name });
-            
+
         }
     }
     /// <summary>
@@ -228,7 +228,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
 
             EventCatalogDto? eventCatlog = await _repositoryContext.WebHookEventCatalogs.Select(EventCatalogMapper.ToDtoExpression()).FirstOrDefaultAsync(x => x.Id == EventCatalogId, ct);
 
-            if(eventCatlog is null)
+            if (eventCatlog is null)
             {
                 _logger.Information("Event Catalog with provided id does not exist - {0}", EventCatalogId);
                 return GenericResponse<EventCatalogDto>.Failure(null, "Event catalog does not exist.", HttpStatusCode.NotFound);

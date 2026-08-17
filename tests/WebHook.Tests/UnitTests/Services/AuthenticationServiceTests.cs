@@ -183,7 +183,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     {
         Environment.SetEnvironmentVariable(JwtSecretEnvVar, null);
 
-        if(_serviceProvider is not null)
+        if (_serviceProvider is not null)
             await _serviceProvider.DisposeAsync();
     }
 

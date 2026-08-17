@@ -39,7 +39,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
 
             WebhookDeadLetterQueue? deadLeterToRetry = await _repositoryContext.WebhookDeadLetterQueues.Include(x => x.webhookDelivery).FirstOrDefaultAsync(x => x.Id == requestManualRetry.DeadLetterId, ct);
 
-            if(deadLeterToRetry is null)
+            if (deadLeterToRetry is null)
             {
                 _logger.Warning("The dead Letter with details to retry does not exist. Dead Letter Id: {0}", requestManualRetry.DeadLetterId);
                 return GenericResponse<string>.Failure("Operation Faield.", "Dead Letter with Id does not exist.", HttpStatusCode.NotFound);
@@ -51,7 +51,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
                 return GenericResponse<string>.Failure("Operation Failed.", "Dead Letter queue already retried.", HttpStatusCode.Conflict);
             }
 
-            if(deadLeterToRetry.webhookDelivery.DeliveryStatus != WebhookDeliveryStatus.DeadLetter)
+            if (deadLeterToRetry.webhookDelivery.DeliveryStatus != WebhookDeliveryStatus.DeadLetter)
             {
                 _logger.Warning("The linked delivery to the dead letter queue record: {0} has an invalid sttaus: {1}.", deadLeterToRetry.Id, deadLeterToRetry.webhookDelivery.DeliveryStatus.ToString());
                 return GenericResponse<string>.Failure("Operation Failed.", $"Could not proceed. Delivery Status: {deadLeterToRetry.webhookDelivery.DeliveryStatus.ToString()}", HttpStatusCode.BadRequest);
@@ -59,7 +59,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
 
             int currentDeliveryCycle = deadLeterToRetry.webhookDelivery.RetryCycle;
 
-            if(deadLeterToRetry.webhookDelivery.RetryCycle >= _deadLetterManualRetryConfiguration.MaximumRetryCycle)
+            if (deadLeterToRetry.webhookDelivery.RetryCycle >= _deadLetterManualRetryConfiguration.MaximumRetryCycle)
             {
                 _logger.Warning("Delivery already exceeds the maximum retry cycle. Current Retry Cycle: {0}, Maximum Retry Cycle: {1}", currentDeliveryCycle, _deadLetterManualRetryConfiguration.MaximumRetryCycle);
                 return GenericResponse<string>.Failure("Operation Failed.", "Retry cycle already exceeded for the delivery.", HttpStatusCode.UnprocessableEntity);

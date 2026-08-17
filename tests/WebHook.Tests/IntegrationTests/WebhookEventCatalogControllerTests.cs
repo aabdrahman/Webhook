@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System.Net;
@@ -29,7 +28,7 @@ public class WebhookEventCatalogControllerTests
             EventCatalogName = "CUSTOMERCREATED",
             Description = "Customer Created Description",
             IsActive = true,
-            AvailableFields = new Dictionary<string, string>(){ { "name", "string" }, { "email", "string" } }
+            AvailableFields = new Dictionary<string, string>() { { "name", "string" }, { "email", "string" } }
         };
     }
 
@@ -39,7 +38,7 @@ public class WebhookEventCatalogControllerTests
         {
             EventCatalogName = "OrderCreated",
             Description = "Order created description.",
-            AvailableFields = new Dictionary<string, string>(){ { "referenceNumber", "string" }, { "count", "int" } }
+            AvailableFields = new Dictionary<string, string>() { { "referenceNumber", "string" }, { "count", "int" } }
         };
     }
 
@@ -120,7 +119,7 @@ public class WebhookEventCatalogControllerTests
         Assert.NotNull(body);
         Assert.True(body.IsSuccessful);
         Assert.NotNull(body.ResponseData);
-        Assert.Equal((int)objResult.StatusCode, (int)expectedResponse.HttpStatusCode);  
+        Assert.Equal((int)objResult.StatusCode, (int)expectedResponse.HttpStatusCode);
     }
 
     [Fact]
@@ -212,7 +211,7 @@ public class WebhookEventCatalogControllerTests
     public async Task WebhookEventCatalogController_GetEventCatalogById_ThrowsExceptionReturns500InternalServerError()
     {
         //Arrange
-        
+
         _webhookEventCatalogService.Setup(wb => wb.GetEventCatalogByIdAsync(Guid.NewGuid(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException());
 
         //Act
@@ -283,7 +282,7 @@ public class WebhookEventCatalogControllerTests
         Assert.False(body.IsSuccessful);
         Assert.Same(expectedResult, body);
         Assert.Equal(objResult.StatusCode, StatusCodes.Status404NotFound);
-    
+
     }
 
     [Fact]

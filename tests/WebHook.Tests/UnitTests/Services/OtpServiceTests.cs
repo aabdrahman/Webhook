@@ -6,13 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
 using Moq;
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.DataTransferObjects.OtpOperation;
@@ -61,7 +57,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if(_serviceProvider is not null)
+        if (_serviceProvider is not null)
         {
             await _serviceProvider.DisposeAsync();
         }
@@ -252,7 +248,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         using var assertScope = _serviceProvider.CreateScope();
         var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var otps = await assertCtx.OtpVerifications.ToListAsync();
-        
+
         foreach (var otp in otps)
         {
             Assert.True(otp.RevokedAt.HasValue, $"OTP with id: {otp.Id} is yet to be revoked.");
@@ -358,7 +354,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
     {
         //Arrange
         var seedUserResut = await SeedUserAsync();
-        string generatedOtp = string.Empty;Guid userId = Guid.NewGuid();
+        string generatedOtp = string.Empty; Guid userId = Guid.NewGuid();
         using (var scope = _serviceProvider.CreateScope())
         {
             var authService = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
@@ -604,7 +600,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             string hashedOtp2 = await requestAppHasher.HashSecret(generatedOtp2);
             OtpVerification otpVerificationRecord2 = BuildOtpVerification(userId: userId);
             otpVerificationRecord.OtpHash = hashedOtp2;
-            
+
             await requestCtx.AddRangeAsync(otpVerificationRecord, otpVerificationRecord2);
             await requestCtx.SaveChangesAsync();
 
@@ -647,7 +643,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             OtpVerification otpVerificationRecord = BuildOtpVerification(userId: userId);
             otpVerificationRecord.OtpHash = hashedOtp;
             //otpVerificationRecord.CreatedAt = DateTimeOffset.UtcNow;
-           
+
 
             string generatedOtp2 = requestOtpGenerator.GenerateOtp();
             string hashedOtp2 = await requestAppHasher.HashSecret(generatedOtp2);

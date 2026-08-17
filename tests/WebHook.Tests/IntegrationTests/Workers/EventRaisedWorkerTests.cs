@@ -9,7 +9,6 @@ using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
-using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -152,43 +151,43 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     }
 
     private static EventRaised BuildEventRaised(Guid? id = null) =>
-        new EventRaised ( createdEventId: id ?? Guid.NewGuid() );
+        new EventRaised(createdEventId: id ?? Guid.NewGuid());
 
     private static WebhookEvent BuildWebhookEvent(
-        Guid?              id        = null,
-        string             eventType = "CUSTOMERCREATED",
-        WebHookEventStatus status    = WebHookEventStatus.Pending,
-        string             payload   = "{}") => new()
-    {
-        Id        = id ?? Guid.NewGuid(),
-        EventType = eventType,
-        Status    = status,
-        PayLoad   = payload,
-        Source    = "CustomerService",
-        CreatedAt = DateTimeOffset.UtcNow
-    };
+        Guid? id = null,
+        string eventType = "CUSTOMERCREATED",
+        WebHookEventStatus status = WebHookEventStatus.Pending,
+        string payload = "{}") => new()
+        {
+            Id = id ?? Guid.NewGuid(),
+            EventType = eventType,
+            Status = status,
+            PayLoad = payload,
+            Source = "CustomerService",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
 
     private static WebHookEventCatalog BuildCatalog(List<string> subscribedFields, string eventName = "CustomerCreated") => new()
     {
-        Id                  = Guid.NewGuid(),
-        EventName           = eventName,
+        Id = Guid.NewGuid(),
+        EventName = eventName,
         NormalizedEventName = eventName.ToUpper(),
-        IsActive            = true,
-        CreatedAt         = DateTimeOffset.UtcNow,
+        IsActive = true,
+        CreatedAt = DateTimeOffset.UtcNow,
         AvailableFields = subscribedFields.ToDictionary(f => f, f => "string")
     };
 
     private static WebhookSubscription BuildSubscription(
         string callbackUrl = "https://partner.com/webhook",
-        bool   isActive    = true) => new()
-    {
-        Id          = Guid.NewGuid(),
-        Name        = "Test Subscription",
-        CallbackUrl = callbackUrl,
-        IsActive    = isActive,
-        CreatedAt   = DateTimeOffset.UtcNow,
-        SecretKey = "test-secret-key"
-    };
+        bool isActive = true) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Subscription",
+            CallbackUrl = callbackUrl,
+            IsActive = isActive,
+            CreatedAt = DateTimeOffset.UtcNow,
+            SecretKey = "test-secret-key"
+        };
 
     /// <summary>
     /// Starts the worker and waits for at least one 5-second PeriodicTimer
@@ -196,7 +195,7 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     /// </summary>
     private static async Task RunWorkerForOneTickAsync(
         EventRaisedWorker worker,
-        int               waitMs = 6500)
+        int waitMs = 6500)
     {
         using var cts = new CancellationTokenSource();
         _ = worker.StartAsync(cts.Token);
@@ -256,7 +255,7 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         await worker.StartAsync(cts.Token);
         cts.Cancel();
 
-        var stopTask        = worker.StopAsync(CancellationToken.None);
+        var stopTask = worker.StopAsync(CancellationToken.None);
         var completedInTime = await Task.WhenAny(stopTask, Task.Delay(5000)) == stopTask;
 
         Assert.True(completedInTime, "StopAsync did not complete within 5 seconds.");
@@ -270,8 +269,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     public async Task ExecuteAsync_PendingEvent_NoSubscriberExists_StatusChangedToProcessed()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Pending);
 
         await ctx.WebhookEvents.AddAsync(webhookEvent);
@@ -284,8 +283,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
 
         Assert.NotNull(updated);
         Assert.Equal(WebHookEventStatus.Processed, updated!.Status);
@@ -325,8 +324,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     {
         // Arrange — status is Processing, not Pending, so FOR UPDATE SKIP LOCKED
         // returns null and the worker rolls back and skips the item
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing);
 
         await ctx.WebhookEvents.AddAsync(webhookEvent);
@@ -339,8 +338,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert — status and ProcessedAt must remain unchanged
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var unchanged         = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var unchanged = await assertCtx.WebhookEvents.FindAsync(webhookEvent.Id);
 
         Assert.Equal(WebHookEventStatus.Processing, unchanged!.Status);
         Assert.Null(unchanged.ProcessedAt);
@@ -463,12 +462,12 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     public async Task ExecuteAsync_RandomActiveSubscribers_ThreeDeliveriesCreated()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var catalog      = BuildCatalog(["paymentreference", "amount"], "PaymentCompleted");
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var catalog = BuildCatalog(["paymentreference", "amount"], "PaymentCompleted");
         var webhookEvent = BuildWebhookEvent(
             eventType: "PAYMENTCOMPLETED",
-            status:    WebHookEventStatus.Pending);
+            status: WebHookEventStatus.Pending);
 
         int recordCount = Random.Shared.Next(1, 5);
 
@@ -481,11 +480,11 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         var subEvents = subscriptions.Select(s => new WebhookSubscriptionEvent
         {
-            Id                    = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
             WebhookSubscriptionId = s.Id,
             WebhookEventCatalogId = catalog.Id,
-            IsActive              = true,
-            CreatedAt             = DateTimeOffset.UtcNow
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
         }).ToArray();
 
         await ctx.WebHookEventCatalogs.AddAsync(catalog);
@@ -501,8 +500,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var deliveries        = await assertCtx.WebhookDeliveries
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveries = await assertCtx.WebhookDeliveries
             .Where(d => d.WebhookEventId == webhookEvent.Id)
             .OrderBy(d => d.CallBackUrl)
             .ToListAsync();
@@ -519,21 +518,21 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     public async Task ExecuteAsync_InactiveSubscriber_NoDeliveryCreated()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var catalog      = BuildCatalog(["name", "accountnumber"], "AccountApproved");
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var catalog = BuildCatalog(["name", "accountnumber"], "AccountApproved");
         var subscription = BuildSubscription(isActive: false); // inactive
-        var subEvent     = new WebhookSubscriptionEvent
+        var subEvent = new WebhookSubscriptionEvent
         {
-            Id                    = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
             WebhookSubscriptionId = subscription.Id,
             WebhookEventCatalogId = catalog.Id,
-            IsActive              = true,
-            CreatedAt             = DateTimeOffset.UtcNow
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
         };
         var webhookEvent = BuildWebhookEvent(
             eventType: "ACCOUNTAPPROVED",
-            status:    WebHookEventStatus.Pending);
+            status: WebHookEventStatus.Pending);
 
         await ctx.WebHookEventCatalogs.AddAsync(catalog);
         await ctx.WebhookSubscriptions.AddAsync(subscription);
@@ -548,8 +547,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var deliveries        = await assertCtx.WebhookDeliveries
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveries = await assertCtx.WebhookDeliveries
             .Where(d => d.WebhookEventId == webhookEvent.Id)
             .ToListAsync();
 
@@ -560,11 +559,11 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     public async Task ExecuteAsync_NoSubscribers_NoDeliveryCreated()
     {
         // Arrange — valid event but no subscriptions exist
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var webhookEvent = BuildWebhookEvent(
             eventType: "ACCOUNTREJECTED",
-            status:    WebHookEventStatus.Pending);
+            status: WebHookEventStatus.Pending);
 
         await ctx.WebhookEvents.AddAsync(webhookEvent);
         await ctx.SaveChangesAsync();
@@ -576,8 +575,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var deliveries        = await assertCtx.WebhookDeliveries
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveries = await assertCtx.WebhookDeliveries
             .Where(d => d.WebhookEventId == webhookEvent.Id)
             .ToListAsync();
 
@@ -588,23 +587,23 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     public async Task ExecuteAsync_DeliveryPayloadMatchesOriginalEventPayload()
     {
         // Arrange
-        using var scope        = _serviceProvider.CreateScope();
-        var ctx                = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        const string expected  = @"{""customerId"":""abc-123"",""firstName"":""John""}";
-        var catalog            = BuildCatalog(["customerId", "firstName"], "CustomerUpdated");
-        var subscription       = BuildSubscription();
-        var subEvent           = new WebhookSubscriptionEvent
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        const string expected = @"{""customerId"":""abc-123"",""firstName"":""John""}";
+        var catalog = BuildCatalog(["customerId", "firstName"], "CustomerUpdated");
+        var subscription = BuildSubscription();
+        var subEvent = new WebhookSubscriptionEvent
         {
-            Id                    = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
             WebhookSubscriptionId = subscription.Id,
             WebhookEventCatalogId = catalog.Id,
-            IsActive              = true,
-            CreatedAt             = DateTimeOffset.UtcNow
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
         };
         var webhookEvent = BuildWebhookEvent(
             eventType: "CUSTOMERUPDATED",
-            status:    WebHookEventStatus.Pending,
-            payload:   expected);
+            status: WebHookEventStatus.Pending,
+            payload: expected);
 
         await ctx.WebHookEventCatalogs.AddAsync(catalog);
         await ctx.WebhookSubscriptions.AddAsync(subscription);
@@ -619,8 +618,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery          = await assertCtx.WebhookDeliveries
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = await assertCtx.WebhookDeliveries
             .FirstOrDefaultAsync(d => d.WebhookEventId == webhookEvent.Id);
 
         Assert.NotNull(delivery);
@@ -636,21 +635,21 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
     {
         // Arrange — seed one Pending event and write it to two separate channels
         // to simulate two competing worker instances
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var catalog      = BuildCatalog(["name", "email"], "CustomerCreated");
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var catalog = BuildCatalog(["name", "email"], "CustomerCreated");
         var subscription = BuildSubscription();
-        var subEvent     = new WebhookSubscriptionEvent
+        var subEvent = new WebhookSubscriptionEvent
         {
-            Id                    = Guid.NewGuid(),
+            Id = Guid.NewGuid(),
             WebhookSubscriptionId = subscription.Id,
             WebhookEventCatalogId = catalog.Id,
-            IsActive              = true,
-            CreatedAt             = DateTimeOffset.UtcNow
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
         };
         var webhookEvent = BuildWebhookEvent(
             eventType: "CUSTOMERCREATED",
-            status:    WebHookEventStatus.Pending);
+            status: WebHookEventStatus.Pending);
 
         await ctx.WebHookEventCatalogs.AddAsync(catalog);
         await ctx.WebhookSubscriptions.AddAsync(subscription);
@@ -666,8 +665,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
         var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
         var workerConfig = _serviceProvider.GetRequiredService<IOptionsMonitor<EventRaisedWorkerConfiguration>>();
-        var workerA      = new EventRaisedWorker(channelA, scopeFactory, workerConfig);
-        var workerB      = new EventRaisedWorker(channelB, scopeFactory, workerConfig);
+        var workerA = new EventRaisedWorker(channelA, scopeFactory, workerConfig);
+        var workerB = new EventRaisedWorker(channelB, scopeFactory, workerConfig);
 
         using var ctsA = new CancellationTokenSource();
         using var ctsB = new CancellationTokenSource();
@@ -687,8 +686,8 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         // Assert — FOR UPDATE SKIP LOCKED means the second worker gets null
         // and skips. Only one set of deliveries should be created.
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var deliveries        = await assertCtx.WebhookDeliveries
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveries = await assertCtx.WebhookDeliveries
             .Where(d => d.WebhookEventId == webhookEvent.Id)
             .ToListAsync();
 
@@ -988,7 +987,7 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
         var catalog = BuildCatalog(["name", "email"], eventName: "AccountApproved");
         var subscription = BuildSubscription();
 
-        var webhookEvent = BuildWebhookEvent(eventType:"ACCOUNTAPPROVED");
+        var webhookEvent = BuildWebhookEvent(eventType: "ACCOUNTAPPROVED");
 
         await ctx.WebHookEventCatalogs.AddAsync(catalog);
         await ctx.WebhookEvents.AddAsync(webhookEvent);

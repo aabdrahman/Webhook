@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Org.BouncyCastle.Utilities;
 using Serilog;
 using System.Net;
 using WebHook.Core.DataTransferObjects.Authentication;
@@ -104,7 +103,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
 
-        if(!await roleManager.RoleExistsAsync(DefaultUserRole))
+        if (!await roleManager.RoleExistsAsync(DefaultUserRole))
         {
             await roleManager.CreateAsync(new Role() { Name = DefaultUserRole, Description = "this is for base users." });
         }
@@ -112,7 +111,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if(_serviceProvider is not null)
+        if (_serviceProvider is not null)
         {
             Environment.SetEnvironmentVariable(JwtSecretEnvVar, null);
             await _serviceProvider.DisposeAsync();
@@ -157,7 +156,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         return new UserService(new RepositoryContext(_dbContextOptions), _userManagerMock.Object);
     }
 
-    private  Mock<UserManager<User>> CreateUserManagerMock()
+    private Mock<UserManager<User>> CreateUserManagerMock()
     {
         var store = new Mock<IUserStore<User>>();
 
@@ -209,7 +208,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
         var existingRole = await roleManager.FindByNameAsync("user");
 
-        if(existingRole is not null)
+        if (existingRole is not null)
         {
             var deletRoleResult = await roleManager.DeleteAsync(existingRole);
         }
@@ -680,7 +679,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         //Act
         using (var reactivationScope = _serviceProvider.CreateScope())
         {
-            var userService = reactivationScope.ServiceProvider.GetRequiredService<IUserService>(); 
+            var userService = reactivationScope.ServiceProvider.GetRequiredService<IUserService>();
             var result = await userService.ReactivateUserProfileAsync(reactivateRequest);
 
             //Assert
@@ -691,9 +690,9 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
             Assert.Equal("User profile successfully reactivated.", result.ResponseMessage, ignoreCase: true);
         }
-        
 
-        
+
+
 
         var assertScope = _serviceProvider.CreateScope();
         var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
@@ -718,7 +717,7 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             Assert.NotNull(deactivateResult);
             Assert.True(deactivateResult.IsSuccessful);
         }
-        
+
 
 
         var reactivateRequset = BuildUserReactivationRequest(usernameoremail: seedResult.userName);

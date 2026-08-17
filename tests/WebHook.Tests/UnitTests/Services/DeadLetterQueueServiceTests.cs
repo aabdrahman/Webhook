@@ -1,10 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
 using WebHook.Core.Entities;
@@ -35,7 +32,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
 
     public async Task DisposeAsync()
     {
-        if(_serviceProvider is not null)
+        if (_serviceProvider is not null)
         {
             await _serviceProvider.DisposeAsync();
         }

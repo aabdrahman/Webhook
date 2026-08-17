@@ -1,23 +1,19 @@
-using MassTransit.Courier.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Serilog;
 using System.Net;
-using Testcontainers.PostgreSql;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
-using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
 using WebHook.Tests.Utilities;
-using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -88,7 +84,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
         {
             opt.DeliveryProcessorIntervalSeconds = 1;
-            opt.TotalBatchSize                = 10;
+            opt.TotalBatchSize = 10;
             opt.DeliveryLockDuration = 60;
         });
 
@@ -149,19 +145,19 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
     private WebhookDelivery BuildPendingDelivery(
         string callbackUrl = "https://partner.com/webhook",
-        string payload     = @"{""customerId"":""123""}",
-        int    retryCount  = 0, Guid? subscriptionId = null) => new()
-    {
-        Id                      = Guid.NewGuid(),
-        CallBackUrl             = callbackUrl,
-        RequestPayload          = payload,
-        DeliveryStatus          = WebhookDeliveryStatus.Pending,
-        RetryCount              = retryCount,
-        CreatedAt               = DateTimeOffset.UtcNow,
-        WebhookSubscriptionEventId = subscriptionId ?? _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
-        webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
-        WebhookDeliveryAttempts = new List<WebhookDeliveryAttempt>()
-    };
+        string payload = @"{""customerId"":""123""}",
+        int retryCount = 0, Guid? subscriptionId = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            CallBackUrl = callbackUrl,
+            RequestPayload = payload,
+            DeliveryStatus = WebhookDeliveryStatus.Pending,
+            RetryCount = retryCount,
+            CreatedAt = DateTimeOffset.UtcNow,
+            WebhookSubscriptionEventId = subscriptionId ?? _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
+            webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
+            WebhookDeliveryAttempts = new List<WebhookDeliveryAttempt>()
+        };
 
     private static WebhookEvent BuildWebhookEvent(
     Guid? id = null,
@@ -211,8 +207,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     /// </summary>
     private async Task RunWorkerUntilProcessedAsync(
         TestableWebhookDeliveryProcessorWorker worker,
-        Func<Task<bool>>                       untilCondition,
-        int                                    timeoutMs = 15_000)
+        Func<Task<bool>> untilCondition,
+        int timeoutMs = 15_000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
 
@@ -282,7 +278,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         await worker.StartAsync(cts.Token);
         cts.Cancel();
 
-        var stopTask        = worker.StopAsync(CancellationToken.None);
+        var stopTask = worker.StopAsync(CancellationToken.None);
         var completedInTime = await Task.WhenAny(stopTask, Task.Delay(5000)) == stopTask;
 
         Assert.True(completedInTime, "StopAsync did not complete within 5 seconds.");
@@ -315,9 +311,9 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     public async Task ExecuteAsync_PendingDelivery_200Response_StatusChangedToDelivered()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery     = BuildPendingDelivery();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -332,8 +328,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, updated!.DeliveryStatus);
         Assert.NotNull(updated.DeliveredAt);
@@ -345,8 +341,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -363,14 +359,14 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var attempts          = await assertCtx.WebhookDeliveryAttempts
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
             .Where(a => a.WebhookDeliveryId == delivery.Id)
             .ToListAsync();
 
         Assert.Single(attempts);
-        Assert.Equal(StatusCodes.Status200OK.ToString(),  attempts[0].HttpResponseCode);
-        Assert.Equal(1,     attempts[0].AttemptedCount);
+        Assert.Equal(StatusCodes.Status200OK.ToString(), attempts[0].HttpResponseCode);
+        Assert.Equal(1, attempts[0].AttemptedCount);
         Assert.True(attempts[0].Duration >= 0);
     }
 
@@ -379,8 +375,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -395,8 +391,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.NotNull(updated!.DeliveredAt);
         Assert.True(updated.DeliveredAt >= updated.CreatedAt);
@@ -411,8 +407,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -427,8 +423,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Failed, updated!.DeliveryStatus);
         Assert.Null(updated.DeliveredAt);
@@ -440,8 +436,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery(retryCount: 0);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery(retryCount: 0);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -449,7 +445,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         _httpHandler = new MockHttpMessageHandler(HttpStatusCode.InternalServerError);
         RewireHttpHandler();
 
-        var worker    = CreateWorker();
+        var worker = CreateWorker();
         var beforeRun = DateTimeOffset.UtcNow;
 
         // Act
@@ -457,8 +453,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.NotNull(updated!.NextRetryAt);
         Assert.True(updated.NextRetryAt > beforeRun);
@@ -469,8 +465,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -489,8 +485,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var attempts          = await assertCtx.WebhookDeliveryAttempts
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
             .Where(a => a.WebhookDeliveryId == delivery.Id)
             .ToListAsync();
 
@@ -507,7 +503,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var deliveries = Enumerable.Range(1, 5)
             .Select(i => BuildPendingDelivery($"https://partner-{i}.com/webhook"))
@@ -526,8 +522,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var allDeliveries     = await assertCtx.WebhookDeliveries.ToListAsync();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var allDeliveries = await assertCtx.WebhookDeliveries.ToListAsync();
 
         Assert.Equal(5, _httpHandler.CallCount);
         Assert.All(allDeliveries,
@@ -549,7 +545,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             await ctx.WebhookDeliveries.AddRangeAsync(deliveries);
             await ctx.SaveChangesAsync();
         }
-        
+
 
         // Override batch size to 3
         var currentWorkerConfig = (_serviceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>()).CurrentValue;
@@ -570,7 +566,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         Assert.Equal(3, _httpHandler.CallCount);
 
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var delivered = await assertCtx.WebhookDeliveries
             .CountAsync(d => d.DeliveryStatus == WebhookDeliveryStatus.Delivered);
@@ -585,15 +581,15 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     public async Task ExecuteAsync_MixedStatusDeliveries_OnlyPendingProcessed()
     {
         // Arrange — one Pending, one already Delivered, one Failed
-        using var scope     = _serviceProvider.CreateScope();
-        var ctx             = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var pending         = BuildPendingDelivery("https://partner.com/webhook");
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var pending = BuildPendingDelivery("https://partner.com/webhook");
         var alreadyDelivered = BuildPendingDelivery("https://other.com/webhook");
-        var failed          = BuildPendingDelivery("https://another.com/webhook");
+        var failed = BuildPendingDelivery("https://another.com/webhook");
 
         alreadyDelivered.DeliveryStatus = WebhookDeliveryStatus.Delivered;
-        alreadyDelivered.DeliveredAt    = DateTimeOffset.UtcNow.AddMinutes(-5);
-        failed.DeliveryStatus           = WebhookDeliveryStatus.Failed;
+        alreadyDelivered.DeliveredAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        failed.DeliveryStatus = WebhookDeliveryStatus.Failed;
 
         await ctx.WebhookDeliveries.AddRangeAsync(pending, alreadyDelivered, failed);
         await ctx.SaveChangesAsync();
@@ -608,9 +604,9 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             worker,
             async () =>
             {
-                using var s   = _serviceProvider.CreateScope();
-                var c         = s.ServiceProvider.GetRequiredService<RepositoryContext>();
-                var p         = await c.WebhookDeliveries.FindAsync(pending.Id);
+                using var s = _serviceProvider.CreateScope();
+                var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+                var p = await c.WebhookDeliveries.FindAsync(pending.Id);
                 return p?.DeliveryStatus != WebhookDeliveryStatus.Pending;
             }, timeoutMs: 2500);
 
@@ -618,15 +614,15 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         Assert.Equal(1, _httpHandler.CallCount);
 
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
-        var updatedPending   = await assertCtx.WebhookDeliveries.FindAsync(pending.Id);
+        var updatedPending = await assertCtx.WebhookDeliveries.FindAsync(pending.Id);
         var updatedDelivered = await assertCtx.WebhookDeliveries.FindAsync(alreadyDelivered.Id);
-        var updatedFailed    = await assertCtx.WebhookDeliveries.FindAsync(failed.Id);
+        var updatedFailed = await assertCtx.WebhookDeliveries.FindAsync(failed.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, updatedPending!.DeliveryStatus);
         Assert.Equal(WebhookDeliveryStatus.Delivered, updatedDelivered!.DeliveryStatus); // unchanged
-        Assert.Equal(WebhookDeliveryStatus.Failed,    updatedFailed!.DeliveryStatus);    // unchanged
+        Assert.Equal(WebhookDeliveryStatus.Failed, updatedFailed!.DeliveryStatus);    // unchanged
     }
 
     // -------------------------------------------------------------------------
@@ -638,7 +634,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange — seed 3 Pending deliveries
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var deliveries = Enumerable.Range(1, 3)
             .Select(i => BuildPendingDelivery($"https://partner-{i}.com/webhook"))
@@ -678,7 +674,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         // Assert — FOR UPDATE SKIP LOCKED prevents double processing
         // Each delivery should have exactly ONE attempt record
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         foreach (var delivery in deliveries)
         {
@@ -720,7 +716,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     {
         // Arrange — seed deliveries
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var deliveries = Enumerable.Range(1, 5)
             .Select(i => BuildPendingDelivery($"https://partner-{i}.com/webhook"))
@@ -742,8 +738,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         // Assert — no delivery should be in an undefined state
         // Each delivery must be either Pending, Delivered, or Failed — never corrupted
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var allDeliveries     = await assertCtx.WebhookDeliveries.ToListAsync();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var allDeliveries = await assertCtx.WebhookDeliveries.ToListAsync();
 
         var validStatuses = new[]
         {
@@ -782,7 +778,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
 
-        if(deliveryWorkerConfig is null)
+        if (deliveryWorkerConfig is null)
         {
             services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
             {
@@ -791,7 +787,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
                 opt.DeliveryLockDuration = 60;
             });
         }
-        else if(deliveryWorkerConfig is not null)
+        else if (deliveryWorkerConfig is not null)
         {
             services.Configure<WebhookDeliveryWorkerConfiguration>(opt =>
             {
@@ -801,7 +797,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 
             });
         }
-        
+
 
         _serviceProvider.Dispose();
         _serviceProvider = services.BuildServiceProvider();
@@ -821,7 +817,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
 internal sealed class TestableWebhookDeliveryProcessorWorker : WebhookDeliveryProcessorWorker
 {
     public TestableWebhookDeliveryProcessorWorker(
-        IServiceScopeFactory                 scopeFactory,
+        IServiceScopeFactory scopeFactory,
         IOptionsMonitor<WebhookDeliveryWorkerConfiguration> options)
         : base(scopeFactory, options) { }
 

@@ -61,7 +61,7 @@ public class EventRaisedWorker : BackgroundService
                     ).FirstOrDefaultAsync();
 
                     //If ecent item is null, maybe the status has changed or its been updated by another worker, then, we return and continue with other raised events in the channel
-                    if(eventItem is null)
+                    if (eventItem is null)
                     {
                         _logger.Information("Created Event with Id - {0} cannot be feched. Possibly currently processing", item.createdEventId);
                         await transaction.RollbackAsync(stoppingToken);
@@ -85,7 +85,7 @@ public class EventRaisedWorker : BackgroundService
                                                                         RequestPayload = eventItem.PayLoad
                                                                     })
                                                                     .ToListAsync(stoppingToken);
-                        
+
                     //Validates if there is any subscriber to teh raised event.
                     if (subscribers.Any())
                     {
@@ -117,7 +117,7 @@ public class EventRaisedWorker : BackgroundService
                         _unsuccessfulRequests.Add(item);
                         _logger.Error(ex, "An error occurred while making saving changes for processing items - {0}", item.createdEventId);
                         break;
-                            
+
                     }
 
                 }
@@ -127,7 +127,7 @@ public class EventRaisedWorker : BackgroundService
                     _unsuccessfulRequests.Add(item);
                     //await _eventRaisedChannel.Writer.WriteAsync(item, stoppingToken);
                     _logger.Error(ex, "An error occurred fetching the created event - {0} from database.", item.createdEventId);
-                    break; 
+                    break;
                 }
                 finally
                 {
@@ -141,7 +141,7 @@ public class EventRaisedWorker : BackgroundService
                         }
 
                         _unsuccessfulRequests.Clear();
-                            
+
                     }
                 }
             }

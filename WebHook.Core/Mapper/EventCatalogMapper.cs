@@ -58,7 +58,7 @@ public static class EventCatalogMapper
     /// <returns>
     /// An expression tree that maps <see cref="WebHookEventCatalog"/> to <see cref="EventCatalogDto"/>.
     /// </returns>
-    public static Expression<Func<WebHookEventCatalog, EventCatalogDto>> ToDtoExpression() 
+    public static Expression<Func<WebHookEventCatalog, EventCatalogDto>> ToDtoExpression()
     {
         return webHookEventCatalog => new EventCatalogDto()
         {

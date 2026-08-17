@@ -8,11 +8,10 @@ using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
-using Xunit;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
-public class PendingRaisedEventsWorkerTests: IClassFixture<PostgreSqlFixture>, IAsyncLifetime
+public class PendingRaisedEventsWorkerTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private readonly PostgreSqlFixture _fixture;
 
@@ -392,7 +391,7 @@ public class PendingRaisedEventsWorkerTests: IClassFixture<PostgreSqlFixture>, I
     {
         var scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();
 
-        var options =_serviceProvider.GetRequiredService<IOptionsMonitor<PendingRaisedEventsWorkerConfiguration>>();
+        var options = _serviceProvider.GetRequiredService<IOptionsMonitor<PendingRaisedEventsWorkerConfiguration>>();
 
         return new PendingRaisedEventsWorker(_channel, scopeFactory, options);
     }

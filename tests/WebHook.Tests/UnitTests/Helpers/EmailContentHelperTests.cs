@@ -2,7 +2,6 @@
 using Moq;
 using Serilog;
 using WebHook.Infrastructure.Utilities;
-using Xunit;
 
 namespace WebHook.UnitTests.Utilities;
 

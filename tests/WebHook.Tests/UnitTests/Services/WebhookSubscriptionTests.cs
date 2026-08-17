@@ -30,7 +30,7 @@ public class WebhookSubscriptionTests : IDisposable
 
         //Secret Configuration Mocking
         _signatureSecretConfigurationMocker = new Mock<IOptionsMonitor<SignatureSecretConfiguration>>();
-        _signatureSecretConfigurationMocker.Setup(ssc =>  ssc.CurrentValue).Returns(new SignatureSecretConfiguration() { KeySize = 32 });
+        _signatureSecretConfigurationMocker.Setup(ssc => ssc.CurrentValue).Returns(new SignatureSecretConfiguration() { KeySize = 32 });
 
         //Secret Key Generator Mocker
         _secretGeneratorMock = new Mock<ISecretKeyGenerator>();
@@ -50,7 +50,7 @@ public class WebhookSubscriptionTests : IDisposable
     private (RepositoryContext ctx, WebhookSubscriptionService svc) GetSut()
     {
         var context = new RepositoryContext(_dbContextOptions);
-       return (context, new WebhookSubscriptionService(context, _secretGeneratorMock.Object, _signatureSecretConfigurationMocker.Object, _encryptionServiceMock.Object));
+        return (context, new WebhookSubscriptionService(context, _secretGeneratorMock.Object, _signatureSecretConfigurationMocker.Object, _encryptionServiceMock.Object));
     }
 
     private WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
@@ -93,7 +93,7 @@ public class WebhookSubscriptionTests : IDisposable
 
     private List<WebHookEventCatalog> GetEventCatalogs()
     {
-        return 
+        return
             [
                BuildCatalogEntity(["name", "email"]),
                BuildCatalogEntity(["productId", "orderCount"], "OrderCreated"),
@@ -131,7 +131,7 @@ public class WebhookSubscriptionTests : IDisposable
         //Arrange
         var sut = GetSut();
         var existingEventCatalogs = await sut.ctx.WebHookEventCatalogs.ToListAsync();
-        List<WebhookSubscription> webhookSubscriptions = 
+        List<WebhookSubscription> webhookSubscriptions =
             [
                 BuildEntity("user 1", existingEventCatalogs.OrderBy(x => x.Id).Take(Random.Shared.Next(1, 4)).Select(x => x.Id).ToList()),
                 BuildEntity("user 2", existingEventCatalogs.OrderBy(x => x.Id).Take(Random.Shared.Next(1, 4)).Select(x => x.Id).ToList()),

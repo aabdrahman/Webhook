@@ -97,9 +97,9 @@ public sealed class RetryPendingDeliveriesWorkerTests
         // Short tick interval so tests do not wait 60 seconds
         services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
         {
-            opt.TotalBatchSize       = 10;
+            opt.TotalBatchSize = 10;
             opt.MaximumAttendedCount = 5;
-            opt.ThresholdDuration    = 25000;
+            opt.ThresholdDuration = 25000;
         });
 
         _serviceProvider = services.BuildServiceProvider();
@@ -256,8 +256,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
     /// </summary>
     private async Task RunWorkerUntilAsync(
         TestableRetryPendingDeliveriesWorker worker,
-        Func<Task<bool>>                     condition,
-        int                                  timeoutMs = 15_000)
+        Func<Task<bool>> condition,
+        int timeoutMs = 15_000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
 
@@ -322,7 +322,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
         // With the bug present, StopAsync may hang beyond the timeout.
         cts.Cancel();
 
-        var stopTask        = worker.StopAsync(CancellationToken.None);
+        var stopTask = worker.StopAsync(CancellationToken.None);
         var completedInTime = await Task.WhenAny(stopTask, Task.Delay(5000)) == stopTask;
 
         Assert.True(completedInTime,
@@ -354,8 +354,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange — RetryCount = 1 does not satisfy > 1 in raw SQL (BUG 1 in service)
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildRetryableDelivery(retryCount: 1);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 1);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -378,8 +378,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildRetryableDelivery(retryCount: 2);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -393,15 +393,15 @@ public sealed class RetryPendingDeliveriesWorkerTests
         await RunWorkerUntilAsync(worker, async () =>
         {
             using var s = _serviceProvider.CreateScope();
-            var c       = s.ServiceProvider.GetRequiredService<RepositoryContext>();
-            var d       = await c.WebhookDeliveries.FindAsync(delivery.Id);
+            var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+            var d = await c.WebhookDeliveries.FindAsync(delivery.Id);
             return d?.DeliveryStatus == WebhookDeliveryStatus.Delivered;
         });
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, updated!.DeliveryStatus);
         Assert.NotNull(updated.DeliveredAt);
@@ -413,8 +413,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildRetryableDelivery(retryCount: 2);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -429,14 +429,14 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var attempts          = await assertCtx.WebhookDeliveryAttempts
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
             .Where(a => a.WebhookDeliveryId == delivery.Id)
             .ToListAsync();
 
         Assert.Single(attempts);
         Assert.Equal("OK", attempts[0].HttpResponseCode);
-        Assert.Equal(1,    attempts[0].AttemptedCount);
+        Assert.Equal(1, attempts[0].AttemptedCount);
     }
 
     // -------------------------------------------------------------------------
@@ -447,9 +447,9 @@ public sealed class RetryPendingDeliveriesWorkerTests
     public async Task ExecuteAsync_RetryableDelivery_500Response_StatusRemainsFailedAndRetryCountIncremented()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery     = BuildRetryableDelivery(retryCount: 2);
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
         var originalCount = delivery.RetryCount;
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
@@ -465,11 +465,11 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Failed, updated!.DeliveryStatus);
-        Assert.Equal(originalCount + 1,             updated.RetryCount);
+        Assert.Equal(originalCount + 1, updated.RetryCount);
         Assert.NotNull(updated.NextRetryAt);
         Assert.Null(updated.DeliveredAt);
     }
@@ -479,9 +479,9 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildRetryableDelivery(retryCount: 2);
-        var beforeRun   = DateTimeOffset.UtcNow;
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+        var beforeRun = DateTimeOffset.UtcNow;
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -496,8 +496,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.NotNull(updated!.NextRetryAt);
         Assert.True(updated.NextRetryAt > beforeRun);
@@ -512,8 +512,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange — RetryCount = 5, after increment = 6 > MaximumAttendedCount (5)
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildRetryableDelivery(retryCount: 5);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 5);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -527,16 +527,16 @@ public sealed class RetryPendingDeliveriesWorkerTests
         await RunWorkerUntilAsync(worker, async () =>
         {
             using var s = _serviceProvider.CreateScope();
-            var c       = s.ServiceProvider.GetRequiredService<RepositoryContext>();
-            var d       = await c.WebhookDeliveries.FindAsync(delivery.Id);
+            var c = s.ServiceProvider.GetRequiredService<RepositoryContext>();
+            var d = await c.WebhookDeliveries.FindAsync(delivery.Id);
             return d?.DeliveryStatus == WebhookDeliveryStatus.DeadLetter;
         });
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
-        var dlq               = await assertCtx.WebhookDeadLetterQueues
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var dlq = await assertCtx.WebhookDeadLetterQueues
             .FirstOrDefaultAsync(d => d.WebhookDeliveryId == delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.DeadLetter, updated!.DeliveryStatus);
@@ -593,7 +593,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
     {
         // Arrange — 3 retryable deliveries, two workers competing
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var deliveries = Enumerable.Range(1, 3)
             .Select(i => BuildRetryableDelivery(
@@ -633,7 +633,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
         // Assert — FOR UPDATE SKIP LOCKED prevents double processing
         // Each delivery gets exactly one attempt
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         foreach (var delivery in deliveries)
         {
@@ -739,7 +739,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
                 opt.RetryFailedDeliveryIntervalSeconds = 1;
             });
         }
-        else if(workerConfig is not null)
+        else if (workerConfig is not null)
         {
             services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
             {
@@ -751,7 +751,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
                 opt.RetryFailedDeliveryIntervalSeconds = workerConfig.RetryFailedDeliveryIntervalSeconds;
             });
         }
-        
+
 
         _serviceProvider.Dispose();
         _serviceProvider = services.BuildServiceProvider();
@@ -772,7 +772,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
 internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeliveriesWorker
 {
     public TestableRetryPendingDeliveriesWorker(
-        IServiceScopeFactory                                   scopeFactory,
+        IServiceScopeFactory scopeFactory,
         IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor)
         : base(scopeFactory, optionsMonitor) { }
 

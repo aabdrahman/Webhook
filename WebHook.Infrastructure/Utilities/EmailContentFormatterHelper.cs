@@ -1,6 +1,6 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Serilog;
+using System.Text;
 
 namespace WebHook.Infrastructure.Utilities;
 

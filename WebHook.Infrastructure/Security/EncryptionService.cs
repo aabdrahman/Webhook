@@ -70,7 +70,7 @@ public sealed class EncryptionService : IEncryptionService
             ICryptoTransform cryptoTransform = encryptAes.CreateEncryptor(encryptAes.Key, encryptAes.IV);
 
             using (MemoryStream memoryStream = new MemoryStream())
-            using(CryptoStream cryptoStream = new CryptoStream(memoryStream, cryptoTransform, CryptoStreamMode.Write))
+            using (CryptoStream cryptoStream = new CryptoStream(memoryStream, cryptoTransform, CryptoStreamMode.Write))
             {
                 byte[] valueToEncryptByte = Encoding.UTF8.GetBytes(valueToEncrypt);
                 cryptoStream.Write(valueToEncryptByte, 0, valueToEncryptByte.Length);

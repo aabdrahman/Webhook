@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using WebHook.Infrastructure.Security;
+﻿using WebHook.Infrastructure.Security;
 
 namespace WebHook.Tests.UnitTests.Security;
 

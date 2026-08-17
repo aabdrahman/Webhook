@@ -64,7 +64,7 @@ public sealed class RetryAfterPendingService
             if (!deliveriesToReattmpt.Any())
             {
                 _logger.Information("No delivery to process currently.");
-                return; 
+                return;
             }
 
             //Loop through and set the status to processing and also the lockeduntil and lockedBy
@@ -83,7 +83,7 @@ public sealed class RetryAfterPendingService
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "An error occurred while saving deliveries as processing.");  
+                _logger.Error(ex, "An error occurred while saving deliveries as processing.");
                 await transaction.RollbackAsync(ct);
                 return;
             }
@@ -92,25 +92,25 @@ public sealed class RetryAfterPendingService
             var deliveryIds = deliveriesToReattmpt.Select(x => x.Id).ToList();
 
             //Get teh metadata hosted in the otehr tables from database.
-            var deliveriesMetadata = await _repositoryContext.WebhookDeliveries      
+            var deliveriesMetadata = await _repositoryContext.WebhookDeliveries
                                                         .Where(x => deliveryIds.Contains(x.Id))
-                                                        .Select(x => new WebhookDeliveryProcessorMetadataDto() 
-                                                                        { 
-                                                                            DeliveryId = x.Id, 
-                                                                            EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, 
-                                                                            RaisedEventName = x.webhookEvent.EventType.ToUpper(), 
-                                                                            ContactEmail = x.WebhookSubscriptionEvent.webhookSubscription.ContactEmail ?? "",
-                                                                            ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
-                                                                            SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
-                                                                            AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
-                                                                            FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
-                                                                            FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
-                                                                            EventId = x.WebhookSubscriptionEvent.Id
-                                                                        })
+                                                        .Select(x => new WebhookDeliveryProcessorMetadataDto()
+                                                        {
+                                                            DeliveryId = x.Id,
+                                                            EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey,
+                                                            RaisedEventName = x.webhookEvent.EventType.ToUpper(),
+                                                            ContactEmail = x.WebhookSubscriptionEvent.webhookSubscription.ContactEmail ?? "",
+                                                            ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                            SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                            AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
+                                                            FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
+                                                            FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
+                                                            EventId = x.WebhookSubscriptionEvent.Id
+                                                        })
                                                         .ToDictionaryAsync(x => x.DeliveryId, ct);
 
             //Validate the delivery metadata to ensure all necessary itesms are fetched.
-            if(deliveriesMetadata.Count != deliveryIds.Count)
+            if (deliveriesMetadata.Count != deliveryIds.Count)
             {
                 _logger.Error("An error occurred while fetching metadata. The count of the delivery ids - {0} is not the same as that of the fetced metadata - {1}", deliveryIds.Count, deliveriesMetadata.Count);
                 return; //This is returned and lock not released because there is a seperate worker that releases locked deliveries.
@@ -125,7 +125,7 @@ public sealed class RetryAfterPendingService
             {
                 DateTimeOffset attemptedTime = DateTimeOffset.UtcNow;
 
-                if(!deliveriesMetadata.TryGetValue(delivery.Id, out var deliveryMetadata))
+                if (!deliveriesMetadata.TryGetValue(delivery.Id, out var deliveryMetadata))
                 {
                     _logger.Error("Delivery metadata does not exists for delivery - {0}", delivery.Id);
                     continue; //This continues to other delivery in the loop.
@@ -192,7 +192,7 @@ public sealed class RetryAfterPendingService
                             HttpResponseCode = httpResponse.StatusCode.ToString(),
                             Duration = httpDuration
                         });
-                       
+
                     }
 
                 }
@@ -243,7 +243,7 @@ public sealed class RetryAfterPendingService
 
                     DateTimeOffset notificationTimestamp = DateTimeOffset.UtcNow;
                     //Escalation for the deadletter queue.
-                    if(delivery.DeliveryStatus == WebhookDeliveryStatus.DeadLetter)
+                    if (delivery.DeliveryStatus == WebhookDeliveryStatus.DeadLetter)
                     {
                         _logger.Information("Getting mail notification content for deadletter queue for delivery - {0}", delivery.Id);
 
@@ -329,7 +329,7 @@ public sealed class RetryAfterPendingService
                     foreach (var deliveryAttempt in delivery.WebhookDeliveryAttempts)
                         _repositoryContext.Entry(deliveryAttempt).State = EntityState.Detached;
 
-                    foreach(var deliveryDeadLetter in delivery.webhookDeadLetterQueues)
+                    foreach (var deliveryDeadLetter in delivery.webhookDeadLetterQueues)
                         _repositoryContext.Entry(deliveryDeadLetter).State = EntityState.Detached;
 
                     _repositoryContext.Entry(delivery).State = EntityState.Detached;

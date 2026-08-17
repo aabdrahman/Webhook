@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Serilog;
 using System.Diagnostics;
 using System.Text;
@@ -64,7 +63,7 @@ public sealed class WebhookDeliveryProcessorService
             }
 
             //Loop through all the selected deliveries to set status as processing using the transaction for the update-select.
-            foreach(var deliveryItem in deliveriesToProcess)
+            foreach (var deliveryItem in deliveriesToProcess)
             {
                 deliveryItem.LockedBy = workerId;
                 deliveryItem.LockedUntil = DateTimeOffset.UtcNow.AddSeconds(lockDuration);
@@ -92,7 +91,7 @@ public sealed class WebhookDeliveryProcessorService
                                                 .Where(x => deliveryIds.Contains(x.Id))
                                                 .Select(x => new WebhookDeliveryProcessorMetadataDto() { DeliveryId = x.Id, EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, RaisedEventName = x.webhookEvent.EventType })
                                                 .ToDictionaryAsync(x => x.DeliveryId, ct);
-                                                //.ToListAsync(ct);
+            //.ToListAsync(ct);
 
             if (!deliveryMetadatas.Any())
             {
@@ -116,7 +115,7 @@ public sealed class WebhookDeliveryProcessorService
 
                 //WebhookDeliveryProcessorMetadataDto? deliveryMetadata = deliveryMetadatas.FirstOrDefault(x => x.DeliveryId == delivery.Id);
 
-                if(!deliveryMetadatas.TryGetValue(delivery.Id, out var deliveryMetadata))
+                if (!deliveryMetadatas.TryGetValue(delivery.Id, out var deliveryMetadata))
                 {
                     _logger.Error("The delivery metadata for the delivery could not be fetched due to unforesseen issues for the delivery - {0}.", delivery.Id);
                     continue;
@@ -128,7 +127,7 @@ public sealed class WebhookDeliveryProcessorService
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 string responseContent = string.Empty;
                 string httpResponseCode = string.Empty;
-                
+
                 DateTimeOffset attemptedTime = DateTimeOffset.UtcNow;
 
                 //Build the request item to call HTTP

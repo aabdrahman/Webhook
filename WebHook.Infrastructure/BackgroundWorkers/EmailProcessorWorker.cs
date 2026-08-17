@@ -32,7 +32,7 @@ public class EmailProcessorWorker : BackgroundService
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_emailProcessorWorkerConfiguration.ProcessingIntervalInSeconds));
 
-        while(!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
+        while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
             _logger.Information("Begin processing email sending worker....");
 

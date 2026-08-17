@@ -6,6 +6,6 @@ internal class NullableDateTimeOffsetColumnConverter : ValueConverter<DateTimeOf
 {
     public NullableDateTimeOffsetColumnConverter() : base(c => c.HasValue ? c.Value.ToUniversalTime() : c, c => c)
     {
-        
+
     }
 }

@@ -120,7 +120,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
     /// </summary>
     private WebhookDeliveryProcessorService CreateSut(
         MockHttpMessageHandler httpHandler,
-        RepositoryContext      ctx)
+        RepositoryContext ctx)
     {
         var httpClientFactory = new MockHttpClientFactory(httpHandler);
         var retryAfterService = new WebhookDeliveryRetryAfterService();
@@ -184,19 +184,19 @@ public sealed class WebhookDeliveryProcessorServiceTests
 
     private WebhookDelivery BuildPendingDelivery(
         string callbackUrl = "https://partner.com/webhook",
-        string payload     = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}",
-        int    retryCount  = 0, Guid? subscriptionId = null) => new()
-    {
-        Id                        = Guid.NewGuid(),
-        CallBackUrl               = callbackUrl,
-        RequestPayload            = payload,
-        DeliveryStatus            = WebhookDeliveryStatus.Pending,
-        RetryCount                = retryCount,
-        CreatedAt                 = DateTimeOffset.UtcNow,
-        WebhookSubscriptionEventId = subscriptionId ?? _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
-        webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
-        WebhookDeliveryAttempts   = new List<WebhookDeliveryAttempt>() // initialise to avoid NullRef
-    };
+        string payload = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}",
+        int retryCount = 0, Guid? subscriptionId = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            CallBackUrl = callbackUrl,
+            RequestPayload = payload,
+            DeliveryStatus = WebhookDeliveryStatus.Pending,
+            RetryCount = retryCount,
+            CreatedAt = DateTimeOffset.UtcNow,
+            WebhookSubscriptionEventId = subscriptionId ?? _webhookSubscriptions.SelectMany(x => x.WebhookEvents).Select(x => x.Id).First(),
+            webhookEvent = BuildWebhookEvent(status: WebHookEventStatus.Processing, payload: payload),
+            WebhookDeliveryAttempts = new List<WebhookDeliveryAttempt>() // initialise to avoid NullRef
+        };
 
     // -------------------------------------------------------------------------
     // No pending deliveries
@@ -207,9 +207,9 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange — empty database
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var handler     = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut         = CreateSut(handler, ctx);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(handler, ctx);
 
         // Act & Assert — should return cleanly without throwing
         var ex = await Record.ExceptionAsync(
@@ -223,9 +223,9 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var handler     = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut         = CreateSut(handler, ctx);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
@@ -242,23 +242,23 @@ public sealed class WebhookDeliveryProcessorServiceTests
     public async Task ProcessPendingDeliveriesAsync_SuccessfulResponse_StatusChangedToDelivered()
     {
         // Arrange
-        using var scope  = _serviceProvider.CreateScope();
-        var ctx          = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery     = BuildPendingDelivery();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, updated!.DeliveryStatus);
         Assert.NotNull(updated.DeliveredAt);
@@ -269,23 +269,23 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
-        var beforeCall  = DateTimeOffset.UtcNow;
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
+        var beforeCall = DateTimeOffset.UtcNow;
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert — DeliveredAt is set and is after the call started
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.NotNull(updated!.DeliveredAt);
         Assert.True(updated.DeliveredAt >= beforeCall);
@@ -296,28 +296,28 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK, responseBody: "OK");
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert — one attempt record created with correct HTTP response code
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var attempts          = await assertCtx.WebhookDeliveryAttempts
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
             .Where(a => a.WebhookDeliveryId == delivery.Id)
             .ToListAsync();
 
         Assert.Single(attempts);
         Assert.Equal(StatusCodes.Status200OK.ToString(), attempts[0].HttpResponseCode);
-        Assert.Equal(1,    attempts[0].AttemptedCount);
+        Assert.Equal(1, attempts[0].AttemptedCount);
         Assert.True(attempts[0].Duration >= 0);
     }
 
@@ -326,22 +326,22 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange — any 2xx is a success
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.Created);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, updated!.DeliveryStatus);
     }
@@ -355,22 +355,22 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.InternalServerError);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Failed, updated!.DeliveryStatus);
         Assert.Null(updated.DeliveredAt);
@@ -381,22 +381,22 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery(retryCount: 0);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery(retryCount: 0);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.InternalServerError);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert — NextRetryAt is set in the future
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.NotNull(updated!.NextRetryAt);
         Assert.True(updated.NextRetryAt > DateTimeOffset.UtcNow);
@@ -407,22 +407,22 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange — any non-2xx is a failure
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.NotFound);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Failed, updated!.DeliveryStatus);
     }
@@ -432,8 +432,8 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
@@ -448,8 +448,8 @@ public sealed class WebhookDeliveryProcessorServiceTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var attempts          = await assertCtx.WebhookDeliveryAttempts
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var attempts = await assertCtx.WebhookDeliveryAttempts
             .Where(a => a.WebhookDeliveryId == delivery.Id)
             .ToListAsync();
 
@@ -466,7 +466,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var deliveries = new[]
         {
@@ -479,15 +479,15 @@ public sealed class WebhookDeliveryProcessorServiceTests
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync(totalToProcess: 10);
 
         // Assert — all three are delivered and HTTP was called three times
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var updated           = await assertCtx.WebhookDeliveries.ToListAsync();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeliveries.ToListAsync();
 
         Assert.Equal(3, handler.CallCount);
         Assert.All(updated, d => Assert.Equal(WebhookDeliveryStatus.Delivered, d.DeliveryStatus));
@@ -498,7 +498,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange — 5 pending deliveries but limit is 3
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         for (int i = 0; i < 5; i++)
             await ctx.WebhookDeliveries.AddAsync(
@@ -507,7 +507,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync(totalToProcess: 3);
@@ -516,7 +516,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
         Assert.Equal(3, handler.CallCount);
 
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var delivered = await assertCtx.WebhookDeliveries
             .CountAsync(d => d.DeliveryStatus == WebhookDeliveryStatus.Delivered);
@@ -531,10 +531,10 @@ public sealed class WebhookDeliveryProcessorServiceTests
     public async Task ProcessPendingDeliveriesAsync_MixedResponses_EachDeliveryUpdatedCorrectly()
     {
         // Arrange — two deliveries going to different URLs with different outcomes
-        using var scope    = _serviceProvider.CreateScope();
-        var ctx            = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
         var successDelivery = BuildPendingDelivery("https://success.com/webhook");
-        var failDelivery    = BuildPendingDelivery("https://fail.com/webhook");
+        var failDelivery = BuildPendingDelivery("https://fail.com/webhook");
 
         await ctx.WebhookDeliveries.AddRangeAsync(successDelivery, failDelivery);
         await ctx.SaveChangesAsync();
@@ -552,13 +552,13 @@ public sealed class WebhookDeliveryProcessorServiceTests
 
         // Assert
         using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx         = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
 
         var success = await assertCtx.WebhookDeliveries.FindAsync(successDelivery.Id);
-        var fail    = await assertCtx.WebhookDeliveries.FindAsync(failDelivery.Id);
+        var fail = await assertCtx.WebhookDeliveries.FindAsync(failDelivery.Id);
 
         Assert.Equal(WebhookDeliveryStatus.Delivered, success!.DeliveryStatus);
-        Assert.Equal(WebhookDeliveryStatus.Failed,    fail!.DeliveryStatus);
+        Assert.Equal(WebhookDeliveryStatus.Failed, fail!.DeliveryStatus);
         Assert.NotNull(success.DeliveredAt);
         Assert.Null(fail.DeliveredAt);
         Assert.NotNull(fail.NextRetryAt);
@@ -573,16 +573,16 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange — delivery is already Delivered, not Pending
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var delivery    = BuildPendingDelivery();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
         delivery.DeliveryStatus = WebhookDeliveryStatus.Delivered;
-        delivery.DeliveredAt    = DateTimeOffset.UtcNow.AddMinutes(-1);
+        delivery.DeliveredAt = DateTimeOffset.UtcNow.AddMinutes(-1);
 
         await ctx.WebhookDeliveries.AddAsync(delivery);
         await ctx.SaveChangesAsync();
 
         var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut     = CreateSut(handler, ctx);
+        var sut = CreateSut(handler, ctx);
 
         // Act
         await sut.ProcessPendingDeliveriesAsync();
@@ -600,11 +600,11 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         // Arrange
         using var scope = _serviceProvider.CreateScope();
-        var ctx         = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var handler     = new MockHttpMessageHandler(HttpStatusCode.OK);
-        var sut         = CreateSut(handler, ctx);
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(handler, ctx);
 
-        using var cts   = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         // Act & Assert — should not throw

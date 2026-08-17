@@ -35,22 +35,22 @@ public class WebhookEventControllerTests
 
     private CreateWebhookEventDto BuildCreateWebhookEventDto(string eventType = "CustomerCreated", string payload = "{\"customerId\":\"12345\", \"customerName\":\"John Doe\"}",
                                                             string source = "TestSource", Guid? correlationId = null) => new CreateWebhookEventDto()
-    {
-        EventType = eventType,
-        PayLoad = payload,
-        Source = source,
-        CorrelationId = correlationId ?? Guid.NewGuid()
-    };
+                                                            {
+                                                                EventType = eventType,
+                                                                PayLoad = payload,
+                                                                Source = source,
+                                                                CorrelationId = correlationId ?? Guid.NewGuid()
+                                                            };
 
-    private GetWebhookEventParameters GetWebhookEventParameters(string eventType = "CustomerCreated", string source = "TestSource", 
-                                                                WebHookEventStatus? status = null, int pageNumber = 1, 
+    private GetWebhookEventParameters GetWebhookEventParameters(string eventType = "CustomerCreated", string source = "TestSource",
+                                                                WebHookEventStatus? status = null, int pageNumber = 1,
                                                                 int pageSize = 10, Guid? correlationId = null) => new GetWebhookEventParameters()
-    {
-        EventType = eventType,
-        Source = source,
-        Status = status?.ToString() ?? string.Empty,
-        CorrelationId = correlationId,
-    };
+                                                                {
+                                                                    EventType = eventType,
+                                                                    Source = source,
+                                                                    Status = status?.ToString() ?? string.Empty,
+                                                                    CorrelationId = correlationId,
+                                                                };
 
     public CreateWebhookEventDto GetCreateWebhookEventDto(string eventType = "", string payLoad = "", string source = "", Guid? correlationId = null) => new CreateWebhookEventDto()
     {
@@ -98,7 +98,7 @@ public class WebhookEventControllerTests
         var expectedWebhookEvent = BuildWebhookEventEntityDto(correlationId: correlationId);
 
         var expectedResponse = GenericResponse<IReadOnlyList<WebhookEventDto>>.Success(
-        
+
             new List<WebhookEventDto> { expectedWebhookEvent },
             "Webhook event fetched successfully.",
             System.Net.HttpStatusCode.OK

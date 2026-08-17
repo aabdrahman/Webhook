@@ -170,7 +170,7 @@ public sealed class WebhookEventService : IWebhookEventService
                 PropertyInfo[] properties = raisedEventType.GetProperties();
                 var anyNullValues = properties.Where(p => p.CanRead && p.CanWrite && p.GetValue(raisedEventObject) is null).Select(x => x.Name).ToList();
 
-                if(anyNullValues.Any())
+                if (anyNullValues.Any())
                 {
                     _logger.Warning("Invalid payload for event type - {0}, Missing required fields: {1}", createWebhookEvent.EventType, string.Join(", ", anyNullValues));
                     return GenericResponse<string>.Failure("Operation Failed.", $"Invalid payload for event type. Missing required fields: {string.Join(", ", anyNullValues)}", HttpStatusCode.BadRequest);
@@ -253,7 +253,7 @@ public sealed class WebhookEventService : IWebhookEventService
 
             var webhookEvents = await _repositoryContext.WebhookEvents.AsNoTracking().Where(x => x.CorrelationId == correlationId).Select(WebhookEventMapper.ToDtoExpression()).ToListAsync(ct);
 
-            if(!webhookEvents.Any())
+            if (!webhookEvents.Any())
             {
                 _logger.Warning("Webhook event not found for correlation id - {0}", correlationId);
                 return GenericResponse<IReadOnlyList<WebhookEventDto>>.Failure(null, "Webhook event not found.", HttpStatusCode.NotFound);
@@ -265,9 +265,9 @@ public sealed class WebhookEventService : IWebhookEventService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error ocurred while getting webhook event details.");
-            return GenericResponse<IReadOnlyList<WebhookEventDto>>.Failure(null, "An error occurred while fetching the webhook event.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<IReadOnlyList<WebhookEventDto>>.Failure(null, "An error occurred while fetching the webhook event.", HttpStatusCode.InternalServerError,
                                                             new ErrorDetail { ErrorMessage = ex.Message, ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "" });
-            
+
         }
     }
     /// <summary>
@@ -357,17 +357,17 @@ public sealed class WebhookEventService : IWebhookEventService
                 query = query.Where(x => x.Source == parameters.Source);
             }
 
-            if(!string.IsNullOrWhiteSpace(parameters.EventType))
+            if (!string.IsNullOrWhiteSpace(parameters.EventType))
             {
                 query = query.Where(x => x.EventType == parameters.EventType.ToUpper());
             }
 
-            if(!string.IsNullOrWhiteSpace(parameters.Status) && Enum.TryParse<WebHookEventStatus>(parameters.Status, true, out var enumStatus))
+            if (!string.IsNullOrWhiteSpace(parameters.Status) && Enum.TryParse<WebHookEventStatus>(parameters.Status, true, out var enumStatus))
             {
                 query = query.Where(x => x.Status == enumStatus);
             }
 
-            if(parameters.CorrelationId.HasValue)
+            if (parameters.CorrelationId.HasValue)
             {
                 query = query.Where(x => x.CorrelationId == parameters.CorrelationId.Value);
             }

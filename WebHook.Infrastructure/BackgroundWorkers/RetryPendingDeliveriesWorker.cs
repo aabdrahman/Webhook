@@ -48,11 +48,11 @@ public class RetryPendingDeliveriesWorker : BackgroundService
                 var retryDeliveresAfterFailedConfiguration = workerConfig.CurrentValue;
 
                 await retryService.RunRetryAfterFirstAttemptAsync(ct: stoppingToken, totalAttempts: retryDeliveresAfterFailedConfiguration.TotalBatchSize,
-                                                                    maximumAttemptCount: retryDeliveresAfterFailedConfiguration.MaximumAttendedCount, thresholdDuration: retryDeliveresAfterFailedConfiguration.ThresholdDuration, 
+                                                                    maximumAttemptCount: retryDeliveresAfterFailedConfiguration.MaximumAttendedCount, thresholdDuration: retryDeliveresAfterFailedConfiguration.ThresholdDuration,
                                                                     lockDuration: retryDeliveresAfterFailedConfiguration.DeliveryLockDuration, workerId: _workerId.ToString());
 
                 _logger.Information("Failed webhook deliveries processed successfully....");
-                
+
             }
             catch (Exception ex)
             {
@@ -60,6 +60,6 @@ public class RetryPendingDeliveriesWorker : BackgroundService
             }
         }
 
-       
+
     }
 }

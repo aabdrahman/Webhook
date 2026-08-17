@@ -81,7 +81,7 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
                 })
                 .ToListAsync(cancellationToken);
 
-            if(!subscribedEvents.Any())
+            if (!subscribedEvents.Any())
             {
                 _logger.Warning("No subscribed events found for subscriptionId: {SubscriptionId}", subscriptionId);
                 return GenericResponse<IReadOnlyList<WebhookSubscriptionEventDto>>.Failure(null, "No subscribed events found for the specified subscription.", HttpStatusCode.NotFound,
@@ -164,7 +164,7 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
                                                                             .IgnoreQueryFilters()
                                                                             .SingleOrDefaultAsync(se => se.WebhookSubscriptionId == subscriptionId && se.webHookEventCatalog.NormalizedEventName == eventName.ToUpper(), cancellationToken);
 
-            if(alreadySubscribedEvent is not null && alreadySubscribedEvent.IsActive)
+            if (alreadySubscribedEvent is not null && alreadySubscribedEvent.IsActive)
             {
                 _logger.Warning("An active Subscription already exists for event: {EventName} and subscriptionId: {SubscriptionId}", eventName, subscriptionId);
                 return GenericResponse<string>.Failure(null, "Subscription already exists for the specified event.", HttpStatusCode.Conflict,
@@ -243,7 +243,7 @@ public sealed class WebhookSubscriptionEventService : IWebhookSubscriptionEventS
             WebhookSubscriptionEvent? subscriptionEvent = await _repositoryContext.WebhookEventSubscriptions
                                                         .SingleOrDefaultAsync(se => se.WebhookSubscriptionId == subscriptionId && se.webHookEventCatalog.NormalizedEventName == eventName.ToUpper(), cancellationToken);
 
-            if(subscriptionEvent is null)
+            if (subscriptionEvent is null)
             {
                 _logger.Warning("No subscription found for event: {EventName} and subscriptionId: {SubscriptionId}", eventName, subscriptionId);
                 return GenericResponse<string>.Failure(null, "No subscription found for the specified event.", HttpStatusCode.NotFound,

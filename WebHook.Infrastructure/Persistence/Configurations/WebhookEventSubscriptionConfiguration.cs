@@ -39,7 +39,7 @@ public sealed class WebhookEventSubscriptionConfiguration : IEntityTypeConfigura
         builder.HasMany(x => x.WebhookDeliveries)
             .WithOne(x => x.WebhookSubscriptionEvent)
             .HasForeignKey(x => x.WebhookSubscriptionEventId)
-            .OnDelete(DeleteBehavior.NoAction);    
+            .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasQueryFilter(x => x.IsActive);
     }

@@ -122,7 +122,7 @@ public sealed class StaleClaimedDeliveryReleaseService
 
             foreach (var deliveryItem in itemsToRelease)
             {
-                _logger.Warning("Releasing stale delivery {0} — LockedBy: {1}, LockedUntil: {2}, RetryCount: {3}",deliveryItem.Id, deliveryItem.LockedBy, deliveryItem.LockedUntil, deliveryItem.RetryCount);
+                _logger.Warning("Releasing stale delivery {0} — LockedBy: {1}, LockedUntil: {2}, RetryCount: {3}", deliveryItem.Id, deliveryItem.LockedBy, deliveryItem.LockedUntil, deliveryItem.RetryCount);
 
                 // Clear the lock fields so no worker considers this delivery in-flight by setting the lockedBy and lockedUntil to null and status to failed.
                 deliveryItem.LockedBy = null;

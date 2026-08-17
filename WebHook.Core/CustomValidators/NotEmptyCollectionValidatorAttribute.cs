@@ -7,9 +7,9 @@ internal class NotEmptyCollectionValidatorAttribute : ValidationAttribute
 {
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
-        if(value is IEnumerable enumObject)
+        if (value is IEnumerable enumObject)
         {
-            foreach(var _ in enumObject)
+            foreach (var _ in enumObject)
             {
                 return ValidationResult.Success;
             }
@@ -25,7 +25,7 @@ internal class NotEmptyDictionaryCollectionAttribute : ValidationAttribute
 {
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
-        if(value is IDictionary dictionaryObject)
+        if (value is IDictionary dictionaryObject)
         {
             foreach (var item in dictionaryObject)
             {

@@ -23,7 +23,7 @@ public sealed class OtpService : IOtpService
     private readonly IOptionsMonitor<TokenValidationConfiguration> _tokenValidationOptionsMonitor;
     private readonly IDataProtector _dataProtector;
 
-    public OtpService(RepositoryContext repositoryContext, UserManager<User> userManager, 
+    public OtpService(RepositoryContext repositoryContext, UserManager<User> userManager,
         IApplicationHasher applicationHasher, IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IDataProtectionProvider dataProtectionProvider)
     {
         _repositoryContext = repositoryContext;
@@ -74,7 +74,7 @@ public sealed class OtpService : IOtpService
 
             User? linkedUser = await _userManager.Users.AsNoTracking().IgnoreQueryFilters().FirstOrDefaultAsync(x => x.NormalizedEmail == otpVerificationRequest.EmailAddress.ToUpper(), ct);
 
-            if(linkedUser is null)
+            if (linkedUser is null)
             {
                 _logger.Warning("User with provided email does not exist - {0}", otpVerificationRequest.EmailAddress);
                 return GenericResponse<OtpVerificationDto>.Failure(null, "OTP Verification Failed. Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -92,7 +92,7 @@ public sealed class OtpService : IOtpService
 
             bool isOtpValid = await _applicationHasher.ValidateHashedSecret(linkedUserOtp.OtpHash, otpVerificationRequest.Otp);
 
-            if(!isOtpValid)
+            if (!isOtpValid)
             {
                 _logger.Warning("Provided OTP: {0} does not match the hashed record for linked otp.", otpVerificationRequest.Otp);
                 return GenericResponse<OtpVerificationDto>.Failure(null, "OTP Verification Failed. Invalid Credentials.", HttpStatusCode.BadRequest);

@@ -29,7 +29,7 @@ public sealed class EmailServiceTests : IDisposable
 
     // Environment variable key used by the service
     private const string SmtpPasswordEnvVar = "SmtpClientPassword";
-    private const string ValidPassword       = "test-smtp-password";
+    private const string ValidPassword = "test-smtp-password";
 
     public EmailServiceTests()
     {
@@ -37,8 +37,8 @@ public sealed class EmailServiceTests : IDisposable
 
         _settings = new EmailSenderEmailSmtpSettingsConfiguration
         {
-            Host     = "127.0.0.1",
-            Port     = 2525,
+            Host = "127.0.0.1",
+            Port = 2525,
             Username = "noreply@webhookservice.com"
         };
 
@@ -64,9 +64,9 @@ public sealed class EmailServiceTests : IDisposable
     private EmailService CreateSut() =>
         new EmailService(_optionsMock.Object);
 
-    private static EmailSenderDto ValidDto(string? subject = null, string? content = null, bool isHtml = true, params string[] recipients) => 
+    private static EmailSenderDto ValidDto(string? subject = null, string? content = null, bool isHtml = true, params string[] recipients) =>
         new EmailSenderDto(Subject: subject ?? "Test Subject", MailContent: content ?? "<p>Test body</p>", MailRecipients: recipients.Length > 0 ? recipients.ToList() : new List<string> { "subscriber@partner.com" }, IsHtml: isHtml);
-        
+
 
     // -------------------------------------------------------------------------
     // Environment variable — password missing or empty
@@ -291,7 +291,7 @@ public sealed class EmailServiceTests : IDisposable
     public async Task SendMailAsync_IsHtmlTrue_DoesNotThrow()
     {
         var sut = CreateSut();
-        var ex  = await Record.ExceptionAsync(
+        var ex = await Record.ExceptionAsync(
             () => sut.SendMailAsync(ValidDto(content: "<h1>Hello</h1>", isHtml: true)));
         Assert.Null(ex);
     }
@@ -300,7 +300,7 @@ public sealed class EmailServiceTests : IDisposable
     public async Task SendMailAsync_IsHtmlFalse_DoesNotThrow()
     {
         var sut = CreateSut();
-        var ex  = await Record.ExceptionAsync(
+        var ex = await Record.ExceptionAsync(
             () => sut.SendMailAsync(ValidDto(content: "Plain text", isHtml: false)));
         Assert.Null(ex);
     }
@@ -313,7 +313,7 @@ public sealed class EmailServiceTests : IDisposable
     public async Task SendMailAsync_EmptySubject_DoesNotThrow()
     {
         var sut = CreateSut();
-        var ex  = await Record.ExceptionAsync(
+        var ex = await Record.ExceptionAsync(
             () => sut.SendMailAsync(ValidDto(subject: string.Empty)));
         Assert.Null(ex);
     }
@@ -322,7 +322,7 @@ public sealed class EmailServiceTests : IDisposable
     public async Task SendMailAsync_EmptyBody_DoesNotThrow()
     {
         var sut = CreateSut();
-        var ex  = await Record.ExceptionAsync(
+        var ex = await Record.ExceptionAsync(
             () => sut.SendMailAsync(ValidDto(content: string.Empty)));
         Assert.Null(ex);
     }
@@ -345,8 +345,8 @@ public sealed class EmailServiceTests : IDisposable
             .Setup(o => o.CurrentValue)
             .Returns(new EmailSenderEmailSmtpSettingsConfiguration
             {
-                Host     = "updated-host.com",
-                Port     = 587,
+                Host = "updated-host.com",
+                Port = 587,
                 Username = "updated@webhookservice.com"
             });
 

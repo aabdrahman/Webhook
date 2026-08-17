@@ -52,7 +52,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// Encrypts the plaintext secret before it is written to the database,
     /// ensuring secrets are never stored in the clear.
     /// </param>
-    public WebhookSubscriptionService(RepositoryContext repositoryContext, ISecretKeyGenerator secretKeyGenerator, 
+    public WebhookSubscriptionService(RepositoryContext repositoryContext, ISecretKeyGenerator secretKeyGenerator,
                                         IOptionsMonitor<SignatureSecretConfiguration> optionsMonitor, IEncryptionService encryptionService)
     {
         _logger = Log.ForContext(_className, nameof(WebhookSubscriptionService));
@@ -108,7 +108,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             WebhookSubscription? webhookSubscriptionToActivate = await _repositoryContext.WebhookSubscriptions.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
 
-            if(webhookSubscriptionToActivate is null)
+            if (webhookSubscriptionToActivate is null)
             {
                 _logger.Information("Webhook subscription with provided id does not exist - {0}", webhookSubscriptionId);
                 return GenericResponse<string>.Failure("Operation Failed.", "Webhook subscription with provided id deos not exist.", HttpStatusCode.NotFound);
@@ -134,9 +134,9 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occrred activating webhook subscription - {0}", webhookSubscriptionId);
-            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred activating webhook sunscription.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred activating webhook sunscription.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
-       
+
         }
     }
 
@@ -195,7 +195,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             var notExistingEvents = eventsToSubscribe.Except(subscribedEventsInDatabase.Select(x => x.NormalizedEventName).ToList()).ToList();
 
-            if(eventsToSubscribe.Count != subscribedEventsInDatabase.Count)
+            if (eventsToSubscribe.Count != subscribedEventsInDatabase.Count)
             {
                 _logger.Information("Events to subscribe - {0} does not exist in the database.", string.Join(", ", notExistingEvents));
                 return GenericResponse<string>.Failure("Operation Failed.", "One or more events to subscribe does not exist.", HttpStatusCode.BadRequest);
@@ -208,7 +208,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             List<WebhookSubscriptionEvent> submittedEventsToMap = subscribedEventsInDatabase.Select(x => new WebhookSubscriptionEvent() { WebhookEventCatalogId = x.Id }).ToList();
 
             subscriptionToInsert.WebhookEvents = submittedEventsToMap;
-            
+
 
             await _repositoryContext.WebhookSubscriptions.AddAsync(subscriptionToInsert, ct);
 
@@ -222,7 +222,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occrred while creating webhook subscription.");
-            return GenericResponse<string>.Failure("Operation Failed", "An error occurred when creating webhook subscription.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<string>.Failure("Operation Failed", "An error occurred when creating webhook subscription.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
 
         }
@@ -272,7 +272,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             WebhookSubscription? webhookSubscriptionToDelete = await _repositoryContext.WebhookSubscriptions.Include(x => x.WebhookEvents).FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
 
-            if(webhookSubscriptionToDelete is null)
+            if (webhookSubscriptionToDelete is null)
             {
                 _logger.Information("Webhook to delete with provided Id does not exist - {0}", webhookSubscriptionId);
                 return GenericResponse<string>.Failure("Operation Failed.", "Webhook with provided id does not exist.", HttpStatusCode.NotFound);
@@ -289,7 +289,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred performing webhook subscription delete operation.");
-            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred deleting webhook.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred deleting webhook.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
     }
@@ -320,7 +320,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetAllWebhookSubscriptionAsync(CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetAllWebhookSubscriptionAsync));
-    
+
         try
         {
             _logger.Information("Fetching all webhook subscriptions....");
@@ -335,7 +335,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred fetching webhook subscriptions...");
-            return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "An error occurred fetching webhook subscriptions.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "An error occurred fetching webhook subscriptions.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorDescription = ex?.InnerException?.Message ?? "", ErrorMessage = ex.Message, ErrorTitle = ex.GetType().Name });
 
         }
@@ -376,7 +376,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             WebhookSubscriptionDto? webhookSubscription = await _repositoryContext.WebhookSubscriptions.AsNoTracking().Select(WebhookSubscriptionMapper.ToDtoExpression()).FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
 
-            if(webhookSubscription is null)
+            if (webhookSubscription is null)
             {
                 _logger.Information("Webhook subscription with the id does no exist - {0}", webhookSubscriptionId);
                 return GenericResponse<WebhookSubscriptionDto>.Failure(null, "Webhook SUv=bscription with provided id does not exist.", HttpStatusCode.NotFound);
@@ -389,7 +389,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred fetching webhook subscription.");
-            return GenericResponse<WebhookSubscriptionDto>.Failure(null, "An error occurred fetching webhook subscription.", HttpStatusCode.InternalServerError, 
+            return GenericResponse<WebhookSubscriptionDto>.Failure(null, "An error occurred fetching webhook subscription.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
 
