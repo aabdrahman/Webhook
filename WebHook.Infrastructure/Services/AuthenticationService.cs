@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -7,10 +9,12 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.DataTransferObjects.EmailSender;
+using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
@@ -32,12 +36,14 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IApplicationHasher _applicationHasher;
     private readonly IEmailService _emailService;
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
+    private readonly IDataProtector _dataProtector;
 
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
                                 IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher,
-                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper)
+                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails, IDataProtectionProvider dataProtectionProvider)
     {
         _userManager = userManager;
         _repositoryContext = repositoryContext;
@@ -48,9 +54,12 @@ public sealed class AuthenticationService : IAuthenticationService
         _tokenValidationOptionsMonitor = tokenValidationOptionsMonitor;
         _applicationHasher = applicationHasher;
         _emailService = emailService;
+        _emailContentFormatterHelper = emailContentFormatterHelper;
+        _authenticatedUserDetails = authenticatedUserDetails;
+        _dataProtector = dataProtectionProvider.CreateProtector("Webhook.Otp.OtpVerificationSigning");
 
         _logger = Log.ForContext(_className, nameof(AuthenticationService));
-        _emailContentFormatterHelper = emailContentFormatterHelper;
+        
     }
 
     private Serilog.ILogger _logger;
@@ -308,6 +317,156 @@ public sealed class AuthenticationService : IAuthenticationService
 
     }
 
+
+    public async Task<GenericResponse<string>> ResetUserPasswordAsync(ResetUserPasswordequestDto resetUserPasswordequest, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(ResetUserPasswordAsync));
+
+        try
+        {
+            //Begin the operation to reset user password.
+            _logger.Information("Reset User password request - {0}", resetUserPasswordequest);
+
+            //Fetch the token from the http context via the abstracted interface for authenticated user.
+            string passwordResetToken = _authenticatedUserDetails.operationToken;
+
+            //Check if the operation token is null or empty.
+            if (string.IsNullOrEmpty(passwordResetToken))
+            {
+                //Operation token is empty or null, hence the system returns failure
+                _logger.Warning("User operation token could not be obtained from the request header.");
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Token exist for the request, hence, use the dataprotector to unprotect it.
+            string resetTokenSerializedDetails = _dataProtector.Unprotect(passwordResetToken);
+            OtpVerificationSigning? resetTokenDetails = JsonSerializer.Deserialize<OtpVerificationSigning>(resetTokenSerializedDetails, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+
+            //The deserialized reset token can then be used. Validate that the deserilized item is not null.
+            if(resetTokenDetails is null)
+            {
+                _logger.Warning("Serailized Operation Reset Token could not be deserialized accordingly. Unprotected details - {0}", resetTokenSerializedDetails);
+                return GenericResponse<string>.Failure("Operation Failed", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Check the Jti guid and parse to guid successfully.
+            if(!Guid.TryParse(resetTokenDetails.Jti, out Guid tokenJti))
+            {
+                //The jti from unprotected token could not be parsed as guid, hence, its probably been tampered with.
+                _logger.Warning("The deserialized operation reset token jti could not be parsed as guid appropriately. Token details - {0}", resetTokenDetails);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Use the jti to query the OTPOperationTokens table and only get the tokens that are yet to expire, not consumed yet alongside the linked user and the OTP that is validated for it.
+            OtpOperationToken? signedTokenFromDb = await _repositoryContext.OtpOperationTokens
+                .Include(x => x.OtpVerification).Include(x => x.UserToPerformOperation)
+                .FirstOrDefaultAsync(x => x.Jti == tokenJti && !x.RevokedAt.HasValue && !x.ConsumedAt.HasValue && x.ExpiresAt > DateTimeOffset.UtcNow, ct);
+
+            //Check if the fetched token query returns null, this means that either the jti does not exist, its expired or its already consumed.
+            if(signedTokenFromDb is null)
+            {
+                _logger.Error("Linked signed token in databased could not befetched for the parsed jti - {0}", resetTokenDetails.Jti);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Check that the purpose for creating the otp operation token tallies with this operation: PasswordReset
+            if(signedTokenFromDb.Purpose != OtpPurpose.PasswordReset)
+            {
+                _logger.Warning("The provided operation token was created for another purpose. Token Purpose: {0}", signedTokenFromDb.Purpose.ToString());
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Validates that the token is yet to expire, this is a second guard though as the database query is more of the source of truth after the unprotect from the dataprotector.
+            if(signedTokenFromDb.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                _logger.Warning("Signed token is valid but has expired at: {0}", signedTokenFromDb.ExpiresAt);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //User? userToUpdate = await _userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == signedTokenFromDb.UserId, ct);
+
+            //Check if the linked user is not empty, this ensures there is an item to reset password for.
+            if (signedTokenFromDb.UserToPerformOperation is null)
+            {
+                _logger.Warning("The provided signed token was geenrated for an invalid user. Token probably tampered with as user could not be fetched. User ID - {0}", signedTokenFromDb.UserId);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //Validate that the hashed token from the db corresponds with what is passed b the user, using the same hashing algorithm that is used to hash it in the first place.
+            bool operationTokenFromDbValid = await _applicationHasher.ValidateHashedSecret(signedTokenFromDb.TokenHash, passwordResetToken);
+
+            //If it returns false, then, the token is invalid and operation cannot proceed.
+            if (!operationTokenFromDbValid)
+            {
+                _logger.Warning("The hashed token in the database does not correspond with the token from the header. Hashing Vlaidator returns - {0}", operationTokenFromDbValid);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            }
+
+            //IdentityResult removePasswordIdentity = await _userManager.RemovePasswordAsync(userToUpdate);
+
+            //if (!removePasswordIdentity.Succeeded)
+            //{
+            //    _logger.Warning("Password could not be removed from user profile. Errors - {0}", removePasswordIdentity.Errors.ToList());
+            //    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            //}
+
+            //IdentityResult setPasswordIdentityResult = await _userManager.AddPasswordAsync(userToUpdate, resetUserPasswordequest.NewPassword);
+            //if (!setPasswordIdentityResult.Succeeded)
+            //{
+            //    _logger.Warning("New password could not be set for user. Errors - {0}", setPasswordIdentityResult.Errors.ToList());
+            //    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+            //}
+
+            //Using the custom password validator to ensure that the new password corrsponds with what the identity is configured for.
+            //This is a guard even though our reex shoudl work.
+            IdentityResult passwordValidationResult = await ValidateUserPassword(signedTokenFromDb.UserToPerformOperation, resetUserPasswordequest.NewPassword);
+
+            //if it retuns false, then, we can return invalid password for the user.
+            if (!passwordValidationResult.Succeeded)
+            {
+                _logger.Warning("Password reset failed password policy validation. Errors: {0}", passwordValidationResult.Errors.ToList());
+                return GenericResponse<string>.Failure("Operation Failed.", "The provided password does not meet the password requirements.", HttpStatusCode.BadRequest);
+            }
+
+            if(!string.Equals(resetTokenDetails.IssuedFor, signedTokenFromDb.UserToPerformOperation.NormalizedEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.Warning("The signed operation token was issued to: {0} but the token from db ws issued for: {0}", resetTokenDetails.IssuedFor, signedTokenFromDb.UserToPerformOperation.NormalizedEmail);
+                return GenericResponse<string>.Failure("Operation Failed.", "The provided password does not meet the password requirements.", HttpStatusCode.BadRequest);
+            }
+
+            //Begin the operation to update our token details, set to consumed and the consummation timestamp on both the otp and otp operation token table.
+            DateTimeOffset operationTimestamp = DateTimeOffset.UtcNow;
+
+            signedTokenFromDb.UserToPerformOperation.PasswordHash = _userManager.PasswordHasher.HashPassword(signedTokenFromDb.UserToPerformOperation, resetUserPasswordequest.NewPassword);
+            signedTokenFromDb.UserToPerformOperation.IsActive = true;
+            signedTokenFromDb.UserToPerformOperation.LockoutEnd = null;
+            signedTokenFromDb.UserToPerformOperation.AccessFailedCount = 0;
+            signedTokenFromDb.UserToPerformOperation.RefreshToken = string.Empty;
+            signedTokenFromDb.UserToPerformOperation.TokenExpirationTime = null;
+            signedTokenFromDb.OtpVerification.IsConsumed = true;
+            signedTokenFromDb.OtpVerification.ConsumedAt = operationTimestamp;
+            signedTokenFromDb.ConsumedAt = operationTimestamp;
+
+            await _repositoryContext.SaveChangesAsync(ct);
+
+            //All operation successful, hence we log success and return to client.
+            _logger.Information("User password reset successfully. Token successfully consumed. User updated - {0}", signedTokenFromDb.UserToPerformOperation.Id);
+
+            return GenericResponse<string>.Success("Operation Successful.", "Password reset successfully. Kindly proceed to login.", HttpStatusCode.OK);
+            
+        }
+        catch(CryptographicException ex)
+        {
+            _logger.Error(ex, "An error occurred while decrypting the operation token.");
+            return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while resetting user password.");
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while resetting user password, kindly retry.", HttpStatusCode.InternalServerError);
+        }
+    }
+
     //-------------------------------------------------
     // Utility operation class sccoped methods.
     //-------------------------------------------------
@@ -376,5 +535,20 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         return Convert.ToBase64String(rndNumBytes);
+    }
+
+    private async Task<IdentityResult> ValidateUserPassword(User userToUpdatePassword, string password)
+    {
+        foreach (var passwordValidator in _userManager.PasswordValidators)
+        {
+            var result = await passwordValidator.ValidateAsync(_userManager, userToUpdatePassword, password);
+
+            if (!result.Succeeded)
+            {
+                return result;
+            }
+        }
+
+        return IdentityResult.Success;
     }
 }

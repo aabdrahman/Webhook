@@ -232,6 +232,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<IAuthenticatedUserDetails,  AuthenticatedUserDetails>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();

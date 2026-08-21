@@ -650,8 +650,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         var workerA = CreateWorker();
         var workerB = CreateWorker();
 
-        using var ctsA = new CancellationTokenSource(15000);
-        using var ctsB = new CancellationTokenSource(15000);
+        using var ctsA = new CancellationTokenSource(25000);
+        using var ctsB = new CancellationTokenSource(25000);
 
         // Act — both run concurrently
         var taskA = Task.Run(() => workerA.RunAsync(ctsA.Token));

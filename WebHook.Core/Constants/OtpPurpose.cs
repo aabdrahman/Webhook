@@ -2,5 +2,6 @@
 
 public enum OtpPurpose
 {
-    PasswordReset
+    PasswordReset,
+    ChangeEmail
 }
