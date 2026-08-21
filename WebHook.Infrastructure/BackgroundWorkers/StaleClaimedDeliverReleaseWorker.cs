@@ -23,13 +23,19 @@ public class StaleClaimedDeliverReleaseWorker : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("Worker to rocess any possible stale claimed deliveries started successfully.....");
+        _logger.ForContext("MethodName", nameof(StartAsync)).Information("Worker to process any possible stale claimed deliveries started successfully.....");
         await base.StartAsync(cancellationToken);
+    }
+
+    public override Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.ForContext("MethodName", nameof(StopAsync)).Information("Worker to process any possible stale claimed deliveries is stopping.....");
+        return base.StopAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        //Create an instance of the epriodic timer.
+        //Create an instance of the periodic timer.
         using var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(_retryDeliveresAfterFailedConfiguration.StaleDeliveryReleaseIntervalSeconds));
 
         _logger = _logger.ForContext("MethodName", nameof(ExecuteAsync));

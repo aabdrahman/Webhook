@@ -181,7 +181,7 @@ public sealed class WebhookDeliveryProcessorService
                     delivery.LockedBy = null;
                     delivery.LockedUntil = null;
                     responseContent = ex.Message;
-                    httpResponseCode = ex.StatusCode.HasValue ? ex.StatusCode.Value.ToString() : "500";
+                    httpResponseCode = ex.StatusCode.HasValue ? ((int)ex.StatusCode.Value).ToString() : "500";
                 }
 
                 delivery.WebhookDeliveryAttempts.Add

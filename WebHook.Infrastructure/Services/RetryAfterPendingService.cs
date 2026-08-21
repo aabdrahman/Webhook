@@ -147,7 +147,7 @@ public sealed class RetryAfterPendingService
 
                     httpRequest.Headers.Add("X-Webhook-Timestamp", attemptedTime.ToUnixTimeSeconds().ToString());
                     httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName);
-                    httpRequest.Headers.Add("-Webhook-Signature", _signatureService.GenerateSignature(delivery.RequestPayload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
+                    httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(delivery.RequestPayload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
 
                     //using var content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json");
                     //using var httpResponse = await httpClient.PostAsync(delivery.CallBackUrl, content, cancellationToken: requestCts.Token);
@@ -156,7 +156,7 @@ public sealed class RetryAfterPendingService
                     var httpDuration = stopwatch.Elapsed.TotalMilliseconds;
                     var responseContent = await httpResponse.Content.ReadAsStringAsync();
                     httpResponseStatusCode = httpResponse.StatusCode.ToString();
-                    _logger.Information("The callback reponds after - {0}ms", stopwatch.Elapsed.TotalMilliseconds);
+                    _logger.Information("The callback responds after - {0}ms", stopwatch.Elapsed.TotalMilliseconds);
 
                     if (httpResponse.IsSuccessStatusCode)
                     {
@@ -171,7 +171,7 @@ public sealed class RetryAfterPendingService
                             AttemptedAt = DateTimeOffset.UtcNow,
                             AttemptedCount = 1,
                             HttpResponse = responseContent,
-                            HttpResponseCode = httpResponse.StatusCode.ToString(),
+                            HttpResponseCode = ((int)httpResponse.StatusCode).ToString(),
                             Duration = httpDuration
                         });
                     }
@@ -189,7 +189,7 @@ public sealed class RetryAfterPendingService
                             AttemptedAt = DateTimeOffset.UtcNow,
                             AttemptedCount = 1,
                             HttpResponse = responseContent,
-                            HttpResponseCode = httpResponse.StatusCode.ToString(),
+                            HttpResponseCode = ((int)httpResponse.StatusCode).ToString(),
                             Duration = httpDuration
                         });
 
@@ -212,7 +212,7 @@ public sealed class RetryAfterPendingService
                         AttemptedAt = DateTimeOffset.UtcNow,
                         AttemptedCount = 1,
                         HttpResponse = ex.Message,
-                        HttpResponseCode = ex.StatusCode.HasValue ? ex.StatusCode.Value.ToString() : "500",
+                        HttpResponseCode = ex.StatusCode.HasValue ? ((int)ex.StatusCode.Value).ToString() : "500",
                         Duration = stopwatch.Elapsed.TotalMilliseconds
                     });
                 }
@@ -220,7 +220,9 @@ public sealed class RetryAfterPendingService
                 // Check if the value has exceeded the point to push to dead letter.
                 // This can be optimized further to escalate to a recipient that the callback url is not accessible
                 // Also, a possibility of the escalation of long responding endpoints to be done after already saving the details.
-                if (delivery.RetryCount > maximumAttemptCount && delivery.DeliveryStatus == WebhookDeliveryStatus.Failed)
+                //The maxAttempted value is the config value multiplied by by the current retry cycle
+                int maximumCycleAttemptCount = maximumAttemptCount * delivery.RetryCycle;
+                if (delivery.RetryCount > maximumCycleAttemptCount && delivery.DeliveryStatus == WebhookDeliveryStatus.Failed)
                 {
                     delivery.DeliveryStatus = WebhookDeliveryStatus.DeadLetter;
                     delivery.webhookDeadLetterQueues.Add(new WebhookDeadLetterQueue()

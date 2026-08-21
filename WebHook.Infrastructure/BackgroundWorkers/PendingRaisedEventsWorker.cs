@@ -69,7 +69,8 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
     /// <inheritdoc/>
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("PendingRaisedEventsWorker starting. Interval: {IntervalSeconds}s | PendingThreshold: {ThresholdMinutes} minutes", _options.CurrentValue.PendingEventsWorkerIntervalSeconds, _options.CurrentValue.PendingEventsThresholdMinutes);
+
+        _logger.ForContext(_methodName, nameof(StartAsync)).Information("PendingRaisedEventsWorker starting. Interval: {IntervalSeconds}s | PendingThreshold: {ThresholdMinutes} minutes", _options.CurrentValue.PendingEventsWorkerIntervalSeconds, _options.CurrentValue.PendingEventsThresholdMinutes);
 
         return base.StartAsync(cancellationToken);
     }
@@ -77,7 +78,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
     /// <inheritdoc/>
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("PendingRaisedEventsWorker stopping at {Time}.", DateTimeOffset.UtcNow);
+        _logger.ForContext(_methodName, nameof(StopAsync)).Information("PendingRaisedEventsWorker stopping at {Time}.", DateTimeOffset.UtcNow);
 
         return base.StopAsync(cancellationToken);
     }

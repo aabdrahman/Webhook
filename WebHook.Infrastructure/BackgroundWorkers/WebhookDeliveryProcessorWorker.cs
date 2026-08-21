@@ -26,14 +26,14 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("WebhookDeliveryProcessorWorker starting. Tick interval: {0}s", 0);
+        _logger.ForContext("MethodName", nameof(StartAsync)).Information("WebhookDeliveryProcessorWorker starting. Tick interval: {0}s", 0);
         workerId = Guid.CreateVersion7(DateTimeOffset.UtcNow);
         return base.StartAsync(cancellationToken);
     }
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("WebhookDeliveryProcessorWorker stopping at {Time}.", DateTimeOffset.UtcNow);
+        _logger.ForContext("MethodName", nameof(StopAsync)).Information("WebhookDeliveryProcessorWorker stopping at {Time}.", DateTimeOffset.UtcNow);
         return base.StopAsync(cancellationToken);
     }
 

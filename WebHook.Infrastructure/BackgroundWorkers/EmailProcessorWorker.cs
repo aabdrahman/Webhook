@@ -58,7 +58,7 @@ public class EmailProcessorWorker : BackgroundService
 
     public override Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("Email processor worker is starting.....");
+        _logger.ForContext("MethodName", nameof(StartAsync)).Information("Email processor worker is starting.....");
         return base.StartAsync(cancellationToken);
     }
 

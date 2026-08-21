@@ -24,9 +24,16 @@ public class RetryPendingDeliveriesWorker : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.Information("Worker has started successfully.....");
+        _logger.ForContext("MethodName", nameof(StartAsync)).Information("Worker has started successfully.....");
         _workerId = Guid.CreateVersion7(DateTimeOffset.UtcNow);
         await base.StartAsync(cancellationToken);
+    }
+
+    public override Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.ForContext("MethodName", nameof(StopAsync)).Information("Worker is stopping.....");
+       
+        return base.StopAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

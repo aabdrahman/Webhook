@@ -13,13 +13,17 @@ string logFromConfig = builder.Configuration.GetValue<string>("");
 string logFilePath = string.IsNullOrWhiteSpace(logFromConfig) ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", "log-.txt") : Path.Combine(logFromConfig, "log-.txt");
 
 Log.Logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
+                    .MinimumLevel.Information()
                     .Enrich.FromLogContext()
+                    .Enrich.With<CustomLogSourceEnricher>()
+                    .WriteTo.Console()
                     .WriteTo.File(path: logFilePath, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true,
                                     fileSizeLimitBytes: 5_000_000, restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Verbose,
                                     outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.ffff zzzz} || {Level:u3}] || [{ClassName}].[{MethodName}] - {Message:lj}{NewLine}{Exception}{NewLine}")
                     .CreateLogger();
 
+
+builder.Host.UseSerilog();
 builder.Services.ConfigureDatabaseConnection(builder.Configuration);
 builder.Services.ConfigureIdentity(builder.Configuration);
 
