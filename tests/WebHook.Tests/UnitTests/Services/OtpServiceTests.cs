@@ -93,6 +93,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         };
 
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
 
         services.AddLogging();
         services.AddHttpContextAccessor();

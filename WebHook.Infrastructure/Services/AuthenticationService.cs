@@ -467,6 +467,95 @@ public sealed class AuthenticationService : IAuthenticationService
         }
     }
 
+
+    public async Task<GenericResponse<TokenDto>> RefreshTokenAsync(TokenDto tokenDetails, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(RefreshTokenAsync));
+
+        try
+        {
+            _logger.Information("Refresh token request - {0}", tokenDetails);
+
+            ClaimsPrincipal? userClaims = GetUserPrincipalsFromToken(tokenDetails.accessToken);
+
+            if(userClaims is null)
+            {
+                _logger.Warning("User claims could not be fetched from the provided token details.");
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if(!Guid.TryParse(userClaims.FindFirstValue(ClaimTypes.NameIdentifier), out Guid loggedinUserId))
+            {
+                _logger.Warning("User name identifier claim from principals could not be parsed as guid - {0}", userClaims.FindFirstValue(ClaimTypes.NameIdentifier));
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            string? tokenJti = userClaims.FindFirstValue(JwtRegisteredClaimNames.Jti);
+
+            if(Guid.TryParse(tokenJti, out Guid userAssignedJti))
+            {
+                _logger.Warning("Toke jti could not be parsed apropriately. Jti from toke - {0}", tokenJti);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            string? userEmail = userClaims.FindFirstValue(ClaimTypes.Email);
+
+            if (string.IsNullOrWhiteSpace(userEmail))
+            {
+                _logger.Warning("User email address could not be fetched from the user claims.");
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            User? userToRefresh = await _userManager.FindByEmailAsync(userEmail);
+
+            if(userToRefresh is null)
+            {
+                _logger.Warning("User with email does not exist - {0}", userEmail);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if(loggedinUserId != userToRefresh.Id)
+            {
+                _logger.Warning("Mismatch of user ids. User id from the user claims: {0} does not match the record fetched from database: {1}", loggedinUserId, userToRefresh.Id);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if (!tokenDetails.refreshToken.Equals(userToRefresh.RefreshToken))
+            {
+                _logger.Warning("Mismatch of refresh token. Refresh token from request: {0} does not match the current refresh token for user: {1}", tokenDetails.refreshToken, userToRefresh.RefreshToken);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            DateTimeOffset operationTimestamp = DateTimeOffset.UtcNow;
+            _loggedInUser = userToRefresh;
+            _loggedInUser.RefreshToken = GenerateRefreshToken();
+            _loggedInUser.LastAuthenticatedAt = operationTimestamp;
+            _loggedInUser.TokenExpirationTime = operationTimestamp.AddSeconds(_jwtSettingsConfiguration.RefreshTokenExpirationAfterInSeconds);
+
+            IdentityResult updateUserDetailsResult = await _userManager.UpdateAsync(_loggedInUser);
+            if (!updateUserDetailsResult.Succeeded)
+            {
+                _logger.Warning("An error occurred while updating authenticated user details in database - {0}", updateUserDetailsResult.Errors.ToList());
+                return GenericResponse<TokenDto>.Failure(null, "User session could not be refreshed.", HttpStatusCode.BadRequest);
+            }
+
+            _logger.Information("User details updated successfully. Token to be generated. User details - {0},{1}", _loggedInUser.Id, _loggedInUser.NormalizedEmail);
+
+            string accessToken = await GenerateToken();
+
+            _logger.Information("Token geenrated successfully for user - {0}", _loggedInUser.Id);
+
+            return GenericResponse<TokenDto>.Success(new TokenDto(accessToken, _loggedInUser.RefreshToken), "User session successfully refreshed.", HttpStatusCode.OK);
+
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while refreshing user token.");
+            return GenericResponse<TokenDto>.Failure(null, "An error occurred while refreshing user session.", HttpStatusCode.InternalServerError);
+        }
+    }
+
     //-------------------------------------------------
     // Utility operation class sccoped methods.
     //-------------------------------------------------
@@ -483,9 +572,9 @@ public sealed class AuthenticationService : IAuthenticationService
 
         claims.Add(new Claim(ClaimTypes.Email, _loggedInUser?.NormalizedEmail!));
         claims.Add(new Claim(ClaimTypes.Name, _loggedInUser?.NormalizedUserName!));
-        claims.Add(new Claim(ClaimTypes.NameIdentifier, _loggedInUser?.Id.ToString()!));
-        claims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
-        claims.Add(new Claim(JwtRegisteredClaimNames.Sub, _loggedInUser?.Id.ToString()!));
+        claims.Add(new Claim(ClaimTypes.NameIdentifier, _loggedInUser?.Id.ToString("N")!));
+        claims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")));
+        claims.Add(new Claim(JwtRegisteredClaimNames.Sub, _loggedInUser?.Id.ToString("N")!));
 
         return claims;
     }
@@ -550,5 +639,37 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         return IdentityResult.Success;
+    }
+
+    private ClaimsPrincipal? GetUserPrincipalsFromToken(string token, bool validateLifetime = false)
+    {
+        string secretKey = Environment.GetEnvironmentVariable("webhook_secret_key") ?? throw new ArgumentNullException("");
+
+        var tokenValidationParameters = new TokenValidationParameters()
+        {
+            ValidateLifetime = validateLifetime,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.Zero,
+
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            ValidIssuers = _jwtSettingsConfiguration.ValidIssuer.Split(";", StringSplitOptions.TrimEntries),
+            ValidAudiences = _jwtSettingsConfiguration.ValidAudiences.Split(";", StringSplitOptions.TrimEntries)
+        };
+
+        SecurityToken securityToken;
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+
+        var principals = tokenHandler.ValidateToken(token, tokenValidationParameters, out securityToken);
+        var jwtSecurityToken = securityToken as JwtSecurityToken;
+
+        if(jwtSecurityToken is null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return null;
+        }
+
+        return principals;
     }
 }

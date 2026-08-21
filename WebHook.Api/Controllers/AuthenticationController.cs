@@ -15,6 +15,7 @@ namespace WebHook.Api.Controllers;
 ///   <item><description>Authenticate with email or username and password to receive a JWT access token.</description></item>
 ///   <item><description>Change an existing account password after successful authentication.</description></item>
 ///   <item><description>Request a one-time password (OTP) for account operations such as password reset.</description></item>
+///   <item><description>Request a refresh on a signed in user session..</description></item>
 /// </list>
 /// </remarks>
 [Route("api/[controller]")]
@@ -199,6 +200,55 @@ public class AuthenticationController : ControllerBase
         try
         {
             var result = await _authenticationService.RequestOtpAsync(requestOtpRequest, ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// Refreshes an authenticated user's session using a valid refresh token.
+    /// </summary>
+    /// <param name="tokenDetails">
+    /// Contains the refresh token required to obtain a new authentication session.
+    /// </param>
+    /// <param name="ct">
+    /// A cancellation token that can be used to cancel the operation before it completes.
+    /// </param>
+    /// <returns>
+    /// A response containing the newly generated authentication tokens when the refresh
+    /// operation is successful; otherwise, an appropriate error response.
+    /// </returns>
+    /// <response code="200">
+    /// The refresh token is valid and a new authentication session has been generated.
+    /// </response>
+    /// <response code="400">
+    /// The supplied refresh token could not be found or is no longer valid.
+    /// </response>
+    /// <response code="500">
+    /// An unexpected error occurred while processing the refresh request.
+    /// </response>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RefreshSession([FromBody] TokenDto tokenDetails, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(RefreshSession));
+        try
+        {
+            var result = await _authenticationService.RefreshTokenAsync(tokenDetails, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)
