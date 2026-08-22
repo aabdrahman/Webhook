@@ -51,6 +51,8 @@ builder.Services.ConfigureSwagger();
 builder.Services.AddEndpointsApiExplorer();
 //builder.Services.AddOpenApi();
 
+//Application Caching
+builder.Services.ConfigureApplicationCaching();
 
 var app = builder.Build();
 

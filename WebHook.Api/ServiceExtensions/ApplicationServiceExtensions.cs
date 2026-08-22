@@ -394,4 +394,13 @@ internal static class ApplicationServiceExtensions
 
         });
     }
+
+    internal static void ConfigureApplicationCaching(this IServiceCollection services)
+    {
+        services.AddMemoryCache(opts =>
+        {
+            opts.SizeLimit = 2 * 1024 * 1024;
+            
+        });
+    }
 }
