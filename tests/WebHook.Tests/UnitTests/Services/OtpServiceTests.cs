@@ -92,8 +92,12 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
         };
 
+        services.AddMemoryCache();
+
         services.AddSingleton<IWebHostEnvironment>(environment);
         services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
+        services.AddScoped<ICacheService, CacheService>();
+
 
         services.AddLogging();
         services.AddHttpContextAccessor();

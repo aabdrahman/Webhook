@@ -38,12 +38,14 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
     private readonly IDataProtector _dataProtector;
+    private readonly ICacheService _cacheService;
 
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
                                 IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher,
-                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails, IDataProtectionProvider dataProtectionProvider)
+                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails,
+                                IDataProtectionProvider dataProtectionProvider, ICacheService cacheService)
     {
         _userManager = userManager;
         _repositoryContext = repositoryContext;
@@ -57,9 +59,10 @@ public sealed class AuthenticationService : IAuthenticationService
         _emailContentFormatterHelper = emailContentFormatterHelper;
         _authenticatedUserDetails = authenticatedUserDetails;
         _dataProtector = dataProtectionProvider.CreateProtector("Webhook.Otp.OtpVerificationSigning");
+        _cacheService = cacheService;
 
         _logger = Log.ForContext(_className, nameof(AuthenticationService));
-        
+
     }
 
     private Serilog.ILogger _logger;
@@ -137,7 +140,8 @@ public sealed class AuthenticationService : IAuthenticationService
             _loggedInUser.LastLoginDate = operationTimestamp;
             _loggedInUser.LastAuthenticatedAt = operationTimestamp;
 
-            string token = await GenerateToken();
+            Guid tokenJti = Guid.CreateVersion7(DateTimeOffset.UtcNow);
+            string token = await GenerateToken(tokenJti);
 
             var updateUserResult = await _userManager.UpdateAsync(_loggedInUser);
 
@@ -148,8 +152,9 @@ public sealed class AuthenticationService : IAuthenticationService
             }
 
             var tokenDetails = new TokenDto(accessToken: token, refreshToken: _loggedInUser.RefreshToken);
+            var writeTokenToCache = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser?.NormalizedEmail!, tokenJti);
 
-            _logger.Information("User with details - {0} aigned in successfully and token generated.", loginUserDetails.UserNameOrEmailAddress);
+            _logger.Information("User with details - {0} aigned in successfully and token generated. Write to cache result - {1}", loginUserDetails.UserNameOrEmailAddress, writeTokenToCache);
 
             return GenericResponse<TokenDto>.Success(tokenDetails, "User signed in successfully.", HttpStatusCode.OK);
         }
@@ -492,9 +497,9 @@ public sealed class AuthenticationService : IAuthenticationService
 
             string? tokenJti = userClaims.FindFirstValue(JwtRegisteredClaimNames.Jti);
 
-            if(Guid.TryParse(tokenJti, out Guid userAssignedJti))
+            if(!Guid.TryParse(tokenJti, out Guid userAssignedJti))
             {
-                _logger.Warning("Toke jti could not be parsed apropriately. Jti from toke - {0}", tokenJti);
+                _logger.Warning("Token JTI could not be parsed. JTI from token - {0}", tokenJti);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
@@ -503,6 +508,19 @@ public sealed class AuthenticationService : IAuthenticationService
             if (string.IsNullOrWhiteSpace(userEmail))
             {
                 _logger.Warning("User email address could not be fetched from the user claims.");
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            Guid accessTokenJtiFromCache = await _cacheService.GetItemsFromCacheAsync<Guid>(userEmail);
+            if(accessTokenJtiFromCache == default(Guid))
+            {
+                _logger.Warning("Cached user jti could not be fetched successully. Result from cache - {0}", accessTokenJtiFromCache);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if(userAssignedJti != accessTokenJtiFromCache)
+            {
+                _logger.Warning("Cached token jti: {0} for user: {1} does not match the extracted jti from claims: {2}", accessTokenJtiFromCache, userEmail, userAssignedJti);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
@@ -526,6 +544,13 @@ public sealed class AuthenticationService : IAuthenticationService
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
+            // Safe vakidation of expiration time — treat null as already expired
+            if (userToRefresh.TokenExpirationTime is null || DateTimeOffset.UtcNow > userToRefresh.TokenExpirationTime)
+            {
+                _logger.Warning("Refresh token expired or not set for user {0}. Expiry - {1}", userToRefresh.Id, userToRefresh.TokenExpirationTime);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
             DateTimeOffset operationTimestamp = DateTimeOffset.UtcNow;
             _loggedInUser = userToRefresh;
             _loggedInUser.RefreshToken = GenerateRefreshToken();
@@ -541,9 +566,11 @@ public sealed class AuthenticationService : IAuthenticationService
 
             _logger.Information("User details updated successfully. Token to be generated. User details - {0},{1}", _loggedInUser.Id, _loggedInUser.NormalizedEmail);
 
-            string accessToken = await GenerateToken();
+            Guid accessTokenJti = Guid.CreateVersion7(DateTimeOffset.UtcNow);
+            string accessToken = await GenerateToken(tokenJti: accessTokenJti);
+            bool writeToCacheResult = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser.NormalizedEmail!, accessTokenJti);
 
-            _logger.Information("Token geenrated successfully for user - {0}", _loggedInUser.Id);
+            _logger.Information("Token generated successfully for user - {0}. Write to cache result - {1}", _loggedInUser.Id, writeToCacheResult);
 
             return GenericResponse<TokenDto>.Success(new TokenDto(accessToken, _loggedInUser.RefreshToken), "User session successfully refreshed.", HttpStatusCode.OK);
 
@@ -560,7 +587,7 @@ public sealed class AuthenticationService : IAuthenticationService
     // Utility operation class sccoped methods.
     //-------------------------------------------------
 
-    private async Task<List<Claim>> GetUserClaims()
+    private async Task<List<Claim>> GetUserClaims(Guid tokenJti)
     {
         var claims = new List<Claim>();
         var roles = await _userManager.GetRolesAsync(_loggedInUser!);
@@ -573,8 +600,10 @@ public sealed class AuthenticationService : IAuthenticationService
         claims.Add(new Claim(ClaimTypes.Email, _loggedInUser?.NormalizedEmail!));
         claims.Add(new Claim(ClaimTypes.Name, _loggedInUser?.NormalizedUserName!));
         claims.Add(new Claim(ClaimTypes.NameIdentifier, _loggedInUser?.Id.ToString("N")!));
-        claims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")));
+        claims.Add(new Claim(JwtRegisteredClaimNames.Jti, tokenJti.ToString("N")));
         claims.Add(new Claim(JwtRegisteredClaimNames.Sub, _loggedInUser?.Id.ToString("N")!));
+        claims.Add(new Claim(JwtRegisteredClaimNames.FamilyName, _loggedInUser!.LastName));
+        claims.Add(new Claim(JwtRegisteredClaimNames.GivenName, _loggedInUser.FirstName));
 
         return claims;
     }
@@ -589,9 +618,9 @@ public sealed class AuthenticationService : IAuthenticationService
 
     }
 
-    private async Task<string> GenerateToken()
+    private async Task<string> GenerateToken(Guid tokenJti)
     {
-        var userClaims = await GetUserClaims();
+        var userClaims = await GetUserClaims(tokenJti);
         var tokenCredentials = GetSigninCredentials();
         var tokenOptions = GetTokenOptions(tokenCredentials, userClaims);
 
@@ -651,7 +680,7 @@ public sealed class AuthenticationService : IAuthenticationService
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateIssuerSigningKey = true,
-            ClockSkew = TimeSpan.Zero,
+            ClockSkew = TimeSpan.FromSeconds(5),
 
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
             ValidIssuers = _jwtSettingsConfiguration.ValidIssuer.Split(";", StringSplitOptions.TrimEntries),

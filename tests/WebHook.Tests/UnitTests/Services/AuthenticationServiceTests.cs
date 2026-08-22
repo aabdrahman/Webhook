@@ -172,6 +172,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         }).AddEntityFrameworkStores<RepositoryContext>()
         .AddDefaultTokenProviders();
 
+        services.AddMemoryCache();
+
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<Core.Interfaces.Services.IAuthenticationService, Infrastructure.Services.AuthenticationService>();
         services.AddScoped<IOtpGenerator, OtpGenerator>();
@@ -179,6 +181,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<EmailContentFormatterHelper>();
         services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<ICacheService, CacheService>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -237,7 +240,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             _serviceProvider.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), _serviceProvider.GetRequiredService<SignInManager<User>>(),
             otpGenerator ?? _serviceProvider.GetRequiredService<IOtpGenerator>(), _serviceProvider.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), _serviceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
             applicationHasher ?? _serviceProvider.GetRequiredService<IApplicationHasher>(), _serviceProvider.GetRequiredService<IEmailService>(), 
-            _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, dataProtectionProvider ?? _serviceProvider.GetRequiredService<IDataProtectionProvider>()
+            _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, 
+            dataProtectionProvider ?? _serviceProvider.GetRequiredService<IDataProtectionProvider>(), _serviceProvider.GetRequiredService<ICacheService>()
             );
     }
 
