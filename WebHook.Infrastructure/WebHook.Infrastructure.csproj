@@ -27,7 +27,6 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.22.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.11" />
 
 	</ItemGroup>
 

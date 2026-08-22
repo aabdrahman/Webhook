@@ -240,6 +240,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IOtpGenerator, OtpGenerator>();
         services.AddScoped<IApplicationHasher, ApplicationHasher>();
+        services.AddScoped<ICacheService, CacheService>();
 
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
         services.AddSingleton<EmailContentFormatterHelper>();

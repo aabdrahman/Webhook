@@ -314,7 +314,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
 
         //Assert
         Assert.NotNull(result);
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.NotNull(result.ResponseData);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.Equal("User signed in successfully.", result.ResponseMessage, ignoreCase: true);
