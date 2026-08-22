@@ -637,7 +637,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
         var deliveryAttempts = await assertCtx.WebhookDeliveryAttempts.Where(x => x.WebhookDeliveryId == delivery.Id).ToListAsync();
 
         Assert.Single(deliveryAttempts);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable.ToString(), deliveryAttempts[0].HttpResponseCode);
+        Assert.Equal(((int)HttpStatusCode.ServiceUnavailable).ToString(), deliveryAttempts[0].HttpResponseCode);
         Assert.Equal(1, deliveryAttempts[0].AttemptedCount);
 
     }

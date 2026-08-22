@@ -435,7 +435,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
             .ToListAsync();
 
         Assert.Single(attempts);
-        Assert.Equal("OK", attempts[0].HttpResponseCode);
+        Assert.Equal(((int)HttpStatusCode.OK).ToString(), attempts[0].HttpResponseCode);
         Assert.Equal(1, attempts[0].AttemptedCount);
     }
 

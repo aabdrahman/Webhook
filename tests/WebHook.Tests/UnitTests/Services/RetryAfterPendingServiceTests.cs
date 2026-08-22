@@ -452,7 +452,7 @@ public sealed class RetryAfterPendingServiceTests
             .ToListAsync();
 
         Assert.Single(attempts);
-        Assert.Equal("OK", attempts[0].HttpResponseCode);
+        Assert.Equal(((int)HttpStatusCode.OK).ToString(), attempts[0].HttpResponseCode);
         Assert.Equal(1, attempts[0].AttemptedCount);
     }
 
@@ -574,7 +574,7 @@ public sealed class RetryAfterPendingServiceTests
             .ToListAsync();
 
         Assert.Single(attempts);
-        Assert.Equal("InternalServerError", attempts[0].HttpResponseCode);
+        Assert.Equal(((int)HttpStatusCode.InternalServerError).ToString(), attempts[0].HttpResponseCode);
     }
 
     // -------------------------------------------------------------------------
@@ -934,7 +934,7 @@ public sealed class RetryAfterPendingServiceTests
             .ToListAsync();
 
         Assert.Single(attempts);
-        Assert.Equal("ServiceUnavailable", attempts[0].HttpResponseCode);
+        Assert.Equal(((int)HttpStatusCode.ServiceUnavailable).ToString(), attempts[0].HttpResponseCode);
         Assert.Contains("Connection refused", attempts[0].HttpResponse);
         Assert.Equal(1, attempts[0].AttemptedCount);
     }
