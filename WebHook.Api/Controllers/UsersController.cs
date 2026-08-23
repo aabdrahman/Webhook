@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
@@ -23,6 +24,7 @@ namespace WebHook.Api.Controllers;
 /// </remarks>
 [Route("api/[controller]")]
 [ApiController]
+[AllowAnonymous]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;

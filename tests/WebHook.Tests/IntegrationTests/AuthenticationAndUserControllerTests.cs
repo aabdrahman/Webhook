@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.DataTransferObjects.OtpOperation;
+using WebHook.Core.Interfaces.Services;
 
 namespace WebHook.IntegrationTests.Controllers;
 
@@ -21,37 +22,51 @@ namespace WebHook.IntegrationTests.Controllers;
 ///   - Exception handling returning 500
 ///   - No database, SMTP, or external service needed
 ///
-/// Testcontainers is NOT needed here — the service layer is the
-/// trust boundary. Database-level behaviour is covered by the
-/// service integration tests.
+/// LIFECYCLE:
+/// The factory is shared for the whole class via IClassFixture — one server
+/// startup per class. A fresh HttpClient is created per test method via
+/// IAsyncLifetime so headers do not bleed between tests. Mocks are reset
+/// in InitializeAsync (per-method) to ensure each test starts clean.
 /// </summary>
-public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
+public sealed class AuthenticationAndUserControllerTests
+    : IClassFixture<WebApiFactory>, IAsyncLifetime
 {
     // -------------------------------------------------------------------------
     // Fields
     // -------------------------------------------------------------------------
 
-    private WebApiFactory _factory = null!;
+    private readonly WebApiFactory _factory;
     private HttpClient _client = null!;
 
     // -------------------------------------------------------------------------
-    // IAsyncLifetime
+    // Constructor — receives the shared factory from IClassFixture
+    // -------------------------------------------------------------------------
+
+    public AuthenticationAndUserControllerTests(WebApiFactory factory)
+        => _factory = factory;
+
+    // -------------------------------------------------------------------------
+    // IAsyncLifetime — runs before/after each test METHOD
     // -------------------------------------------------------------------------
 
     public Task InitializeAsync()
     {
-        Log.Logger = new LoggerConfiguration().CreateLogger();
-
-        _factory = new WebApiFactory();
+        // Fresh client per test — avoids header/cookie state bleed
         _client = _factory.CreateClient();
+
+        // Reset mock setups and invocation records before each test
+        // so no setup from a previous test affects the current one
+        _factory.ResetMocks();
 
         return Task.CompletedTask;
     }
 
-    public async Task DisposeAsync()
+    public Task DisposeAsync()
     {
+        // Dispose only the client — factory is disposed by xUnit
+        // after ALL tests in the class have completed
         _client.Dispose();
-        await _factory.DisposeAsync();
+        return Task.CompletedTask;
     }
 
     // -------------------------------------------------------------------------
@@ -107,10 +122,10 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     };
 
     private static OtpVerificationRequestDto BuildOtpVerificationDto(
-        string? usereamiladdress = null,
+        string? emailAddress = null,
         string otp = "123456") => new()
         {
-            EmailAddress = usereamiladdress ?? "",
+            EmailAddress = emailAddress ?? "",
             Otp = otp
         };
 
@@ -125,12 +140,14 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
         var tokenDto = new TokenDto("access-token-value", "refresh-token-value");
 
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<TokenDto>.Success(
                 tokenDto, "User signed in successfully.", HttpStatusCode.OK));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Authentication/login", BuildLoginDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Authentication/login", BuildLoginDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -148,17 +165,20 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<TokenDto>.Failure(
                 null, "Invalid Credentials.", HttpStatusCode.NotFound));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Authentication/login", BuildLoginDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Authentication/login", BuildLoginDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<GenericResponse<TokenDto>>();
+        Assert.NotNull(body);
         Assert.False(body!.IsSuccessful);
     }
 
@@ -167,12 +187,14 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<TokenDto>.Failure(
-                null, "User profiled locked out.", HttpStatusCode.BadRequest));
+                null, "User profile locked out.", HttpStatusCode.BadRequest));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Authentication/login", BuildLoginDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Authentication/login", BuildLoginDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -183,11 +205,13 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Authentication/login", BuildLoginDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Authentication/login", BuildLoginDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -197,19 +221,21 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     public async Task Login_ForwardsCredentialsToService()
     {
         // Arrange
-        var capturedDto = null as LoginUserDto;
+        LoginUserDto? capturedDto = null;
 
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
             .Callback<LoginUserDto, CancellationToken>((dto, _) => capturedDto = dto)
-            .ReturnsAsync(GenericResponse<TokenDto>.Failure(null, "Not found.", HttpStatusCode.NotFound));
+            .ReturnsAsync(GenericResponse<TokenDto>.Failure(
+                null, "Not found.", HttpStatusCode.NotFound));
 
         var loginDto = BuildLoginDto("specificuser@test.com", "SpecificPass@1!");
 
         // Act
         await _client.PostAsJsonAsync("/api/Authentication/login", loginDto);
 
-        // Assert — correct values forwarded
+        // Assert
         Assert.NotNull(capturedDto);
         Assert.Equal("specificuser@test.com", capturedDto!.UserNameOrEmailAddress);
         Assert.Equal("SpecificPass@1!", capturedDto.Password);
@@ -220,15 +246,18 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(GenericResponse<TokenDto>.Failure(null, "Not found.", HttpStatusCode.NotFound));
+            .Setup(s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<TokenDto>.Failure(
+                null, "Not found.", HttpStatusCode.NotFound));
 
         // Act
         await _client.PostAsJsonAsync("/api/Authentication/login", BuildLoginDto());
 
         // Assert
         _factory.AuthenticationServiceMock.Verify(
-            s => s.LoginUserAsync(It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()),
+            s => s.LoginUserAsync(
+                It.IsAny<LoginUserDto>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -241,7 +270,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.ChangePasswordAsync(It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ChangePasswordAsync(
+                It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Success(
                 "OK", "Password changed successfully.", HttpStatusCode.OK));
 
@@ -258,7 +288,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.ChangePasswordAsync(It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ChangePasswordAsync(
+                It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "Current password is incorrect.", HttpStatusCode.BadRequest));
 
@@ -275,7 +306,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.ChangePasswordAsync(It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ChangePasswordAsync(
+                It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "User not found.", HttpStatusCode.NotFound));
 
@@ -292,7 +324,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.ChangePasswordAsync(It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ChangePasswordAsync(
+                It.IsAny<ChangePasswordDto>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
@@ -312,7 +345,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.RequestOtpAsync(It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.RequestOtpAsync(
+                It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Success(
                 "OK", "OTP sent successfully.", HttpStatusCode.OK));
 
@@ -329,7 +363,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.RequestOtpAsync(It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.RequestOtpAsync(
+                It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "User not found.", HttpStatusCode.NotFound));
 
@@ -346,7 +381,8 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.AuthenticationServiceMock
-            .Setup(s => s.RequestOtpAsync(It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.RequestOtpAsync(
+                It.IsAny<RequestOtpDto>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
@@ -366,17 +402,20 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Success(
                 "OK", "User created successfully.", HttpStatusCode.Created));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Users/register", BuildCreateUserDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<GenericResponse<string>>();
+        Assert.NotNull(body);
         Assert.True(body!.IsSuccessful);
     }
 
@@ -385,12 +424,14 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "User with email already exists.", HttpStatusCode.Conflict));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Users/register", BuildCreateUserDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -401,28 +442,32 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "Username already taken.", HttpStatusCode.Conflict));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Users/register", BuildCreateUserDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
-    public async Task Register_WeakPassword_Returns400BadRequest()
+    public async Task Register_WeakPassword_Returns400()
     {
         // Arrange
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<string>.Failure(
                 null, "Your profile could not be created.", HttpStatusCode.BadRequest));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Users/register", BuildCreateUserDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -433,11 +478,13 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     {
         // Arrange
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Users/register", BuildCreateUserDto());
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto());
 
         // Assert
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -447,12 +494,14 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     public async Task Register_ForwardsRequestBodyToService()
     {
         // Arrange
-        var capturedDto = null as CreateUserDto;
+        CreateUserDto? capturedDto = null;
 
         _factory.UserServiceMock
-            .Setup(s => s.CreateUserAsync(It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
             .Callback<CreateUserDto, CancellationToken>((dto, _) => capturedDto = dto)
-            .ReturnsAsync(GenericResponse<string>.Success("OK", "Created.", HttpStatusCode.Created));
+            .ReturnsAsync(GenericResponse<string>.Success(
+                "OK", "Created.", HttpStatusCode.Created));
 
         var request = BuildCreateUserDto("specific@test.com", "specificuser");
 
@@ -562,6 +611,7 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<GenericResponse<string>>();
+        Assert.NotNull(body);
         Assert.True(body!.IsSuccessful);
         Assert.Contains("reactivated", body.ResponseMessage, StringComparison.OrdinalIgnoreCase);
     }
@@ -627,14 +677,15 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
     public async Task ValidateOtp_ValidCode_Returns200()
     {
         // Arrange
-        //_factory.OtpServiceMock
-        //    .Setup(s => s.ValidateOtpAsync(
-        //        It.IsAny<OtpVerificationRequestDto>(), It.IsAny<CancellationToken>()))
-        //    .ReturnsAsync(GenericResponse<string>.Success(
-        //        "OK", "OTP validated successfully.", HttpStatusCode.OK));
-        _factory.OtpServiceMock.Setup(o => o.ValidateOtpAsync(It.IsAny<OtpVerificationRequestDto>(), It.IsAny<CancellationToken>()))
+        _factory.OtpServiceMock
+            .Setup(s => s.ValidateOtpAsync(
+                It.IsAny<OtpVerificationRequestDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<OtpVerificationDto>.Success(
-                new OtpVerificationDto() { ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(30), SignedToken = RandomNumberGenerator.GetHexString(12) },
+                new OtpVerificationDto
+                {
+                    ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(30),
+                    SignedToken = RandomNumberGenerator.GetHexString(12)
+                },
                 "OTP validated successfully.",
                 HttpStatusCode.OK));
 
@@ -767,27 +818,27 @@ public sealed class AuthenticationAndUserControllerTests : IAsyncLifetime
         var capturedId = Guid.Empty;
 
         _factory.OtpServiceMock
-            .Setup(s => s.RevokeUserOtpAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.RevokeUserOtpAsync(
+                It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Callback<Guid, CancellationToken>((id, _) => capturedId = id)
-            .ReturnsAsync(GenericResponse<string>.Success("OK", "Revoked.", HttpStatusCode.OK));
+            .ReturnsAsync(GenericResponse<string>.Success(
+                "OK", "Revoked.", HttpStatusCode.OK));
 
         // Act
         await _client.DeleteAsync($"/api/OtpOperation/revoke-otp/{userId}");
 
-        // Assert — correct userId routed to service
+        // Assert — correct userId routed through to service
         Assert.Equal(userId, capturedId);
     }
 
     [Fact]
     public async Task RevokeOtp_InvalidGuidInRoute_Returns400()
     {
-        // Arrange — route constraint {userId:guid} rejects non-GUID values
-
-        // Act
+        // Route constraint {userId:guid} rejects non-GUID values before
+        // the controller is invoked — service is never called
         var response = await _client.DeleteAsync(
-            "/api/OtpOperation/revoke-otp/12345");
+            "/api/OtpOperation/revoke-otp/not-a-guid");
 
-        // Assert — ASP.NET Core route constraint rejects before hitting controller
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 

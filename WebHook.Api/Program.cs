@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Scalar.AspNetCore;
 using Serilog;
+using WebHook.Api.ApplicationFilters;
 using WebHook.Api.ServiceExtensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,7 +28,10 @@ builder.Host.UseSerilog();
 builder.Services.ConfigureDatabaseConnection(builder.Configuration);
 builder.Services.ConfigureIdentity(builder.Configuration);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(opts =>
+{
+    opts.Filters.Add<CustomAuthenticationFilter>();
+});
 builder.Services.ConfigureApplicationServices();
 builder.Services.AddConfigurationModels(builder.Configuration);
 

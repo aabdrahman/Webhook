@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Channels;
 using System.Xml.XPath;
+using WebHook.Api.ApplicationFilters;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -249,6 +250,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<WebhookDeliveryProcessorService>();
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<StaleClaimedDeliveryReleaseService>();
+
+        services.AddScoped<CustomAuthenticationFilter>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)

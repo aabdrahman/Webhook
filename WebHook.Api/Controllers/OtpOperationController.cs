@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.OtpOperation;
@@ -26,6 +27,7 @@ namespace WebHook.Api.Controllers;
 /// </remarks>
 [Route("api/[controller]")]
 [ApiController]
+[AllowAnonymous]
 public class OtpOperationController : ControllerBase
 {
     private readonly IOtpService _otpService;
