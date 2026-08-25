@@ -30,6 +30,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     private readonly ISecretKeyGenerator _secretKeyGenerator;
     private readonly SignatureSecretConfiguration _signatureSecretConfiguration;
     private readonly IEncryptionService _encryptionService;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
     /// <summary>
     /// Initializes a new instance of <see cref="WebhookSubscriptionService"/>.
@@ -52,14 +53,18 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// Encrypts the plaintext secret before it is written to the database,
     /// ensuring secrets are never stored in the clear.
     /// </param>
+    /// <param name="authenticatedUserDetails">
+    /// Gets the major authenticated user details and necessary for knowing user authorziation.
+    /// </param>
     public WebhookSubscriptionService(RepositoryContext repositoryContext, ISecretKeyGenerator secretKeyGenerator,
-                                        IOptionsMonitor<SignatureSecretConfiguration> optionsMonitor, IEncryptionService encryptionService)
+                                        IOptionsMonitor<SignatureSecretConfiguration> optionsMonitor, IEncryptionService encryptionService, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _logger = Log.ForContext(_className, nameof(WebhookSubscriptionService));
         _repositoryContext = repositoryContext;
         _secretKeyGenerator = secretKeyGenerator;
         _signatureSecretConfiguration = optionsMonitor.CurrentValue;
         _encryptionService = encryptionService;
+        _authenticatedUserDetails = authenticatedUserDetails;
     }
 
     private string _className = "ClassName";
@@ -186,6 +191,13 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         {
             _logger.Information("Create Webhook Subscription with details - {0}", createWebhookSubscription);
 
+            //Validate that the authenticated user details could be parsed successfully.
+            if(!Guid.TryParse(_authenticatedUserDetails.userId, out Guid userId))
+            {
+                _logger.Warning("Authenticated user id could not be parsed successfully as guid - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<string>.Failure("Operation Failed.", "User details could not be fetched successfully.", HttpStatusCode.BadRequest);
+            }
+
             //Validate and check the provided subscribed events
             var eventsToSubscribe = createWebhookSubscription.SubscribedEvents.Select(x => x.ToUpper()).ToList();
             var subscribedEventsInDatabase = await _repositoryContext.WebHookEventCatalogs
@@ -201,6 +213,14 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                 return GenericResponse<string>.Failure("Operation Failed.", "One or more events to subscribe does not exist.", HttpStatusCode.BadRequest);
             }
 
+            //Validate that user exists in database.
+            bool isExists = await _repositoryContext.Users.AnyAsync(x => x.Id == userId);
+            if (!isExists)
+            {
+                _logger.Warning("User with id does not exist - {0}", userId);
+                return GenericResponse<string>.Failure("Operation Failed.", $"User with id does not exists - {userId}", HttpStatusCode.NotFound);
+            }
+
             //Begin insertion operations
             WebhookSubscription subscriptionToInsert = createWebhookSubscription.ToEntity();
             subscriptionToInsert.SecretKey = GenerateAndEncryptSignatureService();
@@ -208,7 +228,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             List<WebhookSubscriptionEvent> submittedEventsToMap = subscribedEventsInDatabase.Select(x => new WebhookSubscriptionEvent() { WebhookEventCatalogId = x.Id }).ToList();
 
             subscriptionToInsert.WebhookEvents = submittedEventsToMap;
-
+            subscriptionToInsert.CreatedByUserId = userId;
 
             await _repositoryContext.WebhookSubscriptions.AddAsync(subscriptionToInsert, ct);
 
@@ -216,7 +236,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             _logger.Information("Webhook Subscription successful - {0}", subscriptionToInsert.Id);
 
-            return GenericResponse<string>.Success("Operation Successful.", "You have successfully subscribed to teh webhook.", HttpStatusCode.Created);
+            return GenericResponse<string>.Success("Operation Successful.", "You have successfully subscribed to the webhook.", HttpStatusCode.Created);
 
         }
         catch (Exception ex)
@@ -393,6 +413,48 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
         }
 
+    }
+
+    /// <summary>
+    /// Retrieves all the webhook subscriptions for the authenticated user
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns>
+    /// A <see cref="GenericResponse{T}"/> of <see cref="WebhookSubscriptionDto"/> where:
+    /// <list type="bullet">
+    ///   <item><description><see cref="HttpStatusCode.OK"/> — subscriptions found and retrieved successfully.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription(s) exists for the authenticated user.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
+    /// </list>
+    /// </returns>
+    public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetUserSubscriptionsAsync(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetUserSubscriptionsAsync));
+        try
+        {
+            _logger.Information("Fetching user details for user - {0}", _authenticatedUserDetails.userId);
+
+            if(!Guid.TryParse(_authenticatedUserDetails.userId, out var userId))
+            {
+                _logger.Warning("Authenticated user id could not be parsed as a valid guid - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "Invalid User details.", HttpStatusCode.Forbidden);
+            }
+
+            List<WebhookSubscriptionDto> userSubscriptions = await _repositoryContext.WebhookSubscriptions.Where(x => x.CreatedByUserId!.Value == userId).Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
+
+            _logger.Information("Subscriptions fetched successfully for user - {0} - {1}", userId, userSubscriptions);
+
+            return userSubscriptions.Any() ?
+                GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Success(userSubscriptions, "Subscriptions fetched successfully.", HttpStatusCode.OK) :
+                GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(userSubscriptions, "No subscriptions for authenticated user.", HttpStatusCode.NotFound);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while fetching user subscriptions.");
+            return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "An error occurred while fetching user subscriptions.", HttpStatusCode.InternalServerError,
+                new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
+        }
     }
 
     /// <summary>

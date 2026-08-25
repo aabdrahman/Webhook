@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using Org.BouncyCastle.Tls.Crypto;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -52,7 +53,7 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
+        Environment.SetEnvironmentVariable("webhook_secret_key", Random.Shared.GetHexString(16));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<Core.Interfaces.Services.IAuthenticationService>();

@@ -10,4 +10,5 @@ public interface IWebhookSubscriptionService
     Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetAllWebhookSubscriptionAsync(CancellationToken ct = default);
     Task<GenericResponse<WebhookSubscriptionDto>> GetWebhookSubscriptionByIdAsync(Guid webhookSubscriptionId, CancellationToken ct = default);
     Task<GenericResponse<string>> ActivateWebhookSubscriptionAsync(Guid webhookSubscriptionId, CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetUserSubscriptionsAsync(CancellationToken ct = default);
 }

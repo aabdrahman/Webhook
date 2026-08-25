@@ -188,7 +188,7 @@ public sealed class FilterWebApplicationFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
+        Environment.SetEnvironmentVariable("webhook_secret_key", Random.Shared.GetHexString(16));
         builder.ConfigureAppConfiguration((context, config) =>
         {
             // Override the JWT secret used by your AuthenticationService
