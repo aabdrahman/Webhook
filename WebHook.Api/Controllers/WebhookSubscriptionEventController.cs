@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookSubscriptionEvent;
@@ -58,6 +59,7 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize]
     public async Task<IActionResult> GetSubscribedEvents(Guid subscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetSubscribedEvents));
@@ -98,6 +100,7 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize]
     public async Task<IActionResult> SubscribeEvent(Guid subscriptionId, string eventName)
     {
         _logger = Log.ForContext(_methodName, nameof(SubscribeEvent));
@@ -135,6 +138,7 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize]
     public async Task<IActionResult> UnsubscribeEvent(Guid subscriptionId, string eventName)
     {
         _logger = Log.ForContext(_methodName, nameof(UnsubscribeEvent));

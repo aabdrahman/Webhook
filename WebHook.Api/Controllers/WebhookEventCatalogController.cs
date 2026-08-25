@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Net;
 using WebHook.Core.DataTransferObjects;
@@ -55,6 +56,7 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAllEventCatalog()
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllEventCatalog));
@@ -95,6 +97,7 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpGet("{EventCatalogId:guid}")]
+    [Authorize]
     public async Task<IActionResult> GetEventCatalogById(Guid EventCatalogId)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetEventCatalogById));
@@ -153,6 +156,7 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateEventCatalog([FromBody] CreateEventCatalogDto createEventCatalog)
     {
         _logger = _logger.ForContext(_methodName, nameof(CreateEventCatalog));
@@ -218,6 +222,7 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpPut("{EventCatalogId:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ActivationAction(Guid EventCatalogId, bool isDeactivate = true)
     {
         _logger = _logger.ForContext(_methodName, nameof(ActivationAction));

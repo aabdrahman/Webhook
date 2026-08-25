@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
@@ -83,6 +84,7 @@ public class WebhookEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize]
     public async Task<IActionResult> GetEventByCorrelationId(Guid correlationId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetEventByCorrelationId));
@@ -147,6 +149,7 @@ public class WebhookEventController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllEvents([FromQuery] GetWebhookEventParameters getWebhookEventParameters)
     {
         _logger = Log.ForContext(_methodName, nameof(GetAllEvents));
