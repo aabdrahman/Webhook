@@ -257,6 +257,26 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
     }
 
     [Fact]
+    public async Task CreateAsync_UsernameCntainsInvalidCharacter_Returns409Conflict()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+
+        var sut = CreateSut();
+        var userToCreate = BuildUserToCreate(username: "tested@001");
+
+        //Act
+        var result = await sut.CreateUserAsync(userToCreate);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("Username cannot contan the special character: @", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
     public async Task CreateAsync_UsernameExists_Returns409Conflict()
     {
         //Arrange

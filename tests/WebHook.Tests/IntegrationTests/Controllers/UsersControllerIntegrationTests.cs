@@ -175,6 +175,24 @@ public sealed class UsersControllerIntegrationTests
     }
 
     [Fact]
+    public async Task Register_UsernmaeContainsInvalidCharacter_Returns400()
+    {
+        // Arrange
+        _factory.UserServiceMock
+            .Setup(s => s.CreateUserAsync(
+                It.IsAny<CreateUserDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure(
+                null, "Your profile could not be created.", HttpStatusCode.BadRequest));
+
+        // Act
+        var response = await _client.PostAsJsonAsync(
+            "/api/Users/register", BuildCreateUserDto(userName: "tested@001"));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Register_ForwardsRequestBodyToService()
     {
         // Arrange

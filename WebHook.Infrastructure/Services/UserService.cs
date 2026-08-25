@@ -45,6 +45,12 @@ public sealed class UserService : IUserService
             //    EmailExists = _repositoryContext.Users.Any(x => x.NormalizedEmail == createUser.EmailAddress.ToUpper())
             //}).FirstOrDefaultAsync(ct);
 
+            if(createUser.UserName.Contains("@", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.Warning("Cannot create user as the username contains the character: @ - {0}", createUser.UserName);
+                return GenericResponse<string>.Failure("Operation Failed.", "Username cannot contan the special character: @", HttpStatusCode.BadRequest);
+            }
+
             var existingUserWithEmail = await _userManager.FindByEmailAsync(createUser.EmailAddress);
 
             if (existingUserWithEmail is not null)

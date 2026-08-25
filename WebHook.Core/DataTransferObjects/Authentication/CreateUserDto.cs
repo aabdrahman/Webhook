@@ -48,7 +48,9 @@ public record class CreateUserDto
 
     /// <summary>
     /// Gets or sets the unique username for the new user account.
+    /// Also, the username canot contain: "@"
     /// </summary>
     [Required(ErrorMessage = "User name is required.")]
+    [RegularExpression(@"^[^@]+$", ErrorMessage = "Username cannot contain '@'.")]
     public string UserName { get; set; }
 }
