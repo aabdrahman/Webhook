@@ -27,7 +27,6 @@ namespace WebHook.Api.Controllers;
 /// </remarks>
 [Route("api/[controller]")]
 [ApiController]
-[AllowAnonymous]
 public class OtpOperationController : ControllerBase
 {
     private readonly IOtpService _otpService;
@@ -84,9 +83,8 @@ public class OtpOperationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status410Gone)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> ValidateOtp(
-        [FromBody] OtpVerificationRequestDto otpVerificationRequest,
-        CancellationToken ct = default)
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateOtp([FromBody] OtpVerificationRequestDto otpVerificationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ValidateOtp));
         try
@@ -140,9 +138,8 @@ public class OtpOperationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> RevokeOtp(
-        Guid userId,
-        CancellationToken ct = default)
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RevokeOtp(Guid userId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RevokeOtp));
         try

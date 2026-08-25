@@ -826,7 +826,7 @@ public sealed class WebhookSubscriptionWebApiFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-
+        Environment.SetEnvironmentVariable("webhook_secret_key", Random.Shared.GetHexString(16));
         builder.ConfigureServices(services =>
         {
             // Replace real services with mocks

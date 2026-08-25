@@ -48,6 +48,11 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
         _filterMock?
             .Setup(f => f.OnAuthorizationAsync(It.IsAny<AuthorizationFilterContext>()))
             .Returns(Task.CompletedTask);
+
+        CacheServiceMock
+                .Setup(c => c.GetItemsFromCacheAsync<Guid>(
+                    TestAuthHandler.TestEmail))
+                .ReturnsAsync(TestAuthHandler.TestJtiGuid);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -116,6 +121,8 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
     public const string TestEmail = "TEST@ACME.COM";
     public const string TestRole = "USER";
 
+    public static readonly Guid TestJtiGuid = new("00000000-0000-0000-0000-000000000097");
+
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -128,7 +135,8 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
             new Claim(ClaimTypes.NameIdentifier, TestUserId),
             new Claim(ClaimTypes.Email,          TestEmail),
             new Claim(ClaimTypes.Role,           TestRole),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(ClaimTypes.Role,           "Admin"),
+            new Claim(JwtRegisteredClaimNames.Jti, TestAuthHandler.TestJtiGuid.ToString())
         };
 
         var identity = new ClaimsIdentity(claims, SchemeName);

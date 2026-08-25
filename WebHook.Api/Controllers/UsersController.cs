@@ -83,9 +83,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [AllowAnonymous]
-    public async Task<IActionResult> Register(
-        [FromBody] CreateUserDto createUserRequest,
-        CancellationToken ct = default)
+    public async Task<IActionResult> Register([FromBody] CreateUserDto createUserRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(Register));
         try
@@ -144,9 +142,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [Authorize]
-    public async Task<IActionResult> Deactivate(
-        [FromBody] UserDeactivationRequestDto userDeactivationRequest,
-        CancellationToken ct = default)
+    public async Task<IActionResult> Deactivate([FromBody] UserDeactivationRequestDto userDeactivationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(Deactivate));
         try
@@ -206,9 +202,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Reactivate(
-        [FromBody] ReactivateUserRequestDto reactivateUserRequest,
-        CancellationToken ct = default)
+    public async Task<IActionResult> Reactivate([FromBody] ReactivateUserRequestDto reactivateUserRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(Reactivate));
         try

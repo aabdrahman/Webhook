@@ -21,7 +21,6 @@ namespace WebHook.Api.Controllers;
 /// </remarks>
 [Route("api/[controller]")]
 [ApiController]
-[AllowAnonymous]
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _authenticationService;
@@ -80,9 +79,8 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> LoginUser(
-        [FromBody] LoginUserDto loginUser,
-        CancellationToken ct = default)
+    [AllowAnonymous]
+    public async Task<IActionResult> LoginUser([FromBody] LoginUserDto loginUser, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(LoginUser));
         try
@@ -137,9 +135,7 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> ChangePassword(
-        [FromBody] ChangePasswordDto changePasswordRequest,
-        CancellationToken ct = default)
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ChangePassword));
         try
@@ -194,6 +190,7 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [AllowAnonymous]
     public async Task<IActionResult> RequestOTP(
         [FromBody] RequestOtpDto requestOtpRequest,
         CancellationToken ct = default)
@@ -245,6 +242,7 @@ public class AuthenticationController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<TokenDto>), StatusCodes.Status500InternalServerError)]
+    [AllowAnonymous]
     public async Task<IActionResult> RefreshSession([FromBody] TokenDto tokenDetails, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RefreshSession));

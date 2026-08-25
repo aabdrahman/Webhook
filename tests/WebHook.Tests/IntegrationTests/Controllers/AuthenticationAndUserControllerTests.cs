@@ -55,6 +55,7 @@ public sealed class AuthenticationAndUserControllerTests
         // Fresh client per test — avoids header/cookie state bleed
         _client = _factory.CreateClient();
 
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "test-token");
         // Reset mock setups and invocation records before each test
         // so no setup from a previous test affects the current one
         _factory.ResetMocks();
