@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Net;
 using WebHook.Core.DataTransferObjects;
@@ -56,6 +57,7 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll()
     {
         _logger = Log.ForContext(_methodName, nameof(GetAll));
@@ -97,6 +99,7 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status500InternalServerError)]
     [HttpGet("{webhookSubscriptionId:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetById(Guid webhookSubscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetById));
@@ -148,8 +151,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create([FromBody] CreateWebhookSubscriptionDto createWebhookSubscription)
     {
+        _logger = Log.ForContext(_methodName, nameof(Create));
         try
         {
             var result = await _webhookSubscriptionService.CreateWebhookSubscriptionAsync(createWebhookSubscription, new CancellationToken());
@@ -190,8 +195,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpPut("{webhookSubscriptionId:guid}")]
+    [Authorize]
     public async Task<IActionResult> ActivateSubscription(Guid webhookSubscriptionId)
     {
+        _logger = Log.ForContext(_methodName, nameof(ActivateSubscription));
         try
         {
             var result = await _webhookSubscriptionService.ActivateWebhookSubscriptionAsync(webhookSubscriptionId, new CancellationToken());
@@ -232,11 +239,61 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpDelete("{webhookSubscriptionId:guid}")]
+    [Authorize]
     public async Task<IActionResult> Delete(Guid webhookSubscriptionId)
     {
+        _logger = Log.ForContext(_methodName, nameof(Delete));
         try
         {
             var result = await _webhookSubscriptionService.DeleteWebhookSubscriptionAsync(webhookSubscriptionId, new CancellationToken());
+
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred calling endpoint.");
+            GenericResponse<string> resp = GenericResponse<string>.Failure(null, "An error occrred performing operation.", HttpStatusCode.InternalServerError,
+                new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
+            return StatusCode((int)HttpStatusCode.InternalServerError, resp);
+        }
+    }
+
+    /// <summary>
+    /// Retrieves all webhook subscriptions belonging to the currently authenticated user.
+    /// </summary>
+    /// <remarks>
+    /// Returns a list of all webhook subscriptions associated with the authenticated user's
+    /// account. Each subscription includes its configuration details, subscribed events,
+    /// callback URL, and current active status.
+    ///
+    /// Only subscriptions owned by the requesting user are returned — this endpoint
+    /// does not expose subscriptions belonging to other users.
+    /// </remarks>
+    /// <param name="ct">
+    /// A cancellation token that can be used to cancel the operation before it completes.
+    /// </param>
+    /// <returns>
+    /// A list of <see cref="WebhookSubscriptionDto"/> representing the user's webhook
+    /// subscriptions, or a descriptive error response if none are found or an error occurs.
+    /// </returns>
+    /// <response code="200">Subscriptions retrieved successfully.</response>
+    /// <response code="401">The request does not include a valid authentication token.</response>
+    /// <response code="403">The authenticated user does not have permission to access this resource.</response>
+    /// <response code="404">No webhook subscriptions were found for the authenticated user.</response>
+    /// <response code="500">An unexpected server error occurred.</response>
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [HttpGet("get-user-subscriptions")]
+    [Authorize]
+    public async Task<IActionResult> GetUserSubscriptions(CancellationToken ct)
+    {
+        _logger = Log.ForContext(_methodName, nameof(GetUserSubscriptions));
+        try
+        {
+            var result = await _webhookSubscriptionService.GetUserSubscriptionsAsync(ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }

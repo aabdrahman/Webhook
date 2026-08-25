@@ -7,8 +7,9 @@ using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Interfaces.Services;
+using WebHook.IntegrationTests.Controllers;
 
-namespace WebHook.IntegrationTests.Controllers;
+namespace WebHook.Tests.IntegrationTests.Controllers;
 
 /// <summary>
 /// HTTP-level integration tests for <see cref="AuthenticationController"/>,
@@ -839,7 +840,7 @@ public sealed class AuthenticationAndUserControllerTests
         var response = await _client.DeleteAsync(
             "/api/OtpOperation/revoke-otp/not-a-guid");
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
