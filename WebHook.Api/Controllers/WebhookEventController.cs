@@ -228,6 +228,7 @@ public class WebhookEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [AllowAnonymous]
     public async Task<IActionResult> CreateEvent([FromBody] CreateWebhookEventDto createWebhookEventRequest)
     {
         _logger = Log.ForContext(_methodName, nameof(CreateEvent));

@@ -66,7 +66,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(items, "Dead letter queues fetched successfully.", HttpStatusCode.OK));
 
         // Act
-        var result = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeadLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -92,7 +92,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(new List<DeadLetterQueueDto> { BuildDlqDto() }, "OK", HttpStatusCode.OK));
 
         // Act
-        await _sut.GetDeedLetterQueue(deliveryId);
+        await _sut.GetDeadLetterQueue(deliveryId);
 
         // Assert — correct delivery ID forwarded to service
         _serviceMock.Verify(
@@ -113,7 +113,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(new List<DeadLetterQueueDto> { item }, "OK", HttpStatusCode.OK));
 
         // Act
-        var result = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeadLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
         var body = objectResult!.Value as GenericResponse<IReadOnlyList<DeadLetterQueueDto>>;
 
@@ -139,7 +139,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure(null, "Dead Letter queue items do not exist.", HttpStatusCode.NotFound));
 
         // Act
-        var result = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeadLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -168,7 +168,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Failure(null, "An unexpected error occurred.", HttpStatusCode.InternalServerError));
 
         // Act
-        var result = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeadLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert
@@ -187,7 +187,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
             .ThrowsAsync(new InvalidOperationException("Unexpected fault."));
 
         // Act
-        var result = await _sut.GetDeedLetterQueue(deliveryId);
+        var result = await _sut.GetDeadLetterQueue(deliveryId);
         var objectResult = result as ObjectResult;
 
         // Assert — exception caught, returns 500, does not propagate
@@ -207,7 +207,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
 
         // Act & Assert
         var ex = await Record.ExceptionAsync(
-            () => _sut.GetDeedLetterQueue(deliveryId));
+            () => _sut.GetDeadLetterQueue(deliveryId));
 
         Assert.Null(ex);
     }
@@ -229,7 +229,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
                 .Success(new List<DeadLetterQueueDto>(), "OK", HttpStatusCode.OK));
 
         // Act
-        await _sut.GetDeedLetterQueue(deliveryId, cts.Token);
+        await _sut.GetDeadLetterQueue(deliveryId, cts.Token);
 
         // Assert — specific token forwarded
         _serviceMock.Verify(

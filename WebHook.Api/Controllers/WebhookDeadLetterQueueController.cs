@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
@@ -57,9 +58,10 @@ public class WebhookDeadLetterQueueController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetDeedLetterQueue(Guid deliveryId, CancellationToken token = default)
+    [Authorize]
+    public async Task<IActionResult> GetDeadLetterQueue(Guid deliveryId, CancellationToken token = default)
     {
-        _logger = _logger.ForContext(_methodName, nameof(GetDeedLetterQueue));
+        _logger = _logger.ForContext(_methodName, nameof(GetDeadLetterQueue));
         try
         {
             var result = await _deadLetterQueueService.GetDeliveryDeadKetterAsync(deliveryId, token);
@@ -97,6 +99,7 @@ public class WebhookDeadLetterQueueController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RequestManualRetry([FromBody] RequestManualRetryDto requestManualRetry, CancellationToken token = default)
     {
         try

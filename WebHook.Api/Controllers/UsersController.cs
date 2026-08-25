@@ -24,7 +24,6 @@ namespace WebHook.Api.Controllers;
 /// </remarks>
 [Route("api/[controller]")]
 [ApiController]
-[AllowAnonymous]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -83,6 +82,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [AllowAnonymous]
     public async Task<IActionResult> Register(
         [FromBody] CreateUserDto createUserRequest,
         CancellationToken ct = default)
@@ -143,6 +143,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize]
     public async Task<IActionResult> Deactivate(
         [FromBody] UserDeactivationRequestDto userDeactivationRequest,
         CancellationToken ct = default)
@@ -204,6 +205,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Reactivate(
         [FromBody] ReactivateUserRequestDto reactivateUserRequest,
         CancellationToken ct = default)
