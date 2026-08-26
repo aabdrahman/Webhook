@@ -9,8 +9,11 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Moq;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -43,6 +46,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     private readonly Mock<IWebHostEnvironment> _environmentMock;
     private readonly Mock<IAuthenticatedUserDetails> _authenticatedUserDetailsMock;
     private readonly Mock<IDataProtectionProvider> _dataProtectionProviderMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
     private readonly Mock<IDataProtector> _dataProtectorMock;
     private readonly string _tempDirectory;
     private readonly string _templateDirectory;
@@ -70,6 +74,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         _authenticatedUserDetailsMock = new Mock<IAuthenticatedUserDetails>();
         _dataProtectionProviderMock = new Mock<IDataProtectionProvider>();
         _dataProtectorMock = new Mock<IDataProtector>();
+        _cacheServiceMock = new Mock<ICacheService>();
 
         // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
         _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -124,8 +129,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
 
         services.Configure<JwtSettingsConfiguration>(opts =>
         {
-            opts.ValidIssuer = "";
-            opts.ValidAudiences = "";
+            opts.ValidIssuer = "issuer-test";
+            opts.ValidAudiences = "audience1;audience2";
             opts.RefreshTokenExpirationAfterInSeconds = 3600;
             opts.TokenExpirationAfterInSeconds = 1800;
         });
@@ -231,18 +236,52 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         ConfirmNewPassword = newPassword
     };
 
+    private TokenDto BuildTokenEntity(string accessToken = "", string refreshToken = "") => new TokenDto(accessToken: accessToken, refreshToken: refreshToken);
+
     private Infrastructure.Services.AuthenticationService CreateSut(IOtpGenerator otpGenerator = null, IApplicationHasher applicationHasher = null, 
-            IAuthenticatedUserDetails authenticatedUserDetails = null, IDataProtectionProvider dataProtectionProvider = null)
+            IAuthenticatedUserDetails authenticatedUserDetails = null, IDataProtectionProvider dataProtectionProvider = null, ICacheService cacheService = null)
     {
-        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var scope = _serviceProvider.CreateScope();
+        var sp = scope.ServiceProvider;
+        var ctx = sp.GetRequiredService<RepositoryContext>();
         return new Infrastructure.Services.AuthenticationService(
-            _serviceProvider.GetRequiredService<UserManager<User>>(), ctx,
-            _serviceProvider.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), _serviceProvider.GetRequiredService<SignInManager<User>>(),
-            otpGenerator ?? _serviceProvider.GetRequiredService<IOtpGenerator>(), _serviceProvider.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), _serviceProvider.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
-            applicationHasher ?? _serviceProvider.GetRequiredService<IApplicationHasher>(), _serviceProvider.GetRequiredService<IEmailService>(), 
-            _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, 
-            dataProtectionProvider ?? _serviceProvider.GetRequiredService<IDataProtectionProvider>(), _serviceProvider.GetRequiredService<ICacheService>()
+            sp.GetRequiredService<UserManager<User>>(), ctx,
+            sp.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), sp.GetRequiredService<SignInManager<User>>(),
+            otpGenerator ?? sp.GetRequiredService<IOtpGenerator>(), sp.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), sp.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
+            applicationHasher ?? sp.GetRequiredService<IApplicationHasher>(), sp.GetRequiredService<IEmailService>(), 
+            sp.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, 
+            dataProtectionProvider ?? sp.GetRequiredService<IDataProtectionProvider>(), cacheService ?? sp.GetRequiredService<ICacheService>()
             );
+    }
+
+    private string BuildJwt(string? nameIdentifier = null, string? email = null, string? jti = null, string? audience = null, string? issuer = null, bool expired = false)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>();
+
+        if (nameIdentifier is not null)
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, nameIdentifier));
+
+        if (email is not null)
+            claims.Add(new Claim(ClaimTypes.Email, email));
+
+        if (jti is not null)
+            claims.Add(new Claim(JwtRegisteredClaimNames.Jti, jti));
+
+        var expiry = expired
+            ? DateTime.UtcNow.AddMinutes(-30)
+            : DateTime.UtcNow.AddMinutes(30);
+
+        var token = new JwtSecurityToken(
+            issuer: issuer ?? "issuer-test",
+            audience: audience ?? "audience1",
+            claims: claims,
+            expires: expiry,
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private RequestOtpDto BuildOtpRequest(string usernameoremail = "test@mail.com", OtpPurpose purpose = OtpPurpose.PasswordReset) => new RequestOtpDto() { Purpose = purpose, UserNameOrEmailAddress = usernameoremail };
@@ -310,8 +349,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         //Arrange
         var seedUserResult = await SeedUserAsync();
         var loginRequest = BuildLoginEntity(usernameoremail: "test@mail.com");
-
-        var sut = CreateSut();
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
 
         //Act
         var result = await sut.LoginUserAsync(loginRequest);
@@ -337,13 +376,49 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     }
 
     [Fact]
+    public async Task LoginUserAsync_EmptyOrigin_Returns400BadRequest()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        //Act
+        var result = await sut.LoginUserAsync(BuildLoginEntity());
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task LoginUserAsync_WrongOrigin_Returns400BadRequest()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("issuer3");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        //Act
+        var result = await sut.LoginUserAsync(BuildLoginEntity());
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
     public async Task LoginUserAsync_ValidRequest_UserName_Returns200OK()
     {
         //Arrange
         var seedUserResult = await SeedUserAsync();
         var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.userName);
-
-        var sut = CreateSut();
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
 
         //Act
         var result = await sut.LoginUserAsync(loginRequest);
@@ -435,6 +510,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         var seedUserResult = await SeedUserAsync();
         var loginRequest = BuildLoginEntity(usernameoremail: "test@mail2.com");
 
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
         var sut = CreateSut();
 
         //Act
@@ -464,8 +541,9 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         //Arrange
         var seedUserResult = await SeedUserAsync();
         var loginRequest = BuildLoginEntity(usernameoremail: "testedUser112");
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
 
-        var sut = CreateSut();
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
 
         //Act
         var result = await sut.LoginUserAsync(loginRequest);
@@ -494,8 +572,9 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         //Arrange
         var seedUserResult = await SeedUserAsync();
         var loginRequest = BuildLoginEntity(usernameoremail: "testUser112", password: "Password@123456");
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
 
-        var sut = CreateSut();
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
 
         //Act
         for (int i = 0; i < 3; i++)
@@ -1351,5 +1430,366 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
         Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
         Assert.Equal("The provided password does not meet the password requirements.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_EmptyOrigin_Returns400BadRequest()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        //Act
+        var result = await sut.RefreshTokenAsync(BuildTokenEntity());
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WrongOrigin_Returns400BadRequest()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("issuer3");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        //Act
+        var result = await sut.RefreshTokenAsync(BuildTokenEntity());
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_ValidRequest_Returns200OK()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var seedUserResult = await SeedUserAsync();
+        var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.email);
+        var arrangeSut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var loginResult = await arrangeSut.LoginUserAsync(loginRequest);
+        Assert.True(loginResult.IsSuccessful);
+        Assert.NotNull(loginResult.ResponseData);
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        //Act
+        var result = await sut.RefreshTokenAsync(loginResult.ResponseData);
+
+        //Assert
+        Assert.NotNull(result);
+        
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+
+        using var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var authenticatedUser = await usermanager.FindByEmailAsync(seedUserResult.email);
+        Assert.NotNull(authenticatedUser);
+        Assert.NotEqual(loginResult.ResponseData.refreshToken, authenticatedUser.RefreshToken);
+        Assert.NotEqual(authenticatedUser.LastLoginDate, authenticatedUser.LastAuthenticatedAt);
+        Assert.True(authenticatedUser.LastAuthenticatedAt > authenticatedUser.LastLoginDate);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_InValidRequest_WrongRefreshToken_Returns200OK()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var seedUserResult = await SeedUserAsync();
+        var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.email);
+        var arrangeSut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var loginResult = await arrangeSut.LoginUserAsync(loginRequest);
+        Assert.True(loginResult.IsSuccessful);
+        Assert.NotNull(loginResult.ResponseData);
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        var refreshRequest = BuildTokenEntity(accessToken: loginResult.ResponseData.accessToken, refreshToken: Convert.ToBase64String(Encoding.UTF8.GetBytes(Random.Shared.GetHexString(16))));
+
+        //Act
+        var result = await sut.RefreshTokenAsync(refreshRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+        
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_InValidRequest_WrongJti_Returns200OK()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var seedUserResult = await SeedUserAsync();
+        var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.email);
+        var arrangeSut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var loginResult = await arrangeSut.LoginUserAsync(loginRequest);
+        Assert.True(loginResult.IsSuccessful);
+        Assert.NotNull(loginResult.ResponseData);
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        _cacheServiceMock.Setup(x => x.GetItemsFromCacheAsync<Guid>(It.IsAny<string>())).ReturnsAsync(Guid.NewGuid());
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object, cacheService: _cacheServiceMock.Object);
+
+        var refreshRequest = BuildTokenEntity(accessToken: loginResult.ResponseData.accessToken, refreshToken: loginResult.ResponseData.refreshToken);
+
+        //Act
+        var result = await sut.RefreshTokenAsync(refreshRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_InValidRequest_DefaultGuidAsJti_Returns200OK()
+    {
+        //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var seedUserResult = await SeedUserAsync();
+        var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.email);
+        var arrangeSut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var loginResult = await arrangeSut.LoginUserAsync(loginRequest);
+        Assert.True(loginResult.IsSuccessful);
+        Assert.NotNull(loginResult.ResponseData);
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        _cacheServiceMock.Setup(x => x.GetItemsFromCacheAsync<Guid>(It.IsAny<string>())).ReturnsAsync(default(Guid));
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object, cacheService: _cacheServiceMock.Object);
+
+        var refreshRequest = BuildTokenEntity(accessToken: loginResult.ResponseData.accessToken, refreshToken: loginResult.ResponseData.refreshToken);
+
+        //Act
+        var result = await sut.RefreshTokenAsync(refreshRequest);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_TokenExpirationTimeExceeded_Returns400BadRequest()
+    {
+        // Arrange
+        var seedResult = await SeedUserAsync();
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        TokenDto userToken;
+        using (var loginScope = _serviceProvider.CreateScope())
+        {
+            var authService = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+            var loginResult = await authService.LoginUserAsync(
+                BuildLoginEntity(usernameoremail: seedResult.email));
+
+            Assert.True(loginResult.IsSuccessful, loginResult.ResponseMessage);
+            Assert.NotNull(loginResult.ResponseData);
+            userToken = loginResult.ResponseData!;
+        }
+
+        using (var updateScope = _serviceProvider.CreateScope())
+        {
+            var userManager = updateScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+            var loggedInUser = await userManager.FindByEmailAsync(seedResult.email);
+            Assert.NotNull(loggedInUser);
+
+            loggedInUser!.TokenExpirationTime = DateTimeOffset.UtcNow.AddSeconds(-5);
+
+            var updateResult = await userManager.UpdateAsync(loggedInUser);
+            Assert.True(updateResult.Succeeded, string.Join(", ", updateResult.Errors.Select(e => e.Description)));
+        }
+
+
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var result = await sut.RefreshTokenAsync(userToken);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_TokenExpirationTimeNull_Returns400BadRequest()
+    {
+        // Arrange
+        var seedResult = await SeedUserAsync();
+
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        TokenDto userToken;
+        using (var loginScope = _serviceProvider.CreateScope())
+        {
+            var authService = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+            var loginResult = await authService.LoginUserAsync(
+                BuildLoginEntity(usernameoremail: seedResult.email));
+
+            Assert.True(loginResult.IsSuccessful, loginResult.ResponseMessage);
+            Assert.NotNull(loginResult.ResponseData);
+            userToken = loginResult.ResponseData!;
+        }
+
+        using (var updateScope = _serviceProvider.CreateScope())
+        {
+            var userManager = updateScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+
+            var loggedInUser = await userManager.FindByEmailAsync(seedResult.email);
+            Assert.NotNull(loggedInUser);
+
+            loggedInUser!.TokenExpirationTime = null;
+
+            var updateResult = await userManager.UpdateAsync(loggedInUser);
+            Assert.True(updateResult.Succeeded, string.Join(", ", updateResult.Errors.Select(e => e.Description)));
+        }
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var result = await sut.RefreshTokenAsync(userToken);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    //Custom tken validation tests for refresh token
+    [Fact]
+    public async Task RefreshTokenAsync_TokenAudienceDoesNotMatchOrigin_Returns400BadRequest()
+    {
+        // Arrange — token audience is "audience1" but origin header claims "audience2"
+        // Both are valid audiences in config but must match each other
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience2");
+
+        // Build a token with audience1 — origin is audience2 → mismatch
+        string craftedToken = BuildJwt(nameIdentifier: Guid.NewGuid().ToString(), email: "test@mail.com", jti: Guid.NewGuid().ToString(), audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_NameIdentifierClaimNotAGuid_Returns400BadRequest()
+    {
+        // Arrange — NameIdentifier is not a valid GUID string
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        string craftedToken = BuildJwt(nameIdentifier: "not-a-guid", email: "test@mail.com", jti: Guid.NewGuid().ToString(), audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_JtiClaimNotAGuid_Returns400BadRequest()
+    {
+        // Arrange — JTI claim is not a valid GUID
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        string craftedToken = BuildJwt(nameIdentifier: Guid.NewGuid().ToString(), email: "test@mail.com", jti: "not-a-guid", audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_EmailClaimMissing_Returns400BadRequest()
+    {
+        // Arrange — token has no email claim
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        string craftedToken = BuildJwt(nameIdentifier: Guid.NewGuid().ToString(), email: null, jti: Guid.NewGuid().ToString(), audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_NameIdentifierClaimMissing_Returns400BadRequest()
+    {
+        // Arrange — token has no NameIdentifier claim
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+
+        string craftedToken = BuildJwt(nameIdentifier: null, email: "test@mail.com", jti: Guid.NewGuid().ToString(), audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
     }
 }

@@ -26,4 +26,6 @@ public sealed class AuthenticatedUserDetails : IAuthenticatedUserDetails
     public string userId => _contextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
 
     public string operationToken => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("X-Operation-Token", out var operationTokenValue) ? operationTokenValue.FirstOrDefault()! : "";
+
+    public string? Origin => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("Origin", out var originValue) ? originValue.FirstOrDefault() : "";
 }

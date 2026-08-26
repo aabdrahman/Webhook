@@ -79,13 +79,28 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             _logger.Information("Login user request - {0}", loginUserDetails);
 
+            string? origin = _authenticatedUserDetails.Origin;
+
+            if(string.IsNullOrWhiteSpace(origin))
+            {
+                _logger.Warning("User is not calling from any valid origin.");
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if(!_jwtSettingsConfiguration.ValidAudiences.Split(";", StringSplitOptions.TrimEntries).Contains(origin))
+            {
+                _logger.Warning("The user call origin is not part of system audiences - {0}", origin);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
             User? userToAuthenticate = loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
                 await _userManager.FindByEmailAsync(loginUserDetails.UserNameOrEmailAddress) :
                 await _userManager.FindByNameAsync(loginUserDetails.UserNameOrEmailAddress);
 
             if (userToAuthenticate is null)
             {
-                _logger.Warning(loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exists - {0}" :
+                _logger.Warning(loginUserDetails.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? 
+                                "User with email does not exists - {0}" :
                                 "User with username does not exists - {0}", loginUserDetails.UserNameOrEmailAddress
                     );
 
@@ -348,14 +363,14 @@ public sealed class AuthenticationService : IAuthenticationService
             OtpVerificationSigning? resetTokenDetails = JsonSerializer.Deserialize<OtpVerificationSigning>(resetTokenSerializedDetails, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
 
             //The deserialized reset token can then be used. Validate that the deserilized item is not null.
-            if(resetTokenDetails is null)
+            if (resetTokenDetails is null)
             {
                 _logger.Warning("Serailized Operation Reset Token could not be deserialized accordingly. Unprotected details - {0}", resetTokenSerializedDetails);
                 return GenericResponse<string>.Failure("Operation Failed", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
             }
 
             //Check the Jti guid and parse to guid successfully.
-            if(!Guid.TryParse(resetTokenDetails.Jti, out Guid tokenJti))
+            if (!Guid.TryParse(resetTokenDetails.Jti, out Guid tokenJti))
             {
                 //The jti from unprotected token could not be parsed as guid, hence, its probably been tampered with.
                 _logger.Warning("The deserialized operation reset token jti could not be parsed as guid appropriately. Token details - {0}", resetTokenDetails);
@@ -368,21 +383,21 @@ public sealed class AuthenticationService : IAuthenticationService
                 .FirstOrDefaultAsync(x => x.Jti == tokenJti && !x.RevokedAt.HasValue && !x.ConsumedAt.HasValue && x.ExpiresAt > DateTimeOffset.UtcNow, ct);
 
             //Check if the fetched token query returns null, this means that either the jti does not exist, its expired or its already consumed.
-            if(signedTokenFromDb is null)
+            if (signedTokenFromDb is null)
             {
                 _logger.Error("Linked signed token in databased could not befetched for the parsed jti - {0}", resetTokenDetails.Jti);
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
             }
 
             //Check that the purpose for creating the otp operation token tallies with this operation: PasswordReset
-            if(signedTokenFromDb.Purpose != OtpPurpose.PasswordReset)
+            if (signedTokenFromDb.Purpose != OtpPurpose.PasswordReset)
             {
                 _logger.Warning("The provided operation token was created for another purpose. Token Purpose: {0}", signedTokenFromDb.Purpose.ToString());
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
             }
 
             //Validates that the token is yet to expire, this is a second guard though as the database query is more of the source of truth after the unprotect from the dataprotector.
-            if(signedTokenFromDb.ExpiresAt <= DateTimeOffset.UtcNow)
+            if (signedTokenFromDb.ExpiresAt <= DateTimeOffset.UtcNow)
             {
                 _logger.Warning("Signed token is valid but has expired at: {0}", signedTokenFromDb.ExpiresAt);
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
@@ -433,7 +448,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 return GenericResponse<string>.Failure("Operation Failed.", "The provided password does not meet the password requirements.", HttpStatusCode.BadRequest);
             }
 
-            if(!string.Equals(resetTokenDetails.IssuedFor, signedTokenFromDb.UserToPerformOperation.NormalizedEmail, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(resetTokenDetails.IssuedFor, signedTokenFromDb.UserToPerformOperation.NormalizedEmail, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.Warning("The signed operation token was issued to: {0} but the token from db ws issued for: {0}", resetTokenDetails.IssuedFor, signedTokenFromDb.UserToPerformOperation.NormalizedEmail);
                 return GenericResponse<string>.Failure("Operation Failed.", "The provided password does not meet the password requirements.", HttpStatusCode.BadRequest);
@@ -458,9 +473,9 @@ public sealed class AuthenticationService : IAuthenticationService
             _logger.Information("User password reset successfully. Token successfully consumed. User updated - {0}", signedTokenFromDb.UserToPerformOperation.Id);
 
             return GenericResponse<string>.Success("Operation Successful.", "Password reset successfully. Kindly proceed to login.", HttpStatusCode.OK);
-            
+
         }
-        catch(CryptographicException ex)
+        catch (CryptographicException ex)
         {
             _logger.Error(ex, "An error occurred while decrypting the operation token.");
             return GenericResponse<string>.Failure("Operation Failed.", "Invalid Credentials. Kindly retry.", HttpStatusCode.BadRequest);
@@ -481,15 +496,35 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             _logger.Information("Refresh token request - {0}", tokenDetails);
 
+            string? origin = _authenticatedUserDetails.Origin;
+
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                _logger.Warning("User is not calling from any valid origin.");
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if (!_jwtSettingsConfiguration.ValidAudiences.Split(";", StringSplitOptions.TrimEntries).Contains(origin))
+            {
+                _logger.Warning("The user call origin is not part of system audiences - {0}", origin);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
             ClaimsPrincipal? userClaims = GetUserPrincipalsFromToken(tokenDetails.accessToken);
 
-            if(userClaims is null)
+            if (userClaims is null)
             {
                 _logger.Warning("User claims could not be fetched from the provided token details.");
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            if(!Guid.TryParse(userClaims.FindFirstValue(ClaimTypes.NameIdentifier), out Guid loggedinUserId))
+            if(!userClaims.FindFirstValue(JwtRegisteredClaimNames.Aud)!.Equals(origin, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.Warning("The audience from the token: {0} does not correspond to the origin calling the refresh session: {1}", userClaims.FindFirstValue(JwtRegisteredClaimNames.Aud), origin);
+                return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
+            }
+
+            if (!Guid.TryParse(userClaims.FindFirstValue(ClaimTypes.NameIdentifier), out Guid loggedinUserId))
             {
                 _logger.Warning("User name identifier claim from principals could not be parsed as guid - {0}", userClaims.FindFirstValue(ClaimTypes.NameIdentifier));
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -497,7 +532,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
             string? tokenJti = userClaims.FindFirstValue(JwtRegisteredClaimNames.Jti);
 
-            if(!Guid.TryParse(tokenJti, out Guid userAssignedJti))
+            if (!Guid.TryParse(tokenJti, out Guid userAssignedJti))
             {
                 _logger.Warning("Token JTI could not be parsed. JTI from token - {0}", tokenJti);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -512,13 +547,13 @@ public sealed class AuthenticationService : IAuthenticationService
             }
 
             Guid accessTokenJtiFromCache = await _cacheService.GetItemsFromCacheAsync<Guid>(userEmail);
-            if(accessTokenJtiFromCache == default(Guid))
+            if (accessTokenJtiFromCache == default(Guid))
             {
                 _logger.Warning("Cached user jti could not be fetched successully. Result from cache - {0}", accessTokenJtiFromCache);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            if(userAssignedJti != accessTokenJtiFromCache)
+            if (userAssignedJti != accessTokenJtiFromCache)
             {
                 _logger.Warning("Cached token jti: {0} for user: {1} does not match the extracted jti from claims: {2}", accessTokenJtiFromCache, userEmail, userAssignedJti);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -526,13 +561,13 @@ public sealed class AuthenticationService : IAuthenticationService
 
             User? userToRefresh = await _userManager.FindByEmailAsync(userEmail);
 
-            if(userToRefresh is null)
+            if (userToRefresh is null)
             {
                 _logger.Warning("User with email does not exist - {0}", userEmail);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            if(loggedinUserId != userToRefresh.Id)
+            if (loggedinUserId != userToRefresh.Id)
             {
                 _logger.Warning("Mismatch of user ids. User id from the user claims: {0} does not match the record fetched from database: {1}", loggedinUserId, userToRefresh.Id);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
@@ -544,7 +579,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
-            // Safe vakidation of expiration time — treat null as already expired
+            // Safe validation of expiration time — treat null as already expired
             if (userToRefresh.TokenExpirationTime is null || DateTimeOffset.UtcNow > userToRefresh.TokenExpirationTime)
             {
                 _logger.Warning("Refresh token expired or not set for user {0}. Expiry - {1}", userToRefresh.Id, userToRefresh.TokenExpirationTime);
@@ -634,7 +669,7 @@ public sealed class AuthenticationService : IAuthenticationService
         var tokenOptions = new JwtSecurityToken
         (
             issuer: _jwtSettingsConfiguration.ValidIssuer,
-            audience: "",
+            audience: _authenticatedUserDetails.Origin,
             claims: userClaims,
             expires: DateTime.UtcNow.AddSeconds(_jwtSettingsConfiguration.TokenExpirationAfterInSeconds),
             signingCredentials: tokenCredentials
@@ -694,7 +729,7 @@ public sealed class AuthenticationService : IAuthenticationService
         var principals = tokenHandler.ValidateToken(token, tokenValidationParameters, out securityToken);
         var jwtSecurityToken = securityToken as JwtSecurityToken;
 
-        if(jwtSecurityToken is null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.CurrentCultureIgnoreCase))
+        if (jwtSecurityToken is null || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.CurrentCultureIgnoreCase))
         {
             return null;
         }

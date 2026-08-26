@@ -9,4 +9,5 @@ public interface IAuthenticatedUserDetails
     string emailAddress { get; }
     string userId { get; }
     string operationToken { get; }
+    string? Origin { get; }
 }
