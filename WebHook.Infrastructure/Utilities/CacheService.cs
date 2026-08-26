@@ -53,7 +53,7 @@ public sealed class CacheService : ICacheService
         {
             await Task.Delay(1);
 
-            var cacheResult = _memoryCache.Set<T>(key, value);
+            var cacheResult = _memoryCache.Set<T>(key, value, new MemoryCacheEntryOptions() { Size = 2 * 1024 * 1024});
 
             return true;
         }

@@ -8,6 +8,7 @@
 
 
 	<ItemGroup>
+		<PackageReference Include="KubernetesClient" Version="19.0.2" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9">
 			<PrivateAssets>all</PrivateAssets>
@@ -27,6 +28,11 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.22.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Core" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
 
 	</ItemGroup>
 

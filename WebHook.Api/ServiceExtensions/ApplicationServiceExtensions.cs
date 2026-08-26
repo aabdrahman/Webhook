@@ -18,6 +18,7 @@ using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.BackgroundWorkers;
+using WebHook.Infrastructure.CustomHealthChecks;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
@@ -259,21 +260,22 @@ internal static class ApplicationServiceExtensions
         //Chnanel for raised events
         services.AddSingleton(_ =>
         {
-            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
+            return Channel.CreateBounded<EventRaised>(new BoundedChannelOptions(1000)
             {
                 SingleReader = true,
-                SingleWriter = false
-
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
         });
 
         //Channel for sending email
         services.AddSingleton(_ =>
         {
-            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            return Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500)
             {
                 SingleReader = true,
-                SingleWriter = false
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
         });
     }
@@ -406,5 +408,24 @@ internal static class ApplicationServiceExtensions
             opts.SizeLimit = 2 * 1024 * 1024;
             
         });
+    }
+
+    internal static void ConfigureHealthChecks(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHealthChecks()
+            .AddNpgSql(connectionString: configuration.GetConnectionString("DbConnection") ?? throw new ArgumentNullException("Db Connection string cannot be empty."), timeout: TimeSpan.FromSeconds(10),
+                        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, name: "POSTGRES DB HEALTH CHECK")
+            .AddCheck<InMemoryCacheHealthCheck>(name: "IN MEMORY SYSTEM CACHE HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["cache"])
+            .AddCheck<C_DriveHealthCheck>(name: "SERVER DISK SPACE HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["Disk Space"])
+            .AddCheck<QueuedEmailHealthCheck>(name: "QUEUED EMAIL HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["channels", "email"])
+            .AddCheck<RaisedEventChannelHealthCheck>(name: "QUEUED RAISED EVENTS HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["channels", "raised  events"])
+            .AddCheck<DeadLetterQueuedHealthCheck>(name: "DEAD LETTER DELIVERIES HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "dead letter"])
+            .AddCheck<PendingDeliveriesHealthCheck>(name: "PENDING DELIVERIES HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "pending deliveries"]);
+
+        //services.AddHealthChecksUI(opts =>
+        //{
+        //    opts.AddHealthCheckEndpoint(name: "Webhook System Health Check", uri: "/admin/_healths");
+        //    opts.SetEvaluationTimeInSeconds(600);
+        //}).AddInMemoryStorage();
     }
 }

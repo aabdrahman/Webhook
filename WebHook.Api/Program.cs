@@ -58,6 +58,9 @@ builder.Services.AddEndpointsApiExplorer();
 //Application Caching
 builder.Services.ConfigureApplicationCaching();
 
+//Health Check
+builder.Services.ConfigureHealthChecks(builder.Configuration);
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -99,6 +102,18 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseHealthChecks("/admin/_healths", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+{
+    ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse,
+    Predicate = p => true
+});
+
+//app.MapHealthChecksUI(opts =>
+//{
+//    opts.ApiPath = "/admin/_healths-api";
+//    opts.UIPath = "/_healths-ui";
+//});
 
 app.MapControllers();
 
