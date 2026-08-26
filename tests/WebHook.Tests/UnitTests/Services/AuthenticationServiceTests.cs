@@ -256,7 +256,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     {
         using var scope = _serviceProvider.CreateScope();
         var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
-        var dto = BuildUserToCreate(emailAddress: emailAddress, username: username, password: password);
+        var dto = BuildUserToCreate(emailAddress: emailAddress, username: username, password: password ?? DefaultPassword);
         var result = await userService.CreateUserAsync(dto);
 
         Assert.True(result.IsSuccessful, $"Seed user failed: {result.ResponseMessage}");
@@ -341,7 +341,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     {
         //Arrange
         var seedUserResult = await SeedUserAsync();
-        var loginRequest = BuildLoginEntity(usernameoremail: "testUser112");
+        var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.userName);
 
         var sut = CreateSut();
 
@@ -1222,7 +1222,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     {
         //Arrange
         var seedUserResult = await SeedUserAsync();
-        var seedUserResult2 = await SeedUserAsync(emailAddress: "testedEmail@mail.com", username: "TetedUser@112");
+        var seedUserResult2 = await SeedUserAsync(emailAddress: "testedEmail@mail.com", username: "TestedUser112");
         Guid seedUserId = Guid.NewGuid();
         var operationToken = string.Empty; var generatedOtp = string.Empty;
         using (var requestScope = _serviceProvider.CreateScope())

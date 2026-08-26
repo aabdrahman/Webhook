@@ -1,10 +1,15 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text.Json;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
+using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Core.Mapper;
 using WebHook.Infrastructure.Data_Persistence;
@@ -15,13 +20,20 @@ public sealed class UserService : IUserService
 {
     private readonly UserManager<User> _userManager;
     private readonly RepositoryContext _repositoryContext;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
+    private readonly IDataProtector _dataProtector;
+    private readonly IApplicationHasher _applicationHasher;
 
-    public UserService(RepositoryContext repositoryContext, UserManager<User> userManager)
+    public UserService(RepositoryContext repositoryContext, UserManager<User> userManager, IAuthenticatedUserDetails authenticatedUserDetails, IDataProtectionProvider dataProtectionProvider, IApplicationHasher applicationHasher)
     {
         _repositoryContext = repositoryContext;
         _userManager = userManager;
+        _dataProtector = dataProtectionProvider.CreateProtector("Webhook.Otp.OtpVerificationSigning");
+        _authenticatedUserDetails = authenticatedUserDetails;
+        _applicationHasher = applicationHasher;
 
         _logger = Log.ForContext(_className, nameof(UserService));
+
     }
 
     private Serilog.ILogger _logger;
@@ -118,31 +130,142 @@ public sealed class UserService : IUserService
         {
             _logger.Information("Deactivate User profile request - {0}", userDeactivationRequest);
 
-            User? userToDeactivate = userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
+            string operationToken = _authenticatedUserDetails.operationToken;
+            string userRole = _authenticatedUserDetails.assignedRole;
+            bool isAdmin = userRole.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAdmin)
+            {
+                if (string.IsNullOrWhiteSpace(operationToken))
+                {
+                    _logger.Warning("User deactivation could not be processed as the operation token is not passed.");
+                    return GenericResponse<string>.Failure("Operation Failed.", "Credentials not provided.", HttpStatusCode.Forbidden);
+                }
+
+                string unprotectedToken = _dataProtector.Unprotect(operationToken);
+                OtpVerificationSigning? tokenDetails = JsonSerializer.Deserialize<OtpVerificationSigning>(unprotectedToken, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+                if (tokenDetails is null)
+                {
+                    _logger.Warning("The unprotected token could not be parsed successfully.");
+                    return GenericResponse<string>.Failure("Operation Failed.", "Token could not be parsed successfully. Kindly re-authenticate.", HttpStatusCode.BadRequest);
+                }
+
+                if(!string.Equals(_authenticatedUserDetails.emailAddress, tokenDetails.IssuedFor, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.Warning("Authenticated user: {0} is using another user operation token: {1}", _authenticatedUserDetails.emailAddress, tokenDetails.IssuedFor);
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+                if (!Guid.TryParse(tokenDetails.Jti, out var tokenJti))
+                {
+                    _logger.Warning("The provided jti from the operation token could not be parsed as a valid guid - {0}", tokenDetails.Jti);
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+                OtpOperationToken? operationTokenDetailsFromDb = await _repositoryContext.OtpOperationTokens
+                                                            .OrderByDescending(x => x.CreatedAt)
+                                                            .Include(x => x.OtpVerification)
+                                                            .Where(x => !x.ConsumedAt.HasValue && x.ExpiresAt >= DateTimeOffset.UtcNow && !x.RevokedAt.HasValue && x.OtpVerification.ValidatedAt.HasValue)
+                                                            .FirstOrDefaultAsync(x => x.Jti == tokenJti, ct);
+
+                if (operationTokenDetailsFromDb is null)
+                {
+                    _logger.Warning("The parsed jti from operation token coudl not be verified from database - {0}", tokenDetails.Jti);
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+                if(operationTokenDetailsFromDb.Purpose != Core.Constants.OtpPurpose.DeactivateProfile)
+                {
+                    _logger.Warning("Provided operation token was issued for another purpose: {0}, Expected purpose: {1}", operationTokenDetailsFromDb.Purpose.ToString(), Core.Constants.OtpPurpose.DeactivateProfile);
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+                bool isValidToken = await _applicationHasher.ValidateHashedSecret(operationTokenDetailsFromDb.TokenHash, operationToken);
+
+                if (!isValidToken)
+                {
+                    _logger.Warning("The hashed token for the provided token jti could not be validated with the application hasher.");
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+
+
+                User? userToDeactivate = userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
                                         await _userManager.FindByEmailAsync(userDeactivationRequest.UserNameOrEmailAddress) :
                                         await _userManager.FindByNameAsync(userDeactivationRequest.UserNameOrEmailAddress);
 
-            if (userToDeactivate is null)
-            {
-                _logger.Warning(userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exist - {0}" : "User with provided user name does not exist - {0}", userDeactivationRequest.UserNameOrEmailAddress);
-                return GenericResponse<string>.Failure("Operation Failed.", $"User with details does not exist - {userDeactivationRequest.UserNameOrEmailAddress}", HttpStatusCode.NotFound);
+                if (userToDeactivate is null)
+                {
+                    _logger.Warning(userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exist - {0}" : "User with provided user name does not exist - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+                    return GenericResponse<string>.Failure("Operation Failed.", $"User with details does not exist - {userDeactivationRequest.UserNameOrEmailAddress}", HttpStatusCode.NotFound);
+                }
+
+                if(!userToDeactivate.NormalizedEmail!.Equals(tokenDetails.IssuedFor, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.Warning("Could not proceed as the token is issued for another user. Issued For: {0}, User Email: {1}", tokenDetails.IssuedFor, userToDeactivate.NormalizedEmail);
+                    return GenericResponse<string>.Failure("Operation Failed.", "Invalid Token provided.", HttpStatusCode.BadRequest);
+                }
+
+                DateTimeOffset operationTimestamp = DateTimeOffset.UtcNow;
+                //Update the user details
+                userToDeactivate.IsActive = false;
+                userToDeactivate.DeactivationJustification = userDeactivationRequest.DeactivationJustification;
+                userToDeactivate.DeletedAt = operationTimestamp;
+                userToDeactivate.DeletedByUserId = _authenticatedUserDetails.userId;
+                userToDeactivate.LockoutEnd = DateTimeOffset.UtcNow.AddDays(3525);
+
+                //Update the extracted token details
+                operationTokenDetailsFromDb.OtpVerification.ConsumedAt = operationTimestamp;
+                operationTokenDetailsFromDb.OtpVerification.IsConsumed = true;
+                operationTokenDetailsFromDb.ConsumedAt = operationTimestamp;
+
+                //IdentityResult deactivateResult = await _userManager.UpdateAsync(userToDeactivate);
+
+                //if (!deactivateResult.Succeeded)
+                //{
+                //    _logger.Warning("User profile could not be deactivated. Errors - {0}", deactivateResult.Errors.ToList());
+                //    return GenericResponse<string>.Failure("Operation Failed.", "User profile could not be deactivated. Kindly retry.", HttpStatusCode.BadRequest);
+                //}
+
+                await _repositoryContext.SaveChangesAsync(ct);
+
+                _logger.Information("User profile successfully deactivated - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+                return GenericResponse<string>.Success("Operation Successful.", "User profile successfully deactivated.", HttpStatusCode.OK);
             }
-
-            userToDeactivate.IsActive = false;
-            userToDeactivate.DeactivationJustification = userDeactivationRequest.DeactivationJustification;
-            userToDeactivate.DeletedAt = DateTimeOffset.UtcNow;
-            userToDeactivate.DeletedByUserId = "";
-            IdentityResult deactivateResult = await _userManager.UpdateAsync(userToDeactivate);
-
-            if (!deactivateResult.Succeeded)
+            else
             {
-                _logger.Warning("User profile could not be deactivated. Errors - {0}", deactivateResult.Errors.ToList());
-                return GenericResponse<string>.Failure("Operation Failed.", "User profile could not be deactivated. Kindly retry.", HttpStatusCode.BadRequest);
+                _logger.Information("Begin deactivation operation for admin user... {0}", _authenticatedUserDetails.userId);
+                User? userToDeactivate = userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ?
+                                        await _userManager.FindByEmailAsync(userDeactivationRequest.UserNameOrEmailAddress) :
+                                        await _userManager.FindByNameAsync(userDeactivationRequest.UserNameOrEmailAddress);
+
+                if (userToDeactivate is null)
+                {
+                    _logger.Warning(userDeactivationRequest.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase) ? "User with email does not exist - {0}" : "User with provided user name does not exist - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+                    return GenericResponse<string>.Failure("Operation Failed.", $"User with details does not exist - {userDeactivationRequest.UserNameOrEmailAddress}", HttpStatusCode.NotFound);
+                }
+
+                DateTimeOffset operationTimestamp = DateTimeOffset.UtcNow;
+                //Update the user details
+                userToDeactivate.IsActive = false;
+                userToDeactivate.DeactivationJustification = userDeactivationRequest.DeactivationJustification;
+                userToDeactivate.DeletedAt = operationTimestamp;
+                userToDeactivate.DeletedByUserId = _authenticatedUserDetails.userId;
+                userToDeactivate.LockoutEnd = DateTimeOffset.UtcNow.AddDays(3525);
+
+                await _repositoryContext.SaveChangesAsync(ct);
+
+                _logger.Information("User profile successfully deactivated - {0}", userDeactivationRequest.UserNameOrEmailAddress);
+                return GenericResponse<string>.Success("Operation Successful.", "User profile successfully deactivated.", HttpStatusCode.OK);
+
             }
+            
 
-            _logger.Information("User profile successfully deactivated - {0}", userDeactivationRequest.UserNameOrEmailAddress);
-            return GenericResponse<string>.Success("Operation Successful.", "User profile successfully deactivated.", HttpStatusCode.OK);
-
+        }
+        catch(CryptographicException ex)
+        {
+            _logger.Error(ex, "An error occurred while deactivating user. Operation token could not be validated.");
+            return GenericResponse<string>.Failure("Operation Failed.", "Token has expired. Kindly re-authenticate.", HttpStatusCode.BadRequest);
         }
         catch (Exception ex)
         {
