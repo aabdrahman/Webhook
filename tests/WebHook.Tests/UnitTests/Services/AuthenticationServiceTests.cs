@@ -1528,7 +1528,12 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.Null(result.ResponseData);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
         Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
-        
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var authUser = await usermanager.FindByEmailAsync(seedUserResult.email);
+        Assert.NotNull(authUser);
+        Assert.NotEqual(0, authUser.AccessFailedCount);
     }
 
     [Fact]
@@ -1634,6 +1639,12 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.Null(result.ResponseData);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
         Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var authUser = await usermanager.FindByEmailAsync(seedResult.email);
+        Assert.NotNull(authUser);
+        Assert.NotEqual(0, authUser.AccessFailedCount);
     }
 
     [Fact]
@@ -1678,6 +1689,12 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.Null(result.ResponseData);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
         Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var authUser = await usermanager.FindByEmailAsync(seedResult.email);
+        Assert.NotNull(authUser);
+        Assert.NotEqual(0, authUser.AccessFailedCount);
     }
 
     //Custom tken validation tests for refresh token
@@ -1715,6 +1732,40 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
 
         var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: "any-refresh");
+
+        // Act
+        var result = await sut.RefreshTokenAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_NameIdentifierClaimNotMatchTokenId_Returns400BadRequest()
+    {
+        // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
+        var seedResult = await SeedUserAsync();
+        TokenDto userToken;
+        using (var loginScope = _serviceProvider.CreateScope())
+        {
+            var authService = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+            var loginResult = await authService.LoginUserAsync(
+                BuildLoginEntity(usernameoremail: seedResult.email));
+
+            Assert.True(loginResult.IsSuccessful, loginResult.ResponseMessage);
+            Assert.NotNull(loginResult.ResponseData);
+            userToken = loginResult.ResponseData!;
+        }
+
+        string craftedToken = BuildJwt(nameIdentifier: Guid.NewGuid().ToString("N"), email: "test@mail.com", jti: Guid.NewGuid().ToString(), audience: "audience1");
+
+        var sut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var request = BuildTokenEntity(accessToken: craftedToken, refreshToken: userToken.refreshToken);
 
         // Act
         var result = await sut.RefreshTokenAsync(request);

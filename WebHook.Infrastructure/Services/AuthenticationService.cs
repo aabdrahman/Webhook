@@ -569,20 +569,26 @@ public sealed class AuthenticationService : IAuthenticationService
 
             if (loggedinUserId != userToRefresh.Id)
             {
-                _logger.Warning("Mismatch of user ids. User id from the user claims: {0} does not match the record fetched from database: {1}", loggedinUserId, userToRefresh.Id);
+                var updateFailedAttemptCountResult = await _userManager.AccessFailedAsync(userToRefresh);
+                _logger.Warning("Mismatch of user ids. User id from the user claims: {0} does not match the record fetched from database: {1}. Update Failed ATtempt returns - {2}, Errors - {3}", 
+                                loggedinUserId, userToRefresh.Id, updateFailedAttemptCountResult.Succeeded, updateFailedAttemptCountResult.Errors.ToList());
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
             if (!tokenDetails.refreshToken.Equals(userToRefresh.RefreshToken))
             {
-                _logger.Warning("Mismatch of refresh token. Refresh token from request: {0} does not match the current refresh token for user: {1}", tokenDetails.refreshToken, userToRefresh.RefreshToken);
+                var updateFailedAttemptCountResult = await _userManager.AccessFailedAsync(userToRefresh);
+                _logger.Warning("Mismatch of refresh token. Refresh token from request: {0} does not match the current refresh token for user: {1}. Update Failed ATtempt returns - {2}, Errors - {3}", 
+                                tokenDetails.refreshToken, userToRefresh.RefreshToken, updateFailedAttemptCountResult.Succeeded, updateFailedAttemptCountResult.Errors.ToList());
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
             // Safe validation of expiration time — treat null as already expired
             if (userToRefresh.TokenExpirationTime is null || DateTimeOffset.UtcNow > userToRefresh.TokenExpirationTime)
             {
-                _logger.Warning("Refresh token expired or not set for user {0}. Expiry - {1}", userToRefresh.Id, userToRefresh.TokenExpirationTime);
+                var updateFailedAttemptCountResult = await _userManager.AccessFailedAsync(userToRefresh);
+                _logger.Warning("Refresh token expired or not set for user {0}. Expiry - {1}. Update Failed ATtempt returns - {2}, Errors - {3}", 
+                                userToRefresh.Id, userToRefresh.TokenExpirationTime, updateFailedAttemptCountResult.Succeeded, updateFailedAttemptCountResult.Errors.ToList());
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
@@ -705,9 +711,9 @@ public sealed class AuthenticationService : IAuthenticationService
         return IdentityResult.Success;
     }
 
-    private ClaimsPrincipal? GetUserPrincipalsFromToken(string token, bool validateLifetime = false)
+    private ClaimsPrincipal? GetUserPrincipalsFromToken(string token, bool validateLifetime = true)
     {
-        string secretKey = Environment.GetEnvironmentVariable("webhook_secret_key") ?? throw new ArgumentNullException("");
+        string secretKey = Environment.GetEnvironmentVariable("webhook_secret_key") ?? throw new ArgumentNullException("Application secret key is not yet defined.");
 
         var tokenValidationParameters = new TokenValidationParameters()
         {
