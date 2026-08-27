@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Moq;
 using System.Net;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
@@ -10,6 +11,7 @@ using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
 
 namespace WebHook.Tests.UnitTests.Services;
@@ -19,10 +21,12 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
 
     private readonly PostgreSqlFixture _postgreSqlFixture;
     private ServiceProvider _serviceProvider = null;
+    private readonly Mock<IAuthenticatedUserDetails> _authenticatedUserDetailsMock;
 
     public DeadLetterQueueServiceTests(PostgreSqlFixture postgreSqlFixture)
     {
         _postgreSqlFixture = postgreSqlFixture;
+        _authenticatedUserDetailsMock = new Mock<IAuthenticatedUserDetails>();
     }
 
     private List<string> _encryptedSecrets = [];
@@ -52,8 +56,10 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             opts.MaximumRetryCycle = 3;
         });
 
+        services.AddHttpContextAccessor();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -100,9 +106,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
     }
 
-    private DeadLetterQueueService CreateSut(RepositoryContext context)
+    private DeadLetterQueueService CreateSut(RepositoryContext context, IAuthenticatedUserDetails authenticatedUserDetails = null)
     {
-        return new DeadLetterQueueService(context, _serviceProvider.GetRequiredService<IOptionsMonitor<DeadLetterManualRetryConfiguration>>());
+        return new DeadLetterQueueService(context, _serviceProvider.GetRequiredService<IOptionsMonitor<DeadLetterManualRetryConfiguration>>(), authenticatedUserDetails ?? _serviceProvider.GetRequiredService<IAuthenticatedUserDetails>());
     }
 
 
@@ -184,8 +190,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_NonExistentDeadLetterId_Returns404()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var request = BuildRetryRequest(Guid.NewGuid(), Guid.NewGuid());
 
         // Act
@@ -200,8 +207,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_NonExistentDeadLetterId_DoesNotThrow()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var request = BuildRetryRequest(Guid.NewGuid(), Guid.NewGuid());
 
         // Act & Assert
@@ -217,8 +225,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_AlreadyRetried_Returns409Conflict()
     {
         // Arrange — DLQ entry already has RetriedAt set
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery();
         var dlqEntry = BuildDlqEntry(
             delivery.Id,
@@ -243,8 +252,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_AlreadyRetried_DeliveryStatusUnchanged()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.Pending); // already promoted
         var dlqEntry = BuildDlqEntry(
             delivery.Id,
@@ -271,8 +281,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_DeliveryNotInDeadLetterStatus_Returns400()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.Failed); //Not at dead letter
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -293,8 +304,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_DeliveryInDeadLetterStatus_ProcessSuccessfully()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter);
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -318,8 +330,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_RetryCycleAtMaximum_Returns422()
     {
         // Arrange — RetryCycle equals MaximumRetryCycle (3)
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(
             status: WebhookDeliveryStatus.DeadLetter,
             retryCycle: 3); // equals MaximumRetryCycle
@@ -342,8 +355,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_RetryCycleExceedsMaximum_Returns422()
     {
         // Arrange — RetryCycle exceeds MaximumRetryCycle
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(
             status: WebhookDeliveryStatus.DeadLetter,
             retryCycle: 5); // above MaximumRetryCycle (3)
@@ -365,8 +379,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_RetryCycleBelowMaximum_Proceeds()
     {
         // Arrange — RetryCycle = 1, MaximumRetryCycle = 3 → allowed
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(
             status: WebhookDeliveryStatus.DeadLetter,
             retryCycle: 1);
@@ -391,8 +406,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_Returns200()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -414,8 +430,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_DeliveryStatusSetToPending()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -437,8 +454,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_RetryCycleIncremented()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var originalCycle = delivery.RetryCycle;
         var dlqEntry = BuildDlqEntry(delivery.Id);
@@ -461,8 +479,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_LockFieldsCleared()
     {
         // Arrange — delivery has stale lock fields
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         delivery.LockedBy = "worker-1";
         delivery.LockedUntil = DateTimeOffset.UtcNow.AddMinutes(5);
@@ -488,8 +507,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_NextRetryAtCleared()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         delivery.NextRetryAt = DateTimeOffset.UtcNow.AddHours(1); // has future retry scheduled
 
@@ -513,8 +533,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_DlqRetriedAtIsSet()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var dlqEntry = BuildDlqEntry(delivery.Id);
         var beforeCall = DateTimeOffset.UtcNow;
@@ -538,8 +559,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_JustificationPersisted()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -561,11 +583,12 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task RequestManualRetryAsync_ValidRequest_RetriedByIsEmpty()
+    public async Task RequestManualRetryAsync_ValidRequest_RetriedByNotEmpty()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         var dlqEntry = BuildDlqEntry(delivery.Id);
 
@@ -585,7 +608,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var updated = await assertCtx.WebhookDeadLetterQueues.FindAsync(dlqEntry.Id);
 
         // This assertion passes WITH the bug (RetriedBy is always "")
-        Assert.Equal("", updated!.RetriedBy);
+        Assert.NotEqual("", updated!.RetriedBy);
         // Assert.Equal("admin@webhookservice.com", updated!.RetriedBy);
     }
 
@@ -593,8 +616,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task RequestManualRetryAsync_ValidRequest_RetryCountNotReset()
     {
         // Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
         delivery.RetryCount = 5; // maxed out
 
@@ -612,6 +636,33 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var updated = await assertCtx.WebhookDeliveries.FindAsync(delivery.Id);
 
         Assert.Equal(delivery.RetryCount, updated!.RetryCount);
+    }
+
+    [Fact]
+    public async Task RequestManualRetryAsync_ValidRequest_RetriedByUpdated()
+    {
+        // Arrange
+        var userId = Guid.NewGuid().ToString("N");
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(userId);
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
+        var delivery = BuildDelivery(status: WebhookDeliveryStatus.DeadLetter, retryCycle: 1);
+        delivery.RetryCount = 5; // maxed out
+
+        var dlqEntry = BuildDlqEntry(delivery.Id);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.WebhookDeadLetterQueues.AddAsync(dlqEntry);
+        await ctx.SaveChangesAsync();
+
+        // Act
+        await sut.RequestManualRetryAsync(BuildRetryRequest(dlqEntry.Id, delivery.Id));
+
+        // Assert — documents bug: RetryCount still 5, not reset to 0
+        using var assertCtx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var updated = await assertCtx.WebhookDeadLetterQueues.FindAsync(dlqEntry.Id);
+
+        Assert.Equal(userId, updated!.RetriedBy);
     }
 
     // -------------------------------------------------------------------------
@@ -739,8 +790,9 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task GetDeliveryDeadLetterAsync_OnlyReturnsEntriesForRequestedDelivery()
     {
         // Arrange — two deliveries, each with a DLQ entry
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
         var deliveryA = BuildDelivery();
         var deliveryB = BuildDelivery();
         var entryA = BuildDlqEntry(deliveryA.Id);

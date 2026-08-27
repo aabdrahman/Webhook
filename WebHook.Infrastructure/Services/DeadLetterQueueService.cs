@@ -7,6 +7,7 @@ using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
 
@@ -16,13 +17,16 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly DeadLetterManualRetryConfiguration _deadLetterManualRetryConfiguration;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
-    public DeadLetterQueueService(RepositoryContext repositoryContext, IOptionsMonitor<DeadLetterManualRetryConfiguration> optionsMonitor)
+    public DeadLetterQueueService(RepositoryContext repositoryContext, IOptionsMonitor<DeadLetterManualRetryConfiguration> optionsMonitor, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
         _deadLetterManualRetryConfiguration = optionsMonitor.CurrentValue;
+        _authenticatedUserDetails = authenticatedUserDetails;
 
         _logger = Log.ForContext(_className, nameof(DeadLetterQueueService));
+
     }
 
     private ILogger _logger;
@@ -67,7 +71,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
 
             deadLeterToRetry.RetryJustification = requestManualRetry.RetryJustification;
             deadLeterToRetry.RetriedAt = DateTimeOffset.UtcNow;
-            deadLeterToRetry.RetriedBy = "";
+            deadLeterToRetry.RetriedBy = _authenticatedUserDetails.userId;
 
             deadLeterToRetry.webhookDelivery.RetryCycle++;
             deadLeterToRetry.webhookDelivery.NextRetryAt = null;
