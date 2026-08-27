@@ -8,6 +8,7 @@ using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 using WebHook.IntegrationTests.BackgroundWorkers;
 
 namespace WebHook.Tests.IntegrationTests.Workers;
@@ -56,6 +57,8 @@ public class StaleClaimedDeliveryReleaseWorkerTests : IClassFixture<PostgreSqlFi
             opt.DeliveryLockDuration = 600; // 10 minutes default
             opt.StaleDeliveryReleaseIntervalSeconds = 1;
         });
+
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(15)));
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -143,7 +146,7 @@ public class StaleClaimedDeliveryReleaseWorkerTests : IClassFixture<PostgreSqlFi
 
     private TestableStaleClaimedDeliverReleaseWorker CreateWorker() =>
         new TestableStaleClaimedDeliverReleaseWorker(
-            _serviceProvider.GetRequiredService<IServiceScopeFactory>(), _serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>());
+            _serviceProvider.GetRequiredService<IServiceScopeFactory>(), _serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>(), _serviceProvider.GetRequiredService<WorkerLivenessTracker>());
 
     /// <summary>
     /// Runs the worker's ExecuteAsync directly and polls the given
@@ -597,8 +600,8 @@ public class StaleClaimedDeliveryReleaseWorkerTests : IClassFixture<PostgreSqlFi
 internal sealed class TestableStaleClaimedDeliverReleaseWorker
     : StaleClaimedDeliverReleaseWorker
 {
-    public TestableStaleClaimedDeliverReleaseWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitorConfig)
-        : base(scopeFactory, optionsMonitorConfig) { }
+    public TestableStaleClaimedDeliverReleaseWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitorConfig, WorkerLivenessTracker workerLivenessTracker)
+        : base(scopeFactory, optionsMonitorConfig, workerLivenessTracker) { }
 
     /// <summary>
     /// Calls <see cref="ExecuteAsync"/> directly on the calling thread.

@@ -7,6 +7,7 @@ using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.BackgroundWorkers;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -68,6 +69,8 @@ public sealed class EmailProcessorWorkerTests : IAsyncLifetime
             opt.ProcessingIntervalInSeconds = 1;
             opt.ProcessingDelayInMilliSeconds = 0;
         });
+
+        services.AddSingleton(new WorkerLivenessTracker(timeSpan: TimeSpan.FromSeconds(15)));
 
         Log.Logger = new LoggerConfiguration().CreateLogger();
 

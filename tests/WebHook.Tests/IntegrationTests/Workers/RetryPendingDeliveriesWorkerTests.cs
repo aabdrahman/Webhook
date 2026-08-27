@@ -78,6 +78,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
             });
         });
 
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(15)));
+
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
@@ -184,7 +186,7 @@ public sealed class RetryPendingDeliveriesWorkerTests
     private TestableRetryPendingDeliveriesWorker CreateWorker() =>
         new TestableRetryPendingDeliveriesWorker(
             _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
-            _serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>());
+            _serviceProvider.GetRequiredService<IOptionsMonitor<RetryDeliveresAfterFailedConfiguration>>(), _serviceProvider.GetRequiredService<WorkerLivenessTracker>());
 
 
     private static WebhookEvent BuildWebhookEvent(
@@ -713,6 +715,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
             });
         });
 
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(15)));
+
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
@@ -773,8 +777,8 @@ internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeliver
 {
     public TestableRetryPendingDeliveriesWorker(
         IServiceScopeFactory scopeFactory,
-        IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor)
-        : base(scopeFactory, optionsMonitor) { }
+        IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
+        : base(scopeFactory, optionsMonitor, workerLivenessTracker) { }
 
     /// <summary>
     /// Calls <see cref="ExecuteAsync"/> directly on the test thread.

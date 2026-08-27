@@ -88,6 +88,8 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             opt.DeliveryLockDuration = 60;
         });
 
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(15)));
+
         _serviceProvider = services.BuildServiceProvider();
 
         // Create schema once, truncate between tests
@@ -141,7 +143,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
     private TestableWebhookDeliveryProcessorWorker CreateWorker() =>
         new TestableWebhookDeliveryProcessorWorker(
             _serviceProvider.GetRequiredService<IServiceScopeFactory>(),
-            _serviceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>());
+            _serviceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>(), _serviceProvider.GetRequiredService<WorkerLivenessTracker>());
 
     private WebhookDelivery BuildPendingDelivery(
         string callbackUrl = "https://partner.com/webhook",
@@ -798,6 +800,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             });
         }
 
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(15)));
 
         _serviceProvider.Dispose();
         _serviceProvider = services.BuildServiceProvider();
@@ -818,8 +821,8 @@ internal sealed class TestableWebhookDeliveryProcessorWorker : WebhookDeliveryPr
 {
     public TestableWebhookDeliveryProcessorWorker(
         IServiceScopeFactory scopeFactory,
-        IOptionsMonitor<WebhookDeliveryWorkerConfiguration> options)
-        : base(scopeFactory, options) { }
+        IOptionsMonitor<WebhookDeliveryWorkerConfiguration> options, WorkerLivenessTracker workerLivenessTracker)
+        : base(scopeFactory, options, workerLivenessTracker) { }
 
     /// <summary>
     /// Calls <see cref="ExecuteAsync"/> directly on the calling thread.

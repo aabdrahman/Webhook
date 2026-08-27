@@ -8,6 +8,7 @@ using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.IntegrationTests.BackgroundWorkers;
 
@@ -44,6 +45,8 @@ public class PendingRaisedEventsWorkerTests : IClassFixture<PostgreSqlFixture>, 
 
                 options.PendingEventsThresholdMinutes = 30;
             });
+
+        services.AddSingleton(new WorkerLivenessTracker(timeSpan: TimeSpan.FromSeconds(15)));
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -393,7 +396,9 @@ public class PendingRaisedEventsWorkerTests : IClassFixture<PostgreSqlFixture>, 
 
         var options = _serviceProvider.GetRequiredService<IOptionsMonitor<PendingRaisedEventsWorkerConfiguration>>();
 
-        return new PendingRaisedEventsWorker(_channel, scopeFactory, options);
+        var livelinessTracker = _serviceProvider.GetRequiredService<WorkerLivenessTracker>();
+
+        return new PendingRaisedEventsWorker(_channel, scopeFactory, options, livelinessTracker);
     }
 
     private static WebhookEvent BuildWebhookEvent(Guid id, WebHookEventStatus status, DateTimeOffset createdAt)
