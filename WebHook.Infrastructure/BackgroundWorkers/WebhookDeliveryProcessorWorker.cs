@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
@@ -11,12 +12,14 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<WebhookDeliveryWorkerConfiguration> _optionsMonitor;
+    private readonly WorkerLivenessTracker _workerLivenessTracker;
 
-    public WebhookDeliveryProcessorWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<WebhookDeliveryWorkerConfiguration> optionsMonitor)
+    public WebhookDeliveryProcessorWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<WebhookDeliveryWorkerConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
     {
         _scopeFactory = scopeFactory;
         _optionsMonitor = optionsMonitor;
         _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryProcessorWorker));
+        _workerLivenessTracker = workerLivenessTracker;
         //_timeout = TimeSpan.FromSeconds(optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds);
     }
 
@@ -48,7 +51,7 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
             try
             {
                 _logger.Information("Beginning webhook delivery processing...");
-
+                _workerLivenessTracker.UpdateHeartBeat();
                 using var scope = _scopeFactory.CreateScope();
 
                 var deliveryProcessor =

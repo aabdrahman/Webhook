@@ -8,6 +8,7 @@ using WebHook.Core.Constants;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
@@ -37,6 +38,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IOptionsMonitor<PendingRaisedEventsWorkerConfiguration> _options;
+    private readonly WorkerLivenessTracker _workerLivenessTracker;
 
     private ILogger _logger;
     private const string _className = "ClassName";
@@ -58,12 +60,13 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
     /// Read inside the loop so runtime config changes are picked up without
     /// restarting the worker.
     /// </param>
-    public PendingRaisedEventsWorker(Channel<EventRaised> eventRaisedChannel, IServiceScopeFactory serviceScopeFactory, IOptionsMonitor<PendingRaisedEventsWorkerConfiguration> options)
+    public PendingRaisedEventsWorker(Channel<EventRaised> eventRaisedChannel, IServiceScopeFactory serviceScopeFactory, IOptionsMonitor<PendingRaisedEventsWorkerConfiguration> options, WorkerLivenessTracker workerLivenessTracker)
     {
         _eventRaisedChannel = eventRaisedChannel;
         _serviceScopeFactory = serviceScopeFactory;
         _options = options;
         _logger = Log.ForContext(_className, nameof(PendingRaisedEventsWorker));
+        _workerLivenessTracker = workerLivenessTracker;
     }
 
     /// <inheritdoc/>
@@ -127,6 +130,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
 
                 foreach (var pendingId in pendingIds)
                 {
+                    _workerLivenessTracker.UpdateHeartBeat();
                     await _eventRaisedChannel.Writer.WriteAsync(new EventRaised(pendingId), stoppingToken);
                 }
 

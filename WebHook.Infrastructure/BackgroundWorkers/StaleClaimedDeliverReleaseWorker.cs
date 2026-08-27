@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
@@ -11,12 +12,14 @@ public class StaleClaimedDeliverReleaseWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RetryDeliveresAfterFailedConfiguration _retryDeliveresAfterFailedConfiguration;
+    private readonly WorkerLivenessTracker _workerLivenessTracker;
 
-    public StaleClaimedDeliverReleaseWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor)
+    public StaleClaimedDeliverReleaseWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
     {
         _scopeFactory = scopeFactory;
         _retryDeliveresAfterFailedConfiguration = optionsMonitor.CurrentValue;
         _logger = Log.ForContext("ClassName", nameof(StaleClaimedDeliverReleaseWorker));
+        _workerLivenessTracker = workerLivenessTracker;
     }
 
     private ILogger _logger;
@@ -46,7 +49,7 @@ public class StaleClaimedDeliverReleaseWorker : BackgroundService
             {
                 //Begin stale claimed deliveries processing.
                 _logger.Information("Begin processing stale claimed deliveries....");
-
+                _workerLivenessTracker.UpdateHeartBeat();
                 //Create the scope and fetch all required services. The config is fethced at every point in time to ensue it picks up any changes made to the config(if any) afetr the last run.
                 await using var scope = _scopeFactory.CreateAsyncScope();
 

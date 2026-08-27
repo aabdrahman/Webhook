@@ -253,6 +253,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<StaleClaimedDeliveryReleaseService>();
 
         services.AddScoped<CustomAuthenticationFilter>();
+
+        services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(45)));
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -420,7 +422,9 @@ internal static class ApplicationServiceExtensions
             .AddCheck<QueuedEmailHealthCheck>(name: "QUEUED EMAIL HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["channels", "email"])
             .AddCheck<RaisedEventChannelHealthCheck>(name: "QUEUED RAISED EVENTS HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["channels", "raised  events"])
             .AddCheck<DeadLetterQueuedHealthCheck>(name: "DEAD LETTER DELIVERIES HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "dead letter"])
-            .AddCheck<PendingDeliveriesHealthCheck>(name: "PENDING DELIVERIES HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "pending deliveries"]);
+            .AddCheck<PendingDeliveriesHealthCheck>(name: "PENDING DELIVERIES HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "pending deliveries"])
+            .AddCheck<WorkerLivelinessHealthCheck>(name: "WORKER LIVELINESS HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "worker liveliness"])
+            .AddCheck<StaleDeliveryHealthCheck>(name: "STALE DELIVERY HEALTH CHECK", failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy, tags: ["operation", "stale deliveries"]);
 
         //services.AddHealthChecksUI(opts =>
         //{

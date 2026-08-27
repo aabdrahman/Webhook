@@ -103,10 +103,13 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseHealthChecks("/admin/_healths", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
+app.MapHealthChecks("/admin/_healths", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions()
 {
     ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse,
     Predicate = p => true
+}).RequireAuthorization(opts =>
+{
+    opts.RequireRole("ADMIN,Admin");
 });
 
 //app.MapHealthChecksUI(opts =>

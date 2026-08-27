@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Infrastructure.Services;
+using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
@@ -11,12 +12,14 @@ public class RetryPendingDeliveriesWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RetryDeliveresAfterFailedConfiguration _retryDeliveresAfterFailedConfiguration;
+    private readonly WorkerLivenessTracker _workerLivenessTracker;
 
-    public RetryPendingDeliveriesWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor)
+    public RetryPendingDeliveriesWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
     {
         _scopeFactory = scopeFactory;
         _retryDeliveresAfterFailedConfiguration = optionsMonitor.CurrentValue;
         _logger = Log.ForContext("ClassName", nameof(RetryPendingDeliveriesWorker));
+        _workerLivenessTracker = workerLivenessTracker;
     }
 
     private ILogger _logger;
@@ -46,7 +49,7 @@ public class RetryPendingDeliveriesWorker : BackgroundService
         {
             try
             {
-
+                _workerLivenessTracker.UpdateHeartBeat();
                 _logger.Information("Begin processing failed webhook deliveries.....");
                 using var scope = _scopeFactory.CreateScope();
                 var retryService = scope.ServiceProvider.GetRequiredService<RetryAfterPendingService>();
