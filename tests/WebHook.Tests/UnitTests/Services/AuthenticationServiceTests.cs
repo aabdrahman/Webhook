@@ -250,7 +250,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             otpGenerator ?? sp.GetRequiredService<IOtpGenerator>(), sp.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), sp.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
             applicationHasher ?? sp.GetRequiredService<IApplicationHasher>(), sp.GetRequiredService<IEmailService>(), 
             sp.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, 
-            dataProtectionProvider ?? sp.GetRequiredService<IDataProtectionProvider>(), cacheService ?? sp.GetRequiredService<ICacheService>()
+            dataProtectionProvider ?? sp.GetRequiredService<IDataProtectionProvider>(), cacheService ?? sp.GetRequiredService<ICacheService>(), sp.GetRequiredService<RoleManager<Role>>()
             );
     }
 
@@ -284,6 +284,8 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    private ChangeUserRoleRequestDto BuildChnageRoleRequest(string emailAddress = "test@mail.com", string roleToAssign = "") => new ChangeUserRoleRequestDto() { NewRoleToAssign = roleToAssign, UserEmailAddress =  emailAddress };
+
     private RequestOtpDto BuildOtpRequest(string usernameoremail = "test@mail.com", OtpPurpose purpose = OtpPurpose.PasswordReset) => new RequestOtpDto() { Purpose = purpose, UserNameOrEmailAddress = usernameoremail };
 
     private LoginUserDto BuildLoginEntity(string usernameoremail = "", string password = DefaultPassword)
@@ -300,6 +302,17 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
 
         Assert.True(result.IsSuccessful, $"Seed user failed: {result.ResponseMessage}");
         return (dto.EmailAddress, dto.UserName);
+    }
+
+    private async Task<string> SeedRoleAsync(string roleName = "Support")
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var roleManger = scope.ServiceProvider.GetRequiredService<RoleManager<Role>>();
+        var roleToSeed = new Role() { Name =  roleName, IsActive = true, Description = "This is a test support role." };
+        var result = await roleManger.CreateAsync(roleToSeed);
+        Assert.True(result.Succeeded);
+
+        return roleToSeed.NormalizedName!;
     }
 
     //private Infrastructure.Services.AuthenticationService GetSut()
@@ -1545,7 +1558,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         var loginRequest = BuildLoginEntity(usernameoremail: seedUserResult.email);
         var arrangeSut = CreateSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var loginResult = await arrangeSut.LoginUserAsync(loginRequest);
-        Assert.True(loginResult.IsSuccessful);
+        Assert.True(loginResult.IsSuccessful, loginResult.ResponseMessage);
         Assert.NotNull(loginResult.ResponseData);
 
         _authenticatedUserDetailsMock.Setup(x => x.Origin).Returns("audience1");
@@ -1842,5 +1855,92 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.Null(result.ResponseData);
         Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
         Assert.Equal("Invalid Credentials.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    //----------------------------------
+    // Change User Role
+    //-----------------------------------
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_UserEmailNotExists_Returns404NotFound()
+    {
+        //Arrange
+        var sut = CreateSut();
+        var request = BuildChnageRoleRequest();
+
+        //Act
+        var result = await sut.ChangeUserRoleAsync(request);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.StartsWith("User with provided email does not exist", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_NewRoleNotExists_Returns404NotFound()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var sut = CreateSut();
+        var request = BuildChnageRoleRequest(emailAddress: seedResult.email, roleToAssign: "Support");
+
+        //Act
+        var result = await sut.ChangeUserRoleAsync(request);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.StartsWith("The specified role to assign does not exist", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_UserAlreadyAssignedRole_Returns409Conflict()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var sut = CreateSut();
+        var request = BuildChnageRoleRequest(emailAddress: seedResult.email, roleToAssign: "User");
+
+        //Act
+        var result = await sut.ChangeUserRoleAsync(request);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.Conflict, result.HttpStatusCode);
+        Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
+        Assert.Equal("User is already assigned to the specified role.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_ValidRequest_Retrns200OK()
+    {
+        //Arrange
+        var seedResult = await SeedUserAsync();
+        var seedRoleResult = await SeedRoleAsync();
+        var request = BuildChnageRoleRequest(roleToAssign: "Support");
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.ChangeUserRoleAsync(request);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+
+        var assertScope = _serviceProvider.CreateScope();
+        var usermanager = assertScope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var updatedUser = await usermanager.FindByEmailAsync(request.UserEmailAddress);
+        Assert.NotNull(updatedUser);
+        var usernewrole = await usermanager.IsInRoleAsync(updatedUser, request.NewRoleToAssign);
+        Assert.True(usernewrole);
+        var useroldrole = await usermanager.IsInRoleAsync(updatedUser, "user");
+        Assert.False(useroldrole);
     }
 }

@@ -265,4 +265,62 @@ public class AuthenticationController : ControllerBase
                 }));
         }
     }
+
+    /// <summary>
+    /// The endpoint is used by admins to modify user role.
+    /// This removes user from all previously assigned role(s) and maintain the new one.
+    /// </summary>
+    /// <param name="changeUserRoleRequest">
+    /// Contains the details of the operation.
+    /// The email of the user to be re-assigned role and then new role to be assigned.
+    /// </param>
+    /// <param name="ct">
+    /// A cancellation token that can be used to cancel the operation before it completes.
+    ///</param>
+    /// <returns>
+    /// A response containing the details of the operation.
+    /// </returns>
+    /// <response code="400">
+    /// This specifes that the validation of some required fields and format failed
+    /// </response>
+    /// <response code="500">
+    /// This specifes that an unexpected error occurred during the operation.
+    /// </response>
+    /// <response code="409">
+    /// This specifes that the user has already been assigned the previous role
+    /// </response>
+    /// <response code="404">
+    /// This specifes that the either the user or the nww role to be assigned does not exist.
+    /// </response>
+    /// <response code="200">
+    /// The operation is completed successfuly and user has been assigned new role.
+    /// </response>
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [HttpPost("assign-new-role")]
+    [Authorize(Roles = "Admin,ADMIN")]
+    public async Task<IActionResult> AssignNewRole([FromBody] ChangeUserRoleRequestDto changeUserRoleRequest, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _authenticationService.ChangeUserRoleAsync(changeUserRoleRequest, ct);
+
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
 }

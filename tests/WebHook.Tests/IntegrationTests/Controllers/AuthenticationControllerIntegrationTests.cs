@@ -66,6 +66,8 @@ public sealed class AuthenticationControllerIntegrationTests
         ConfirmNewPassword     = "NewPass@1234!"
     };
 
+    private static ChangeUserRoleRequestDto BuildChangeRole(string emailAddress = "user@test.com", string roleToAssign = "Support") => new ChangeUserRoleRequestDto() { UserEmailAddress = emailAddress, NewRoleToAssign = roleToAssign  };
+
     private static RequestOtpDto BuildRequestOtpDto(
         string userNameOrEmail = "user@test.com") => new()
         {
@@ -544,6 +546,152 @@ public sealed class AuthenticationControllerIntegrationTests
         _factory.AuthenticationServiceMock.Verify(
             s => s.RefreshTokenAsync(
                 It.IsAny<TokenDto>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_UserEmailNotExist_Returns404NotFound()
+    {
+
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", $"User with provided email does not exist - {request.UserEmailAddress}", HttpStatusCode.NotFound));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_NewRoleNotExist_Returns409Conflict()
+    {
+
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", $"User is already assigned to the specified role.", HttpStatusCode.Conflict));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_OldRolesCannotBeRemoved_Returns400BadRequest()
+    {
+
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", "User could not be removed from the existing roles. Kindly retry.", HttpStatusCode.BadRequest));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_NewRoleAssignFilled_Returns400BadRequest()
+    {
+
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", "User could not be assigned new role.", HttpStatusCode.BadRequest));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_InvalidRequest_Returns400BadRequest()
+    {
+
+        //Arrange
+        var request = BuildChangeRole(emailAddress: "");
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", "User could not be assigned new role.", HttpStatusCode.BadRequest));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_InvalidRequestWrongEmail_Returns400BadRequest()
+    {
+
+        //Arrange
+        var request = BuildChangeRole(emailAddress: "usermail.com");
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure("Operation Failed.", "User could not be assigned new role.", HttpStatusCode.BadRequest));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_ValidRequest_Returns200OK()
+    {
+
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Success("Operation Successful.", "User role reassigned successfully.", HttpStatusCode.OK));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_ThrowsException_Returns500InternalServerError()
+    {
+        //Arrange
+        var request = BuildChangeRole();
+        _factory.AuthenticationServiceMock.Setup(x => x.ChangeUserRoleAsync(It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>())).ThrowsAsync(new Exception("Unexpected error occurred"));
+
+        //Act
+        var response = await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", request);
+
+        //Assert
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_ServiceCalledExactlyOnce()
+    {
+        // Arrange
+        _factory.AuthenticationServiceMock
+            .Setup(s => s.ChangeUserRoleAsync(
+                It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<string>.Failure(
+                "Operation Failed", "Invalid Request.", HttpStatusCode.BadRequest));
+
+        // Act
+        await _client.PostAsJsonAsync("/api/Authentication/assign-new-role", BuildChangeRole());
+
+        // Assert
+        _factory.AuthenticationServiceMock.Verify(
+            s => s.ChangeUserRoleAsync(
+                It.IsAny<ChangeUserRoleRequestDto>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

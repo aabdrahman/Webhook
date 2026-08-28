@@ -39,13 +39,14 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
     private readonly IDataProtector _dataProtector;
     private readonly ICacheService _cacheService;
+    private readonly RoleManager<Role> _roleManager;
 
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
                                 IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher,
                                 IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails,
-                                IDataProtectionProvider dataProtectionProvider, ICacheService cacheService)
+                                IDataProtectionProvider dataProtectionProvider, ICacheService cacheService, RoleManager<Role> roleManager)
     {
         _userManager = userManager;
         _repositoryContext = repositoryContext;
@@ -60,9 +61,9 @@ public sealed class AuthenticationService : IAuthenticationService
         _authenticatedUserDetails = authenticatedUserDetails;
         _dataProtector = dataProtectionProvider.CreateProtector("Webhook.Otp.OtpVerificationSigning");
         _cacheService = cacheService;
+        _roleManager = roleManager;
 
         _logger = Log.ForContext(_className, nameof(AuthenticationService));
-
     }
 
     private Serilog.ILogger _logger;
@@ -621,6 +622,71 @@ public sealed class AuthenticationService : IAuthenticationService
         {
             _logger.Error(ex, "An error occurred while refreshing user token.");
             return GenericResponse<TokenDto>.Failure(null, "An error occurred while refreshing user session.", HttpStatusCode.InternalServerError);
+        }
+    }
+
+
+    public async Task<GenericResponse<string>> ChangeUserRoleAsync(ChangeUserRoleRequestDto changeUserRoleRequest, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(ChangeUserRoleAsync));
+
+        try
+        {
+            _logger.Information("Change User role request - {0}", changeUserRoleRequest);
+
+            User? userToReassignRole = await _userManager.FindByEmailAsync(changeUserRoleRequest.UserEmailAddress);
+
+            if(userToReassignRole is null)
+            {
+                _logger.Warning("User with email does not exist - {0}", changeUserRoleRequest.UserEmailAddress);
+                return GenericResponse<string>.Failure("Operation Failed.", $"User with provided email does not exist - {changeUserRoleRequest.UserEmailAddress}", HttpStatusCode.NotFound);
+            }
+
+            bool roleToAssign = await _roleManager.RoleExistsAsync(changeUserRoleRequest.NewRoleToAssign);
+            if (!roleToAssign)
+            {
+                _logger.Warning("The specified new role to assign does not exist - {0}", changeUserRoleRequest.NewRoleToAssign);
+                return GenericResponse<string>.Failure("Operation Failed.", $"The specified role to assign does not exist - {changeUserRoleRequest.NewRoleToAssign}", HttpStatusCode.NotFound);
+            }
+
+            IList<string> userCurrentRoles = await _userManager.GetRolesAsync(userToReassignRole);
+
+            if(userCurrentRoles is not null && userCurrentRoles.Any())
+            {
+                bool roleAlreadyAssigned = userCurrentRoles.Any(x => x.Equals(changeUserRoleRequest.NewRoleToAssign, StringComparison.OrdinalIgnoreCase));
+                if (roleAlreadyAssigned)
+                {
+                    _logger.Warning("User is already assigned to the specified role - {0}, Assigned Roles - {1}", changeUserRoleRequest.NewRoleToAssign, string.Join(", ", userCurrentRoles));
+                    return GenericResponse<string>.Failure("Operation Failed.", "User is already assigned to the specified role.", HttpStatusCode.Conflict);
+                }
+
+                IdentityResult removeExistingRolesResult = await _userManager.RemoveFromRolesAsync(userToReassignRole, userCurrentRoles);
+                if (!removeExistingRolesResult.Succeeded)
+                {
+                    _logger.Warning("User: {0} could not be removed from specified roles- {1}", string.Join(", ", userCurrentRoles));
+                    return GenericResponse<string>.Failure("Operation Failed.", "User could not be removed from the existing roles. Kindly retry.", HttpStatusCode.Conflict);
+                }
+
+                _logger.Information("User successfully removed from roles - {0}", string.Join(", ", userCurrentRoles));
+            }
+
+            IdentityResult setNewRoleResult = await _userManager.AddToRoleAsync(userToReassignRole, changeUserRoleRequest.NewRoleToAssign);
+            if (!setNewRoleResult.Succeeded)
+            {
+                _logger.Warning("User - {0} could not be assigned new role - {1}. Errors - {3}", userToReassignRole.NormalizedEmail, changeUserRoleRequest.NewRoleToAssign, setNewRoleResult.Errors.ToList());
+                return GenericResponse<string>.Failure("Operation Failed.", "User could not be assigned new role.", HttpStatusCode.BadRequest);
+            }
+
+            await _cacheService.RemoveItemsFromCacheAsync(userToReassignRole.NormalizedEmail!);
+
+            _logger.Information("User: {0} has been successfully reassigned new role -- {1}. User jti removed from cache.", userToReassignRole.NormalizedEmail, changeUserRoleRequest.NewRoleToAssign);
+            return GenericResponse<string>.Success("Operation Successful.", "User role reassigned successfully.", HttpStatusCode.OK);
+            
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while changing user role.");
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred while assigning role.", HttpStatusCode.InternalServerError);
         }
     }
 
