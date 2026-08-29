@@ -61,8 +61,11 @@ builder.Services.ConfigureApplicationCaching();
 //Health Check
 builder.Services.ConfigureHealthChecks(builder.Configuration);
 
+//Cors - Policy
+builder.Services.ConfigureApplicationCorsPolicy(builder.Configuration);
 var app = builder.Build();
 
+app.UseCors("RestrictedPolicy");
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

@@ -19,7 +19,7 @@ public sealed class CacheService : ICacheService
 
     public async Task<T?> GetItemsFromCacheAsync<T>(string cacheKey)
     {
-        _logger.Information("MethodName", nameof(GetItemsFromCacheAsync));
+        _logger.ForContext("MethodName", nameof(GetItemsFromCacheAsync));
         try
         {
             _logger.Information("Getting cached item for key - {0}", cacheKey);
@@ -37,7 +37,7 @@ public sealed class CacheService : ICacheService
 
     public async Task RemoveItemsFromCacheAsync(params string[] keys)
     {
-        _logger.ForContext("", nameof(RemoveItemsFromCacheAsync)).Information("Removing cached items from cache - {0}", keys);
+        _logger.ForContext("MethodName", nameof(RemoveItemsFromCacheAsync)).Information("Removing cached items from cache - {0}", keys);
         await Task.Delay(1);
         foreach (var key in keys)
         {

@@ -432,4 +432,25 @@ internal static class ApplicationServiceExtensions
         //    opts.SetEvaluationTimeInSeconds(600);
         //}).AddInMemoryStorage();
     }
+
+    internal static void ConfigureApplicationCorsPolicy(this IServiceCollection services, IConfiguration configuration)
+    {
+        var corsConfig = configuration.GetSection("CorsPolicy");
+        services.AddCors(opts =>
+        {
+            opts.AddDefaultPolicy(config =>
+            {
+                config.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+            });
+
+            opts.AddPolicy("RestrictedPolicy", config =>
+            {
+                config.WithOrigins(corsConfig["AllowedOrigins"]?.Split(";", StringSplitOptions.TrimEntries) ?? [])
+                    .WithMethods(corsConfig["AllowedMethods"]?.Split(",", StringSplitOptions.TrimEntries) ?? [])
+                    .WithHeaders(corsConfig["AllowedHeaders"]?.Split(",", StringSplitOptions.TrimEntries) ?? []);
+            });
+        });
+    }
 }
