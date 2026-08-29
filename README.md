@@ -1,4 +1,3 @@
-# Webhook
 # WebhookHub
 
 A production-grade webhook notification service built with .NET 10. WebhookHub allows internal business applications to publish events that are reliably delivered as signed HTTP POST requests to registered subscriber callback URLs — with automatic retry, dead-lettering, escalation notifications, and full audit trails.
@@ -19,7 +18,6 @@ Open source and free to use.
 - [Security](#security)
 - [Health Checks](#health-checks)
 - [API Reference](#api-reference)
-- [Authentication](#authentication)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
@@ -39,29 +37,38 @@ POST /api/webhookevent
       │
       ▼
 Validation → Persist → Raise to Channel
-                              │
-                              ▼
-                    EventRaisedWorker
-                              │
-                              ▼
-                   Create Delivery Records
-                              │
-                              ▼
-                    DeliveryWorker (two-phase claim)
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-         Delivered                         Failed
-                                              │
-                                    ┌─────────┴──────────┐
-                                    ▼                     ▼
-                               Retry Queue         Max Retries Exceeded
-                                                          │
-                                                          ▼
-                                                   Dead Letter Queue
-                                                          │
-                                                          ▼
-                                               Escalation Email → Admin Manual Retry
+      │                       │
+      │                       ▼
+      │             EventRaisedWorker
+      │                       │
+      │    ┌──────────────────┘
+      │    │  PendingRaisedEventWorker
+      │    │  (recovers events not picked
+      │    │   up from channel — polls DB
+      │    │   for Pending events past threshold)
+      │    └──────────────────┐
+      │                       ▼
+      │              Create Delivery Records
+      │                       │
+      │                       ▼
+      │             DeliveryWorker (two-phase claim)
+      │                       │
+      │       ┌───────────────┴───────────────┐
+      │       ▼                               ▼
+      │  Delivered                         Failed
+      │                                       │
+      │                             ┌─────────┴──────────┐
+      │                             ▼                     ▼
+      │                        Retry Queue         Max Retries Exceeded
+      │                             │                     │
+      │           StaleClaimedDeliveryReleaseWorker        ▼
+      │           (releases locked-past-lease        Dead Letter Queue
+      │            deliveries back to Failed)              │
+      │                                                    ▼
+      │                                       Escalation Email
+      │                                                    │
+      │                                                    ▼
+      └─────────────────────────────────── Admin Manual Retry
 ```
 
 ---
@@ -102,6 +109,9 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 - Dead-lettering when a delivery exhausts its maximum retry count
 - Escalation email to the subscriber contact on dead-letter transition
 - Admin-initiated manual retry for dead-lettered deliveries with justification
+
+### Event Recovery
+- If an event is published to the in-memory channel but the `EventRaisedWorker` does not process it — due to a crash, restart, or channel overflow — the `PendingRaisedEventWorker` periodically polls the database for events that remain in `Pending` status beyond a configured threshold and re-queues them for fan-out, ensuring no published event is silently lost
 
 ### Stale Delivery Recovery
 - A dedicated background worker monitors deliveries locked beyond their `LockedUntil` timestamp — indicating a crashed worker — and releases them back to the failed queue for reprocessing
@@ -162,29 +172,74 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
 
 ```json
 {
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=webhookhub;Username=...;Password=..."
+    "DbConnection": ""
+  },
+  "CorsPolicy": {
+    "AllowedMethods": "POST,GET,PUT,DELETE,OPTIONS",
+    "AllowedOrigins": "https://localhost:<port>",
+    "AllowedHeaders": "X-Operation-Token"
+  },
+  "SignatureSecretKey": {
+    "KeySize": 32
+  },
+  "WebhookDeliveryWorker": {
+    "DeliveryProcessorIntervalSeconds": 60,
+    "TotalBatchSize": 10,
+    "DeliveryLockDuration": 300
+  },
+  "RetryDeliveriesAfterFailed": {
+    "ThresholdDuration": 125000,
+    "MaximumAttendedCount": 5,
+    "TotalBatchSize": 10,
+    "DeliveryLockDuration": 300,
+    "StaleDeliveryReleaseIntervalSeconds": 120,
+    "RetryFailedDeliveryIntervalSeconds": 150
+  },
+  "EventRaisedWorker": {
+    "ProcessingIntervalInSeconds": 5
+  },
+  "EmailSmtpSettings": {
+    "Host": "",
+    "Port": "",
+    "Username": "",
+    "Password": ""
+  },
+  "EmailProcessorWorker": {
+    "ProcessingIntervalInSeconds": 10,
+    "ProcessingDelayInMilliSeconds": 4500
+  },
+  "PendingRaisedEventsWorker": {
+    "PendingEventsWorkerIntervalSeconds": 300,
+    "PendingEventsThresholdMinutes": 30
+  },
+  "DeadLetterManualRetry": {
+    "MaximumRetryCycle": 3
+  },
+  "UserSettingsConfiguration": {
+    "MinimumPasswordLength": 10,
+    "MaximumAuthenticationAttempt": 3
   },
   "JwtSettings": {
-    "ValidIssuer":                          "webhook_service",
-    "ValidAudiences":                       "audience1;audience2",
-    "TokenExpirationAfterInSeconds":        1800,
-    "RefreshTokenExpirationAfterInSeconds": 3600
+    "ValidIssuer": "https://localhost:<port>",
+    "ValidAudiences": "https://localhost:<port>",
+    "TokenExpirationAfterInSeconds": 600,
+    "RefreshTokenExpirationAfterInSeconds": 60000
   },
-  "SmtpSettings": {
-    "Host":        "smtp.example.com",
-    "Port":        587,
-    "SenderEmail": "noreply@example.com",
-    "SenderName":  "WebhookHub"
+  "TokenValidation": {
+    "OtpExpirationAfterInSeconds": 1200.00,
+    "OtpOperationTokenExpiresAFterInSceonds": 1200.00
   },
-  "DeliverySettings": {
-    "MaxRetryCount":          5,
-    "MaxProcessingCount":     10,
-    "MaxDeliveryDurationMs":  5000,
-    "WorkerLeaseSeconds":     30
-  },
-  "WorkerSettings": {
-    "LivenessTimeoutSeconds": 60
+  "OtpSettings": {
+    "MaximumOtpLength": 12,
+    "OtpToGenerateLength": 6
   }
 }
 ```
@@ -217,7 +272,7 @@ https://localhost:<port>/scalar/v1
 
 ## Delivery Pipeline
 
-The delivery pipeline is split across two background workers communicating through an in-memory channel and the database.
+The delivery pipeline is split across multiple background workers communicating through an in-memory channel and the database.
 
 ### Step 1 — Event Publishing
 
@@ -236,36 +291,46 @@ The system:
 2. Validates the event type exists in the Event Catalog
 3. Validates the JSON payload against the catalog's declared field schema — returns `400` with each failing field named if validation fails
 4. Persists the event with status `Pending`
-5. Publishes the new event ID to the `EventRaised` channel
+5. Publishes the new event ID to the `EventRaised` in-memory channel
 
 ### Step 3–7 — Fan-out (EventRaisedWorker)
 
 The `EventRaisedWorker` listens to the channel. On receiving an event ID:
 
-1. Confirms the event is in `Pending` status in the database
+1. Confirms the event is still in `Pending` status in the database
 2. Queries the subscription-to-event-catalog join table to find all subscriptions registered for the event type
 3. Creates a `WebhookDelivery` record with status `Pending` for each matching subscription
 4. Saves all delivery records
 5. Marks the event as `Processed`
 
+### Event Recovery (PendingRaisedEventWorker)
+
+The in-memory channel is not durable — if the application restarts, is redeployed, or the `EventRaisedWorker` crashes after an event was persisted but before it was read from the channel, the event ID is lost from the channel but the event remains in the database as `Pending`.
+
+The `PendingRaisedEventWorker` guards against this. On a configurable interval (default 300 seconds) it polls the database for events that:
+- Are still in `Pending` status
+- Have been pending longer than the configured threshold (default 30 minutes)
+
+Any such events are treated as missed by the channel and re-queued directly for fan-out — bypassing the channel entirely and driving the same fan-out logic the `EventRaisedWorker` would have run. This ensures no published event is silently dropped regardless of application lifecycle events.
+
 ### Step 8–11 — Delivery (DeliveryWorker)
 
-The `DeliveryWorker` polls the delivery table for `Pending` records:
+The `DeliveryWorker` polls the delivery table for `Pending` records on a configurable interval:
 
-1. Selects up to the configured `MaxProcessingCount` pending deliveries
-2. **Two-phase claim** — marks selected deliveries as `Processing` with `LockedBy = workerInstanceId` and `LockedUntil = now + leaseTime` before any HTTP attempt, preventing duplicate delivery across worker instances
+1. Selects up to the configured `TotalBatchSize` pending deliveries
+2. **Two-phase claim** — marks selected deliveries as `Processing` with `LockedBy = workerInstanceId` and `LockedUntil = now + DeliveryLockDuration` before any HTTP attempt, preventing duplicate delivery across worker instances
 3. For each claimed delivery, retrieves the subscriber callback URL and secret key
 4. Sends an HTTP POST with the event payload and an `X-Webhook-Signature` HMAC header
-5. Records a `DeliveryAttempt` with request payload, response body, status, and `DeliveredAt` timestamp
+5. Records a `DeliveryAttempt` with request payload, response body, HTTP status, and `DeliveredAt` timestamp
 
 **On success:**
 - Marks delivery as `Delivered`
-- Checks delivery duration against the configured `MaxDeliveryDurationMs` — if exceeded, sends a slow endpoint notification email to the subscriber
+- Checks delivery duration against the configured `ThresholdDuration` — if exceeded, sends a slow endpoint notification email to the subscriber
 
 **On failure:**
 - Increments `RetryCount`
-- Computes the next `RetryAt` timestamp
-- Sets status back to `Failed`
+- Computes the next `RetryAt` timestamp based on configured backoff
+- Sets status to `Failed`
 
 **On max retries reached:**
 - Sets delivery status to `DeadLetter`
@@ -274,19 +339,19 @@ The `DeliveryWorker` polls the delivery table for `Pending` records:
 
 ### Step 12 — Retry Processing
 
-A background worker monitors `Failed` deliveries where `DateTimeOffset.UtcNow >= NextRetryAt` and reprocesses them through the same delivery flow.
+A background worker polls for `Failed` deliveries where `DateTimeOffset.UtcNow >= NextRetryAt` and reprocesses them through the same two-phase claim and delivery flow.
 
-### Step 13 — Stale Claim Recovery
+### Step 13 — Stale Claim Recovery (StaleClaimedDeliveryReleaseWorker)
 
-A dedicated `StaleClaimedDeliveryReleaseWorker` monitors deliveries in `Processing` status where `LockedUntil` has been exceeded — indicating the processing worker crashed before releasing the lock. These deliveries are released and their status reset to `Failed` for reprocessing.
+A dedicated worker polls on a configurable interval for deliveries in `Processing` status where `LockedUntil` has been exceeded — indicating the processing worker crashed or timed out before releasing its lock. These deliveries are released and their status reset to `Failed`, making them eligible for the retry worker on its next cycle.
 
 ### Dead Letter Manual Retry
 
 An Admin may request a manual retry for any dead-lettered delivery:
 
-1. The system checks the dead letter's retry cycle count against the configured maximum
-2. If within the limit, the delivery is set back to `Processing`, the retry cycle incremented, and the delivery re-enters the worker pipeline
-3. The request requires a justification stored against the dead letter record for audit
+1. The system checks the dead letter's retry cycle count against the configured `MaximumRetryCycle`
+2. If within the limit, the delivery is set back to `Processing`, the retry cycle is incremented by one, and the delivery re-enters the worker pipeline
+3. The request requires a justification stored against the dead letter record for audit purposes
 
 ---
 
@@ -295,19 +360,21 @@ An Admin may request a manual retry for any dead-lettered delivery:
 | Worker | Trigger | Responsibility |
 |---|---|---|
 | `EventRaisedWorker` | Channel message | Fans out events to delivery records |
-| `DeliveryWorker` | DB poll | Claims and delivers pending webhooks |
+| `PendingRaisedEventWorker` | DB poll | Recovers events that remained `Pending` beyond the threshold — missed by the channel due to restarts or crashes |
+| `DeliveryWorker` | DB poll | Claims and delivers pending webhooks to subscriber callback URLs |
 | `RetryWorker` | DB poll | Reprocesses failed deliveries past their `NextRetryAt` |
-| `StaleClaimedDeliveryReleaseWorker` | DB poll | Reclaims deliveries locked by crashed workers |
+| `StaleClaimedDeliveryReleaseWorker` | DB poll | Releases deliveries locked past their `LockedUntil` — returns them to `Failed` for retry |
+| `EmailProcessorWorker` | Channel + DB poll | Processes queued outbound emails — OTP delivery, slow endpoint notifications, escalation emails |
 
 ### Two-Phase Claim Pattern
 
 The delivery worker uses a two-phase claim rather than optimistic locking. Optimistic locking detects conflicts after the fact but does not prevent multiple workers from attempting the same delivery concurrently. The two-phase approach:
 
-1. **Claim** — `UPDATE deliveries SET status = 'Processing', locked_by = @workerId, locked_until = @expiry WHERE status = 'Pending'`
+1. **Claim** — `UPDATE deliveries SET status = 'Processing', locked_by = @workerId, locked_until = @expiry WHERE status = 'Pending'` using `FOR UPDATE SKIP LOCKED` at the PostgreSQL level so concurrent workers skip already-claimed rows
 2. **Process** — only the worker that holds the lock makes the HTTP call
 3. **Release** — update status to `Delivered` or `Failed` and clear the lock fields
 
-If a worker crashes between steps 1 and 2, `StaleClaimedDeliveryReleaseWorker` detects that `locked_until` has passed and releases the lock, returning the delivery to `Failed` for the retry worker to pick up.
+If a worker crashes between claim and release, `StaleClaimedDeliveryReleaseWorker` detects that `locked_until` has passed and releases the lock, returning the delivery to `Failed` for the retry worker to pick up.
 
 ---
 
@@ -345,12 +412,13 @@ Available at `GET /Admin/_health`.
 |---|---|
 | `postgresql` | Primary database connectivity |
 | `email-queue` | Email channel depth — unhealthy above configured threshold |
-| `event-raised-worker` | Heartbeat liveness of the EventRaisedWorker |
-| `delivery-worker` | Heartbeat liveness of the DeliveryWorker |
-| `stale-claim-worker` | Heartbeat liveness of the StaleClaimedDeliveryReleaseWorker |
+| `event-raised-worker` | Heartbeat liveness of the `EventRaisedWorker` |
+| `pending-raised-event-worker` | Heartbeat liveness of the `PendingRaisedEventWorker` |
+| `delivery-worker` | Heartbeat liveness of the `DeliveryWorker` |
+| `stale-claim-worker` | Heartbeat liveness of the `StaleClaimedDeliveryReleaseWorker` |
 | `dead-letter-queue` | Count of unretried dead letter items |
 | `pending-deliveries` | Count of pending deliveries — detects worker backlog |
-| `stale-processing` | Count of Processing deliveries past their lease — detects crashed workers |
+| `stale-processing` | Count of `Processing` deliveries past their lease — detects crashed workers |
 
 Each worker updates a `WorkerLivenessTracker` singleton at the top of every loop iteration. If the heartbeat goes stale beyond the configured timeout the check turns `Unhealthy`.
 
@@ -360,11 +428,17 @@ Example response:
 {
   "status": "Healthy",
   "checks": [
-    { "name": "postgresql",       "status": "Healthy",   "duration": 12.3,  "exception": null },
-    { "name": "email-queue",      "status": "Healthy",   "duration": 0.1,   "exception": null },
-    { "name": "event-raised-worker", "status": "Healthy","duration": 0.0,   "exception": null }
+    { "name": "postgresql",                 "status": "Healthy", "duration": 12.3, "exception": null },
+    { "name": "email-queue",                "status": "Healthy", "duration": 0.1,  "exception": null },
+    { "name": "event-raised-worker",        "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "pending-raised-event-worker","status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "delivery-worker",            "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "stale-claim-worker",         "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "dead-letter-queue",          "status": "Healthy", "duration": 1.2,  "exception": null },
+    { "name": "pending-deliveries",         "status": "Healthy", "duration": 1.1,  "exception": null },
+    { "name": "stale-processing",           "status": "Healthy", "duration": 0.9,  "exception": null }
   ],
-  "totalDurationMs": 12.9
+  "totalDurationMs": 16.9
 }
 ```
 
@@ -382,6 +456,7 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | POST | `/change-password` | Authenticated | Change account password |
 | POST | `/request-otp` | Public | Request a one-time password via email |
 | POST | `/refresh` | Public | Refresh an authenticated session |
+| POST | `/assign-new-role` | Admin | Assigns new role to a particular user |
 
 ### Users — `api/Users`
 
@@ -458,7 +533,7 @@ Service-level tests covering authentication, user management, OTP flows, and the
 - **xUnit** — test runner
 - **Moq** — mocks for `IAuthenticatedUserDetails`, `IDataProtectionProvider`, `ICacheService`
 - **Testcontainers** — real PostgreSQL container via `IClassFixture<PostgreSqlFixture>` for full Identity pipeline testing
-- Each test method gets a fresh scoped `DbContext` to prevent EF Core change tracker contamination across tests
+- Each test method gets a fresh scoped `DbContext` via `CreateSut()` to prevent EF Core change tracker contamination across tests
 
 ### Integration Tests
 
@@ -512,8 +587,10 @@ WebhookHub/
 ├── WebhookHub.Infrastructure/
 │   ├── BackgroundWorkers/
 │   │   ├── EventRaisedWorker.cs
+│   │   ├── PendingRaisedEventWorker.cs
 │   │   ├── DeliveryWorker.cs
 │   │   ├── RetryWorker.cs
+│   │   ├── EmailProcessorWorker.cs
 │   │   └── StaleClaimedDeliveryReleaseWorker.cs
 │   ├── CustomHealthChecks/
 │   │   ├── QueuedEmailHealthCheck.cs
@@ -540,6 +617,67 @@ WebhookHub/
 ```
 
 ---
+
+## Roadmap
+
+WebhookHub is currently at **v1**. The core delivery pipeline, identity system, and administrative tooling are stable. A subscriber-facing dashboard and the API endpoints that support it are planned for v2.
+
+## Roadmap
+
+WebhookHub is currently at **v1**. The core delivery pipeline, identity system, and administrative tooling are stable. A subscriber-facing dashboard, real-time monitoring, and analytics are planned for v2.
+
+### Planned for v2
+
+#### Subscriber Dashboard
+A web-based interface for subscribers to manage their subscriptions, monitor delivery history, inspect failed deliveries, and trigger manual retries — without requiring admin involvement.
+
+**Endpoints to support the dashboard:**
+- Delivery history per subscription — paginated, filterable by status, date range, and event type
+- Per-delivery attempt log — request payload, response body, HTTP status, duration, and timestamp for each attempt
+- Subscription secret key rotation — self-service key regeneration with immediate effect on future deliveries
+- Subscriber-scoped aggregate metrics — success rate, average delivery duration, dead letter count
+
+#### Real-Time Monitoring
+Live delivery activity streamed to the dashboard without polling:
+- **SignalR hub** — pushes delivery status updates, dead letter transitions, and worker heartbeats to connected clients in real time
+- **Live delivery feed** — scrolling activity log showing each delivery attempt as it happens, with status, subscriber name, event type, and response code
+- **Worker status panel** — live view of each background worker — running, idle, or unhealthy — updated from the liveness tracker on each heartbeat
+
+#### Analytics and Charts
+Time-series and aggregate visualisations giving subscribers and admins visibility into delivery health:
+- **Delivery volume chart** — events published and deliveries attempted over time, by hour or day
+- **Success rate trend** — percentage of successful deliveries over a rolling window, per subscription or globally
+- **Failure breakdown** — failed deliveries grouped by HTTP response code — 4xx client errors vs 5xx server errors vs timeouts
+- **Retry heatmap** — which subscriptions are retrying most frequently, indicating unreliable endpoints
+- **Dead letter rate** — dead letters created over time, with drill-down to the triggering subscription
+- **Delivery latency percentiles** — p50, p95, p99 delivery duration per subscription — identifies slow endpoints before they reach the threshold notification
+- **Event type distribution** — breakdown of published events by type over a time range
+
+#### Developer Experience
+- **Webhook testing sandbox** — subscribers send a test delivery to their callback URL using a sample payload without creating a real event, to verify endpoint configuration before going live
+- **Event replay** — admin-initiated re-raise of a previously processed event, useful for recovering from downstream bugs
+- **Delivery diff view** — side-by-side comparison of request payload sent vs response received for a failed attempt
+- **Subscriber activity log** — audit trail of all subscription changes, key rotations, and manual retries
+
+#### API and Security
+- **Idempotency keys on `POST /api/webhookevent`** — prevents duplicate events on internal service retries using a short-TTL key store
+- **Subscriber endpoint verification** — challenge/response ping before a callback URL is activated on a new subscription, consistent with Stripe and GitHub webhook patterns
+- **Request signing on the publish endpoint** — internal services authenticate with a pre-shared API key or service-to-service JWT
+- **Subscription secret key rotation** — self-service endpoint to regenerate the HMAC signing key for a subscription
+- **OpenTelemetry distributed tracing** — end-to-end trace from event publish through fan-out to final delivery, exportable to Jaeger, Zipkin, or any OTLP-compatible backend
+
+#### Infrastructure
+- **Docker Compose setup** — single command to spin up the API, PostgreSQL, and any supporting services for local development
+- **Helm chart** — Kubernetes deployment manifests for production-grade hosting
+- **GitHub Actions CI pipeline** — automated build, test, and migration script generation on pull request
+
+---
+
+> **Contributing to v2:** If you want to work on any of the above, open an issue to discuss the approach before submitting a pull request. Feature branches should be prefixed with `v2/` and target the `develop` branch rather than `main`.
+
+---
+
+> **Contributing to v2:** If you want to work on any of the above, open an issue to discuss the approach before submitting a pull request.
 
 ## Contributing
 
