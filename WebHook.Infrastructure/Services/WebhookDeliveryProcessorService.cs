@@ -43,7 +43,7 @@ public sealed class WebhookDeliveryProcessorService
             //Create Database transaction for the select
             await using var transaction = await _repositoryContext.Database.BeginTransactionAsync(ct);
 
-            //Begin tos elect the deliveries from database.
+            //Begin to select the deliveries from database.
             List<WebhookDelivery> deliveriesToProcess = await _repositoryContext.WebhookDeliveries.FromSqlRaw
             (
                 @"  SELECT * 

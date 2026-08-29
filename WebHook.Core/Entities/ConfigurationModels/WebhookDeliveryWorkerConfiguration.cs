@@ -13,7 +13,7 @@ public class WebhookDeliveryWorkerConfiguration
     /// </summary>
     public int TotalBatchSize { get; set; }
     /// <summary>
-    /// This is the duration at which a delivery item is locked for in case exception occurs wduring delivery processing
+    /// This is the duration at which a delivery item is locked for in case exception occurs during delivery processing
     /// </summary>
     public double DeliveryLockDuration { get; set; }
 }

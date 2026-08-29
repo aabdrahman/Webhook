@@ -47,6 +47,7 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
 
         services.AddScoped<WebhookDeliveryRetryAfterService>();
+        services.AddScoped<RetryAfterPendingService>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -575,4 +576,41 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
         Assert.Equal(WebhookDeliveryStatus.Failed, persisted.DeliveryStatus);
         Assert.Equal(2, persisted.RetryCount); // 1 + 1
     }
+
+    //[Fact]
+    //public async Task ProcessStaleDeliveriesAsync_LockedAtFirstTimeAttempt_ValidateIfPicked()
+    //{
+    //    //Locking here means that at first attempt, retry count is 1 by default and NextRetryAt is empty
+    //    //Arrange
+    //    var (ctx, svc) = CreateSut();
+    //    var delivery = BuildStaleDelivery();
+
+    //    await ctx.WebhookDeliveries.AddAsync(delivery);
+    //    await ctx.SaveChangesAsync();
+
+    //    //Act
+    //    var result = await svc.ProcessStaleDeliveriesAsync();
+
+    //    //Assert
+    //    Assert.Equal(1, result);
+
+    //    // Assert — fresh context to verify persistence
+    //    using var scope = _serviceProvider.CreateScope();
+    //    var freshCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+    //    var retryService = scope.ServiceProvider.GetRequiredService<RetryAfterPendingService>();
+    //    var persisted = await freshCtx.WebhookDeliveries.FindAsync(delivery.Id);
+
+    //    Assert.Null(persisted!.LockedBy);
+    //    Assert.Null(persisted.LockedUntil);
+    //    Assert.Equal(WebhookDeliveryStatus.Failed, persisted.DeliveryStatus);
+    //    Assert.Equal(delivery.RetryCount++, persisted.RetryCount);
+
+    //    await retryService.RunRetryAfterFirstAttemptAsync(workerId: "worker-1");
+
+    //    using var scope2 = _serviceProvider.CreateScope();
+    //    var ctx2 = scope2.ServiceProvider.GetRequiredService<RepositoryContext>();
+    //    var deliveryDetails = await ctx2.WebhookDeliveries.FindAsync(delivery.Id);
+    //    Assert.NotNull(deliveryDetails);
+    //    Assert.NotNull(deliveryDetails.LockedBy);
+    //}
 }

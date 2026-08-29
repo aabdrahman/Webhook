@@ -51,11 +51,15 @@ public sealed class RetryAfterPendingService
             //Create the transaction for the select for update
             await using var transaction = await _repositoryContext.Database.BeginTransactionAsync(ct);
 
-            //Run the select for update script to pick all pending requests
+            //Run the select for update script to pick all failed requests or deliveries with lockduration exceeded and failed and the next retry at is in the past.
+            //There is a bug here which means that if a delivery is to be processed the first time but the lock could not be released due to failure at processing.
+            //The delivery is then picked up by the lock relaease worker and released, the frmer query will not pick it as the status at that time will be FAILED, LockedUntil and LockedBy WILL be NULL And RrtyCount will be 1
+            //However, the NextRetryAt WILL BE Empty, hence it will NOT be PICKED.
+            //Fix - The fix is to expand our condintion to - Check if NextRetryAt is in teh past OR NextRetryAt is Empty(By default, it is NULL)
             var deliveriesToReattmpt = await _repositoryContext.WebhookDeliveries
                                                     .FromSqlRaw(@"SELECT * 
                                                                   FROM ""WebhookDeliveries""
-                                                                  WHERE ""RetryCount"" >= 1 AND ""DeliveryStatus"" = {0} AND ""NextRetryAt"" <= CURRENT_TIMESTAMP AND (""LockedUntil"" IS NULL OR ""LockedUntil"" < CURRENT_TIMESTAMP) 
+                                                                  WHERE ""RetryCount"" >= 1 AND ""DeliveryStatus"" = {0} AND (""NextRetryAt"" <= CURRENT_TIMESTAMP OR ""NextRetryAt"" IS NULL) AND (""LockedUntil"" IS NULL OR ""LockedUntil"" < CURRENT_TIMESTAMP) 
                                                                   ORDER BY ""CreatedAt"" 
                                                                   LIMIT {1} 
                                                                   FOR UPDATE SKIP LOCKED", WebhookDeliveryStatus.Failed.ToString(), totalAttempts)

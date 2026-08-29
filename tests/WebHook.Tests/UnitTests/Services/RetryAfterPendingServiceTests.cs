@@ -1147,4 +1147,31 @@ public sealed class RetryAfterPendingServiceTests
         Assert.Equal(WebhookDeliveryStatus.Delivered, processedDelivery.DeliveryStatus);
         Assert.Equal(lockedDelivery.DeliveryStatus, unprocessedDelivery.DeliveryStatus);
     }
+
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_UnlockedAfterFirstAttempt()
+    {
+        //Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        WebhookDelivery retryAbleDelivery = BuildRetryableDelivery(retryCount: 1);
+        retryAbleDelivery.NextRetryAt = null; //This means it has never failed and teh failed status was set by the stale claimed delivery worker after it was claimed but not realeased
+
+        await ctx.WebhookDeliveries.AddRangeAsync(retryAbleDelivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(ctx, _httpHandler);
+
+        //Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        //Assert
+        using var assertScope = _serviceProvider.CreateScope();
+        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+        var updatedDelivery = await assertCtx.WebhookDeliveries.FindAsync(retryAbleDelivery.Id);
+        Assert.NotNull(updatedDelivery);
+        Assert.Equal(WebhookDeliveryStatus.Delivered, updatedDelivery.DeliveryStatus);
+    }
 }
