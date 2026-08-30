@@ -17,6 +17,8 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
     public DbSet<WebhookSubscription> WebhookSubscriptions { get; set; }
     public DbSet<OtpOperationToken> OtpOperationTokens { get; set; }
     public DbSet<OtpVerification> OtpVerifications { get; set; }
+    public DbSet<WebhookServiceClient> WebhookServiceClients { get; set; }
+    public DbSet<WebhookServiceClientEventCatalog> WebhookServiceClientEventCatalogs { get; set; }
 
     public RepositoryContext(DbContextOptions<RepositoryContext> options) : base(options)
     {

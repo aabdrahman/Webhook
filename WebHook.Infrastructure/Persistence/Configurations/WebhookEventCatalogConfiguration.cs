@@ -49,6 +49,11 @@ public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<
             .HasForeignKey(x => x.WebhookEventCatalogId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        builder.HasMany(x => x.WebhookServiceClients)
+            .WithOne(x => x.eventCatalog)
+            .HasForeignKey(x => x.EventCatalogId)
+            .OnDelete(DeleteBehavior.ClientCascade);
+
         //builder.HasMany(x => x.WebhookDeliveries)
         //    .WithOne(x => x.webHookEventCatalog)
         //    .HasForeignKey(x => x.WebhookEventCatalogId)

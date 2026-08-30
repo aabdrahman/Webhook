@@ -20,4 +20,7 @@ public class WebHookEventCatalog
     public ICollection<WebhookSubscriptionEvent> WebhookSubscriptions { get; set; } = [];
     //-----One to many relationship with webhook delivery
     //public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
+
+    //----One to many relationship with the serviceclient join table
+    public ICollection<WebhookServiceClientEventCatalog> WebhookServiceClients { get; set; } = [];
 }
