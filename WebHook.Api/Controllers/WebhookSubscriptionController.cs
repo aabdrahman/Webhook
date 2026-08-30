@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using System.Net;
 using WebHook.Core.DataTransferObjects;
@@ -49,6 +50,7 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="403">Forbidden. You do not have permission to access this resource.</response>
     /// <response code="404">No webhook subscriptions were found.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -56,8 +58,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpGet]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetAll()
     {
         _logger = Log.ForContext(_methodName, nameof(GetAll));
@@ -91,6 +95,7 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="403">Forbidden. You do not have permission to access this resource.</response>
     /// <response code="404">No webhook subscription was found for the supplied Id.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -98,8 +103,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpGet("{webhookSubscriptionId:guid}")]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetById(Guid webhookSubscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetById));
@@ -143,6 +150,7 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="401">Unauthorized. Authentication is required.</response>
     /// <response code="403">Forbidden. You do not have permission to perform this action.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -150,8 +158,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPost]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Create([FromBody] CreateWebhookSubscriptionDto createWebhookSubscription)
     {
         _logger = Log.ForContext(_methodName, nameof(Create));
@@ -187,6 +197,7 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="404">The specified webhook subscription was not found.</response>
     /// <response code="409">The requested activation state is already applied.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -194,8 +205,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPut("{webhookSubscriptionId:guid}")]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> ActivateSubscription(Guid webhookSubscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(ActivateSubscription));
@@ -231,6 +244,7 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="404">The specified webhook subscription was not found.</response>
     /// <response code="409">The requested activation state is already applied.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -238,8 +252,10 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpDelete("{webhookSubscriptionId:guid}")]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Delete(Guid webhookSubscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(Delete));
@@ -281,13 +297,16 @@ public class WebhookSubscriptionController : ControllerBase
     /// <response code="403">The authenticated user does not have permission to access this resource.</response>
     /// <response code="404">No webhook subscriptions were found for the authenticated user.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpGet("get-user-subscriptions")]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetUserSubscriptions(CancellationToken ct)
     {
         _logger = Log.ForContext(_methodName, nameof(GetUserSubscriptions));

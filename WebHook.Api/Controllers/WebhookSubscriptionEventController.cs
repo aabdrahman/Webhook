@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookSubscriptionEvent;
@@ -54,12 +55,15 @@ public class WebhookSubscriptionEventController : ControllerBase
     /// <response code="400">The subscription identifier is invalid.</response>
     /// <response code="404">The specified webhook subscription was not found.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpGet]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookSubscriptionEventDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetSubscribedEvents(Guid subscriptionId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetSubscribedEvents));
@@ -94,13 +98,16 @@ public class WebhookSubscriptionEventController : ControllerBase
     /// <response code="404">The webhook subscription or event was not found.</response>
     /// <response code="409">The webhook subscription is already subscribed to the specified event.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPut]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> SubscribeEvent(Guid subscriptionId, string eventName)
     {
         _logger = Log.ForContext(_methodName, nameof(SubscribeEvent));
@@ -133,12 +140,15 @@ public class WebhookSubscriptionEventController : ControllerBase
     /// <response code="400">The request is invalid or the event name is missing.</response>
     /// <response code="404">The webhook subscription or event was not found.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpDelete]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> UnsubscribeEvent(Guid subscriptionId, string eventName)
     {
         _logger = Log.ForContext(_methodName, nameof(UnsubscribeEvent));

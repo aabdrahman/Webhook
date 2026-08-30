@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.OtpOperation;
@@ -77,13 +78,16 @@ public class OtpOperationController : ControllerBase
     /// <response code="404">No active OTP was found for the specified user.</response>
     /// <response code="410">The OTP has expired. A new OTP must be requested.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPost("validate-otp")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status410Gone)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [AllowAnonymous]
+    [EnableRateLimiting("validate-otp-limit")]
     public async Task<IActionResult> ValidateOtp([FromBody] OtpVerificationRequestDto otpVerificationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ValidateOtp));
@@ -134,11 +138,14 @@ public class OtpOperationController : ControllerBase
     /// <response code="200">OTP revoked successfully.</response>
     /// <response code="404">No active OTP was found for the specified user.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpDelete("revoke-otp/{userId:guid}")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> RevokeOtp(Guid userId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RevokeOtp));

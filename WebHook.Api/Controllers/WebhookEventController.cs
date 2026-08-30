@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
@@ -78,13 +79,16 @@ public class WebhookEventController : ControllerBase
     ///   <item><description><c>200 OK</c> — events found and returned.</description></item>
     ///   <item><description><c>404 Not Found</c> — no events exist for the provided correlation ID.</description></item>
     ///   <item><description><c>500 Internal Server Error</c> — an unexpected error occurred.</description></item>
+    ///   <item><description><c>429 Too Many Requests</c> — Too many reqeusts within the configured rate limit</description></item>
     /// </list>
     /// </returns>
     [HttpGet("{correlationId:guid}")]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetEventByCorrelationId(Guid correlationId)
     {
         _logger = Log.ForContext(_methodName, nameof(GetEventByCorrelationId));
@@ -144,12 +148,15 @@ public class WebhookEventController : ControllerBase
     /// <list type="bullet">
     ///   <item><description><c>200 OK</c> — query executed; data may be an empty list.</description></item>
     ///   <item><description><c>500 Internal Server Error</c> — an unexpected error occurred.</description></item>
+    ///   <item><description><c>429 Too Many Requests</c> — Too many requests within the configured limit.</description></item>
     /// </list>
     /// </returns>
     [HttpGet]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<WebhookEventDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetAllEvents([FromQuery] GetWebhookEventParameters getWebhookEventParameters)
     {
         _logger = Log.ForContext(_methodName, nameof(GetAllEvents));

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
@@ -136,12 +137,15 @@ public class UsersController : ControllerBase
     /// <response code="400">The account is already inactive or the request is invalid.</response>
     /// <response code="404">No account was found matching the provided identifier.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPost("deactivate")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Deactivate([FromBody] UserDeactivationRequestDto userDeactivationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(Deactivate));
@@ -196,12 +200,15 @@ public class UsersController : ControllerBase
     /// <response code="400">The account is already active or the request is invalid.</response>
     /// <response code="404">No account was found matching the provided identifier.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPost("reactivate")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Reactivate([FromBody] ReactivateUserRequestDto reactivateUserRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(Reactivate));

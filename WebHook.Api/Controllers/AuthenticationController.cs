@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
@@ -186,14 +187,15 @@ public class AuthenticationController : ControllerBase
     /// <response code="200">OTP generated and sent to the account email address.</response>
     /// <response code="404">No account was found matching the provided identifier.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPost("request-otp")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [AllowAnonymous]
-    public async Task<IActionResult> RequestOTP(
-        [FromBody] RequestOtpDto requestOtpRequest,
-        CancellationToken ct = default)
+    [EnableRateLimiting("request-otp-limit")]
+    public async Task<IActionResult> RequestOTP([FromBody] RequestOtpDto requestOtpRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RequestOTP));
         try
@@ -295,12 +297,15 @@ public class AuthenticationController : ControllerBase
     /// <response code="200">
     /// The operation is completed successfuly and user has been assigned new role.
     /// </response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPost("assign-new-role")]
     [Authorize(Roles = "Admin,ADMIN")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> AssignNewRole([FromBody] ChangeUserRoleRequestDto changeUserRoleRequest, CancellationToken ct = default)
     {
         try

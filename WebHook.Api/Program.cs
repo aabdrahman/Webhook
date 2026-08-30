@@ -61,11 +61,25 @@ builder.Services.ConfigureApplicationCaching();
 //Health Check
 builder.Services.ConfigureHealthChecks(builder.Configuration);
 
-//Cors - Policy
+//Cors Policy
 builder.Services.ConfigureApplicationCorsPolicy(builder.Configuration);
+
+//Application Rate Limiting
+builder.Services.ConfigureApplicationRateLimiting();
+
+//Forwarded headers to get the client Ip Address
+builder.Services.ConfigureForwardHeaders();
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseCors("RestrictedPolicy");
+
+//Add Custom Rate Limiting Middlewares
+app.UseMiddleware<RequestOtpEmailExtractionMiddleware>();
+app.UseMiddleware<ValidateOtpEmailExtractionMiddleware>();
+app.UseRateLimiter();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -114,12 +128,6 @@ app.MapHealthChecks("/admin/_healths", new Microsoft.AspNetCore.Diagnostics.Heal
 {
     opts.RequireRole("ADMIN,Admin");
 });
-
-//app.MapHealthChecksUI(opts =>
-//{
-//    opts.ApiPath = "/admin/_healths-api";
-//    opts.UIPath = "/_healths-ui";
-//});
 
 app.MapControllers();
 

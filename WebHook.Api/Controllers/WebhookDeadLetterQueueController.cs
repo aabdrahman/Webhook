@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
@@ -53,12 +54,15 @@ public class WebhookDeadLetterQueueController : ControllerBase
     /// <response code="200">Dead Letter queue items were retrieved successfully.</response>
     /// <response code="400">The delivery does not have any dead letter queue item.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpGet]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetDeadLetterQueue(Guid deliveryId, CancellationToken token = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetDeadLetterQueue));
@@ -92,6 +96,7 @@ public class WebhookDeadLetterQueueController : ControllerBase
     /// HTTP status code. If an unexpected error occurs while processing the
     /// request, an HTTP 500 Internal Server Error response is returned.
     /// </returns>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpPost]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -99,7 +104,9 @@ public class WebhookDeadLetterQueueController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status422UnprocessableEntity)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> RequestManualRetry([FromBody] RequestManualRetryDto requestManualRetry, CancellationToken token = default)
     {
         try

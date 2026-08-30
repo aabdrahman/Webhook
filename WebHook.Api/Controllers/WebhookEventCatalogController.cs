@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using System.Net;
 using WebHook.Core.DataTransferObjects;
@@ -89,6 +90,7 @@ public class WebhookEventCatalogController : ControllerBase
     /// <response code="403">Forbidden. You do not have permission to access this resource.</response>
     /// <response code="404">No webhook event catalog entry was found for the supplied Id.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<EventCatalogDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -96,8 +98,10 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpGet("{EventCatalogId:guid}")]
     [Authorize]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetEventCatalogById(Guid EventCatalogId)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetEventCatalogById));
@@ -148,6 +152,7 @@ public class WebhookEventCatalogController : ControllerBase
     /// <response code="403">Forbidden. You do not have permission to perform this action.</response>
     /// <response code="409">A webhook event catalog entry with the same details already exists.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -155,8 +160,10 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> CreateEventCatalog([FromBody] CreateEventCatalogDto createEventCatalog)
     {
         _logger = _logger.ForContext(_methodName, nameof(CreateEventCatalog));
@@ -213,6 +220,7 @@ public class WebhookEventCatalogController : ControllerBase
     /// <response code="404">The specified webhook event catalog entry was not found.</response>
     /// <response code="409">The requested activation state is already applied.</response>
     /// <response code="500">An unexpected server error occurred.</response>
+    /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [Produces("application/json")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status400BadRequest)]
@@ -221,8 +229,10 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPut("{EventCatalogId:guid}")]
     [Authorize(Roles = "Admin")]
+    [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> ActivationAction(Guid EventCatalogId, bool isDeactivate = true)
     {
         _logger = _logger.ForContext(_methodName, nameof(ActivationAction));

@@ -6,10 +6,13 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Channels;
+using System.Threading.RateLimiting;
 using System.Xml.XPath;
 using WebHook.Api.ApplicationFilters;
+using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -234,7 +237,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IOtpService, OtpService>();
-        services.AddScoped<IAuthenticatedUserDetails,  AuthenticatedUserDetails>();
+        services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
@@ -255,6 +258,9 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<CustomAuthenticationFilter>();
 
         services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(45)));
+
+        services.AddScoped<RequestOtpEmailExtractionMiddleware>();
+        services.AddScoped<ValidateOtpEmailExtractionMiddleware>();
     }
 
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -408,7 +414,7 @@ internal static class ApplicationServiceExtensions
         services.AddMemoryCache(opts =>
         {
             opts.SizeLimit = 2 * 1024 * 1024;
-            
+
         });
     }
 
@@ -451,6 +457,98 @@ internal static class ApplicationServiceExtensions
                     .WithMethods(corsConfig["AllowedMethods"]?.Split(",", StringSplitOptions.TrimEntries) ?? [])
                     .WithHeaders(corsConfig["AllowedHeaders"]?.Split(",", StringSplitOptions.TrimEntries) ?? []);
             });
+        });
+    }
+
+    internal static void ConfigureApplicationRateLimiting(this IServiceCollection services)
+    {
+        services.AddRateLimiter(opts =>
+        {
+            opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            opts.AddPolicy(policyName: "request-otp-limit", context =>
+            {
+                string ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                string? emailFromRequuest = context.Items["otp-request-email"] as string; //This is set by a custom middleware
+                var partitionKey = emailFromRequuest ?? ipAddress;
+
+                return RateLimitPartition.GetFixedWindowLimiter(partitionKey: partitionKey, _ => new FixedWindowRateLimiterOptions()
+                {
+                    Window = TimeSpan.FromMinutes(10),
+                    PermitLimit = 3,
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                });
+            });
+
+            opts.AddPolicy(policyName: "validate-otp-limit", context =>
+            {
+                string ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                string? emailFromRequuest = context.Items["otp-validation-email"] as string; //This is set by a custom middleware
+                var partitionKey = emailFromRequuest ?? ipAddress;
+
+                return RateLimitPartition.GetFixedWindowLimiter(partitionKey: partitionKey, _ => new FixedWindowRateLimiterOptions()
+                {
+                    Window = TimeSpan.FromMinutes(10),
+                    PermitLimit = 5,
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                });
+            });
+
+            opts.AddPolicy(policyName: "per-user-rating", context =>
+            {
+                string userId = context.User.FindFirstValue(claimType: ClaimTypes.NameIdentifier) ?? "";
+
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions()
+                    {
+                        PermitLimit = 10,
+                        Window = TimeSpan.FromSeconds(60),
+                        QueueLimit = 0,
+                        AutoReplenishment = true,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        SegmentsPerWindow = 1
+                    });
+                }
+
+                string ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new FixedWindowRateLimiterOptions()
+                {
+                    Window = TimeSpan.FromSeconds(60),
+                    PermitLimit = 10,
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                });
+
+            });
+
+            opts.OnRejected = async (context, ct) =>
+            {
+                var defaultResponse = GenericResponse<object>.Failure(null, "Too many requests.", System.Net.HttpStatusCode.TooManyRequests);
+
+                if (context.Lease.TryGetMetadata(metadataName: MetadataName.RetryAfter, out var retryAfterValue))
+                {
+                    var response = GenericResponse<object>.Failure(null, $"Too many requests. Kindly retry again after {retryAfterValue.TotalSeconds} seconds.", System.Net.HttpStatusCode.TooManyRequests);
+                    await context.HttpContext.Response.WriteAsJsonAsync(response, ct);
+                }
+                else
+                {
+                    await context.HttpContext.Response.WriteAsJsonAsync(defaultResponse, ct);
+                }
+            };
+        });
+    }
+
+    internal static void ConfigureForwardHeaders(this IServiceCollection services)
+    {
+        services.Configure<ForwardedHeadersOptions>(opts =>
+        {
+            opts.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
         });
     }
 }
