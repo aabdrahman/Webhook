@@ -27,6 +27,10 @@ public sealed class WebhookServiceClientConfiguration : IEntityTypeConfiguration
             .HasMaxLength(50)
             .IsRequired();
 
+        builder.Property(x => x.CreatedBy)
+            .HasMaxLength(50)
+            .IsRequired();
+
         builder.Property(x => x.ClientKey)
             .IsRequired();
 

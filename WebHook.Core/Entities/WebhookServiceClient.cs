@@ -14,6 +14,7 @@ public class WebhookServiceClient
     public bool IsActive { get; set; } = true;
     public DateTimeOffset? DeactivatedAt { get; set; }
     public string? DeactivatedBy { get; set; }
+    public string CreatedBy { get; set; }
 
     //Relationship with the join table with event catalog
     public ICollection<WebhookServiceClientEventCatalog> EventCatalogs { get; set; } = [];
