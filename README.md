@@ -20,6 +20,7 @@ Open source and free to use.
 - [API Reference](#api-reference)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
+- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -30,10 +31,15 @@ Open source and free to use.
 WebhookHub sits between your internal services and your subscribers. An internal application raises an event — WebhookHub validates it, fans it out to every subscriber registered for that event type, and handles the full delivery lifecycle: retry on failure, escalation emails when an endpoint is slow, dead-lettering when all retries are exhausted, and admin-initiated manual retry for dead-lettered deliveries.
 
 ```
-Internal Service
+Internal Service (onboarded with ClientId + ClientKey)
       │
       ▼
 POST /api/webhookevent
+X-Client-Id: order-service-prod
+X-Client-Key: <raw key>
+      │
+      ▼
+Client credential validation → Event type authorization
       │
       ▼
 Validation → Persist → Raise to Channel
@@ -95,8 +101,17 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 
 ## Features
 
+### Service Client Onboarding
+- Internal services are onboarded by an Admin before they can publish events
+- Each client is issued a unique `ClientId` (Admin-defined) and a cryptographically random `ClientKey` shown once at onboarding and never stored in plaintext
+- Clients present `X-Client-Id` and `X-Client-Key` headers on every publish request
+- Each client is authorised to publish only the event types assigned to it at onboarding — attempts to publish unauthorised event types are rejected with `403 Forbidden`
+- Admins can assign or remove event catalog entries per client at any time without re-onboarding
+- Client keys can be rotated on demand — the previous key is invalidated immediately
+- Clients can be deactivated and reactivated independently of their event catalog assignments
+
 ### Event Publishing
-- Internal services raise events via a simple POST endpoint
+- Internal services raise events via a simple POST endpoint — authenticated by `ClientId` and `ClientKey`
 - Events are validated against a catalog of known event types with declared field schemas
 - JSON payloads are validated against the catalog schema at publish time — missing or invalid fields are rejected with a descriptive error identifying each failing field
 - Correlation IDs group related events from a single business transaction
@@ -126,6 +141,7 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 - Admin bypass — Admins can perform account operations directly without an OTP token
 - Role-based access — `USER` and `Admin` roles enforced per endpoint
 - Custom JTI cache validation on every authenticated request — revoked tokens are rejected immediately without waiting for expiry
+- Rate limiting on sensitive endpoints — OTP request and validation are rate limited per email address to prevent brute force
 
 ### Event Catalog Management
 - Admins define subscribable event types with their available field schemas
@@ -145,10 +161,11 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 | Identity | ASP.NET Core Identity |
 | Authentication | JWT Bearer + custom `IAsyncAuthorizationFilter` |
 | Background workers | `BackgroundService` / `IHostedService` |
-| In-process messaging | `System.Threading.Channels` |
+| In-process messaging | `System.Threading.Channels` (bounded) |
 | Payload signing | HMAC-SHA256 |
 | Data protection | ASP.NET Core Data Protection |
 | Logging | Serilog |
+| Rate limiting | ASP.NET Core `RateLimiter` middleware |
 | API documentation | Scalar (`/scalar/v1`) |
 | Unit tests | xUnit, Moq, Testcontainers PostgreSQL |
 | Integration tests | xUnit, `WebApplicationFactory`, Moq |
@@ -270,28 +287,113 @@ https://localhost:<port>/scalar/v1
 
 ---
 
+## Service Client Onboarding
+
+Before an internal service can publish events it must be onboarded by an Admin. Onboarding establishes the service's identity and defines which event types it is permitted to publish.
+
+### Onboarding a New Client
+
+```
+POST /api/WebhookServiceClients
+Authorization: Bearer <admin-token>
+
+{
+  "serviceName":       "Order Management Service",
+  "clientId":          "order-service-prod",
+  "contactEmail":      "platform@company.com",
+  "allowedEventTypes": ["OrderCreated", "OrderCancelled"]
+}
+```
+
+The `clientId` must be unique, lowercase alphanumeric with hyphens only, and follow the convention `{service-name}-{environment}` — for example `order-service-prod` or `payment-gateway-staging`.
+
+The response includes the raw `ClientKey` — **store it securely, it will not be shown again**:
+
+```json
+{
+  "clientId":  "order-service-prod",
+  "clientKey": "<raw-key>",
+  "message":   "Store your ClientKey securely. It will not be shown again."
+}
+```
+
+### Publishing Events
+
+The onboarded service passes its credentials in request headers:
+
+```
+POST /api/webhookevent
+X-Client-Id:  order-service-prod
+X-Client-Key: <raw key>
+Content-Type: application/json
+
+{
+  "eventType":     "OrderCreated",
+  "payload":       "{ ... }",
+  "source":        "order-service-prod",
+  "correlationId": "..."
+}
+```
+
+The system validates the credentials and checks the event type is in the client's authorised catalog before proceeding. Any attempt to publish an unauthorised event type is rejected with `403 Forbidden`.
+
+### Key Rotation
+
+If a key is lost or compromised, request a new one:
+
+```
+PUT /api/WebhookServiceClients/request-new-key
+Authorization: Bearer <admin-token>
+
+{
+  "clientId":      "order-service-prod",
+  "justification": "Suspected key compromise."
+}
+```
+
+The previous key is invalidated immediately. The consuming service must update its stored key before making further publish requests.
+
+### Managing Catalog Assignments
+
+Event type permissions can be adjusted after onboarding without re-issuing credentials:
+
+```
+# Add a new event type
+POST /api/WebhookServiceClients/{id}/eventcatalogs?catalogName=OrderShipped
+
+# Remove an event type
+DELETE /api/WebhookServiceClients/{id}/eventcatalogs?catalogName=OrderCancelled
+```
+
+### CORS and Service-to-Service Calls
+
+Browser-based callers (the future v2 dashboard) are restricted by the CORS allowlist — only origins registered in `CorsPolicy:AllowedOrigins` can make cross-origin requests from a browser. Server-to-server callers (internal services publishing events) are not subject to CORS — the `X-Client-Id` / `X-Client-Key` credential pair is the authentication boundary for those callers.
+
+---
+
 ## Delivery Pipeline
 
 The delivery pipeline is split across multiple background workers communicating through an in-memory channel and the database.
 
 ### Step 1 — Event Publishing
 
-An internal business application calls:
+An onboarded internal service calls:
 
 ```
 POST /api/webhookevent
 ```
 
-with a payload containing the event type, JSON body, source identifier, and an optional correlation ID.
+with `X-Client-Id` and `X-Client-Key` headers alongside the event payload.
 
 ### Step 2 — Validation and Persistence
 
 The system:
-1. Checks the correlation ID is unique for the event type
-2. Validates the event type exists in the Event Catalog
-3. Validates the JSON payload against the catalog's declared field schema — returns `400` with each failing field named if validation fails
-4. Persists the event with status `Pending`
-5. Publishes the new event ID to the `EventRaised` in-memory channel
+1. Validates the `ClientId` and `ClientKey` against the `ServiceClients` table
+2. Checks the event type is in the client's authorised catalog
+3. Checks the correlation ID is unique for the event type
+4. Validates the JSON payload against the catalog's declared field schema — returns `400` with each failing field named if validation fails
+5. Persists the event with status `Pending`
+6. Publishes the new event ID to the `EventRaised` in-memory channel
 
 ### Step 3–7 — Fan-out (EventRaisedWorker)
 
@@ -386,9 +488,12 @@ If a worker crashes between claim and release, `StaleClaimedDeliveryReleaseWorke
 | Token revocation | JTI stored in distributed cache on login; filter rejects any request whose JTI is missing or mismatched |
 | OTP tokens | Short-lived signed operation tokens using ASP.NET Core Data Protection, hash-validated on use |
 | Operation token purpose | Tokens are issued for a specific purpose (e.g. `DeactivateProfile`) and rejected if presented for any other operation |
+| Service client credentials | `ClientKey` hashed via `IApplicationHasher` — raw key never stored; validated on every publish request |
+| Service client authorisation | Each client is restricted to publishing only its assigned event types |
 | Webhook signatures | `X-Webhook-Signature: sha256=HMAC(payload, subscriberSecretKey)` |
 | Password hashing | ASP.NET Core Identity default (PBKDF2) |
 | Account lockout | Configurable max failed attempts; indefinite lockout on deactivation |
+| Rate limiting | Per-email fixed window on OTP request and validation endpoints |
 
 ### Custom Authentication Filter
 
@@ -428,15 +533,15 @@ Example response:
 {
   "status": "Healthy",
   "checks": [
-    { "name": "postgresql",                 "status": "Healthy", "duration": 12.3, "exception": null },
-    { "name": "email-queue",                "status": "Healthy", "duration": 0.1,  "exception": null },
-    { "name": "event-raised-worker",        "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "pending-raised-event-worker","status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "delivery-worker",            "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "stale-claim-worker",         "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "dead-letter-queue",          "status": "Healthy", "duration": 1.2,  "exception": null },
-    { "name": "pending-deliveries",         "status": "Healthy", "duration": 1.1,  "exception": null },
-    { "name": "stale-processing",           "status": "Healthy", "duration": 0.9,  "exception": null }
+    { "name": "postgresql",                  "status": "Healthy", "duration": 12.3, "exception": null },
+    { "name": "email-queue",                 "status": "Healthy", "duration": 0.1,  "exception": null },
+    { "name": "event-raised-worker",         "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "pending-raised-event-worker", "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "delivery-worker",             "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "stale-claim-worker",          "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "dead-letter-queue",           "status": "Healthy", "duration": 1.2,  "exception": null },
+    { "name": "pending-deliveries",          "status": "Healthy", "duration": 1.1,  "exception": null },
+    { "name": "stale-processing",            "status": "Healthy", "duration": 0.9,  "exception": null }
   ],
   "totalDurationMs": 16.9
 }
@@ -456,7 +561,7 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | POST | `/change-password` | Authenticated | Change account password |
 | POST | `/request-otp` | Public | Request a one-time password via email |
 | POST | `/refresh` | Public | Refresh an authenticated session |
-| POST | `/assign-new-role` | Admin | Assigns new role to a particular user |
+| POST | `/assign-new-role` | Admin | Assign a role to a user |
 
 ### Users — `api/Users`
 
@@ -481,6 +586,25 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | GET | `/{id}` | Authenticated | Get a specific event catalog entry |
 | POST | `/` | Admin | Create a new event type |
 | PUT | `/{id}?isDeactivate={bool}` | Admin | Activate or deactivate an event type |
+
+### Service Clients — `api/WebhookServiceClients`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Admin | List all onboarded service clients |
+| GET | `/{clientId}` | Admin | Get a service client by ClientId |
+| POST | `/` | Admin | Onboard a new internal service client — returns ClientKey once |
+| DELETE | `/deactivate/{clientId}` | Admin | Deactivate a service client |
+| PUT | `/reactivate/{clientId}` | Admin | Reactivate a deactivated service client |
+| PUT | `/request-new-key` | Admin | Rotate the ClientKey for a service client |
+
+### Service Client Event Catalogs — `api/WebhookServiceClients/{id}/eventcatalogs`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Admin | List event catalog subscriptions for a service client |
+| POST | `/?catalogName={name}` | Admin | Assign an event type to a service client |
+| DELETE | `/?catalogName={name}` | Admin | Remove an event type from a service client |
 
 ### Subscriptions — `api/WebhookSubscription`
 
@@ -507,7 +631,7 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 |---|---|---|---|
 | GET | `/{correlationId}` | Authenticated | Get events by correlation ID |
 | GET | `/` | Admin | Query events with filters |
-| POST | `/` | Public | Publish a new webhook event (internal services) |
+| POST | `/` | Service Client | Publish a new webhook event — requires `X-Client-Id` and `X-Client-Key` headers |
 
 ### Dead Letter Queue — `api/WebhookDelivery/{deliveryId}/deadLetters`
 
@@ -539,7 +663,7 @@ Service-level tests covering authentication, user management, OTP flows, and the
 
 HTTP-level tests covering all controllers through the full ASP.NET Core pipeline:
 
-- **`WebApplicationFactory<Program>`** — one factory per controller group, each with its own `TestAuthHandler` and cache mock
+- **`WebApplicationFactory<Program>`** — a single shared `WebApiFactory` used across all controller test classes, with mocks for every service registered centrally
 - **`TestAuthHandler`** — a custom `AuthenticationHandler` that carries both `USER` and `Admin` roles and seeds the cache mock with a non-default JTI so `CustomAuthenticationFilter` passes
 - **Moq** — service layer is fully mocked so tests focus on routing, auth, status code mapping, request forwarding, and exception handling
 - **`IAsyncLifetime`** — fresh `HttpClient` and mock reset before every test method
@@ -572,10 +696,16 @@ WebhookHub/
 │   │   ├── WebhookDeadLetterQueueController.cs
 │   │   ├── WebhookEventCatalogController.cs
 │   │   ├── WebhookEventController.cs
+│   │   ├── WebhookServiceClientsController.cs
+│   │   ├── WebhookServiceClientEventCatalogsController.cs
 │   │   ├── WebhookSubscriptionController.cs
 │   │   └── WebhookSubscriptionEventController.cs
-│   └── Filters/
-│       └── CustomAuthenticationFilter.cs
+│   ├── Filters/
+│   │   └── CustomAuthenticationFilter.cs
+│   └── ServiceExtensions/
+│       └── CustomMiddleware/
+│           ├── RequestOtpEmailExtractionMiddleware.cs
+│           └── ValidateOtpEmailExtractionMiddleware.cs
 │
 ├── WebhookHub.Core/
 │   ├── Constants/
@@ -609,6 +739,8 @@ WebhookHub/
 │       ├── UserService.cs
 │       ├── WebhookEventService.cs
 │       ├── WebhookEventCatalogService.cs
+│       ├── WebhookServiceClientService.cs
+│       ├── WebhookServiceClientCatalogService.cs
 │       ├── WebhookSubscriptionService.cs
 │       └── WebhookSubscriptionEventService.cs
 │
@@ -620,11 +752,7 @@ WebhookHub/
 
 ## Roadmap
 
-WebhookHub is currently at **v1**. The core delivery pipeline, identity system, and administrative tooling are stable. A subscriber-facing dashboard and the API endpoints that support it are planned for v2.
-
-## Roadmap
-
-WebhookHub is currently at **v1**. The core delivery pipeline, identity system, and administrative tooling are stable. A subscriber-facing dashboard, real-time monitoring, and analytics are planned for v2.
+WebhookHub is currently at **v1**. The core delivery pipeline, identity system, service client onboarding, and administrative tooling are stable. A subscriber-facing dashboard, real-time monitoring, and analytics are planned for v2.
 
 ### Planned for v2
 
@@ -662,7 +790,6 @@ Time-series and aggregate visualisations giving subscribers and admins visibilit
 #### API and Security
 - **Idempotency keys on `POST /api/webhookevent`** — prevents duplicate events on internal service retries using a short-TTL key store
 - **Subscriber endpoint verification** — challenge/response ping before a callback URL is activated on a new subscription, consistent with Stripe and GitHub webhook patterns
-- **Request signing on the publish endpoint** — internal services authenticate with a pre-shared API key or service-to-service JWT
 - **Subscription secret key rotation** — self-service endpoint to regenerate the HMAC signing key for a subscription
 - **OpenTelemetry distributed tracing** — end-to-end trace from event publish through fan-out to final delivery, exportable to Jaeger, Zipkin, or any OTLP-compatible backend
 
@@ -676,8 +803,6 @@ Time-series and aggregate visualisations giving subscribers and admins visibilit
 > **Contributing to v2:** If you want to work on any of the above, open an issue to discuss the approach before submitting a pull request. Feature branches should be prefixed with `v2/` and target the `develop` branch rather than `main`.
 
 ---
-
-> **Contributing to v2:** If you want to work on any of the above, open an issue to discuss the approach before submitting a pull request.
 
 ## Contributing
 
