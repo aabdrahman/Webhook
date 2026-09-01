@@ -175,62 +175,70 @@ public class WebhookEventController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new webhook event raised by an internal business service.
+    /// Publishes a new webhook event to be delivered to all subscribers
+    /// registered for the specified event type.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Route: <c>POST api/webhookevent</c>
-    /// </para>
-    /// <para>
-    /// The request body must be a valid JSON object matching
-    /// <see cref="CreateWebhookEventDto"/>. The service performs three
-    /// sequential validation steps before persisting:
-    /// </para>
+    /// This endpoint is intended for onboarded internal services only. Every request must include valid service client credentials in the request headers — requests without credentials or with invalid credentials are rejected before the payloadis processed.
+    /// The full validation flow is:
     /// <list type="number">
     ///   <item>
     ///     <description>
-    ///       <strong>Correlation ID uniqueness</strong> — the combination of
-    ///       <c>CorrelationId</c> and <c>EventType</c> must not already exist.
-    ///       Returns <c>409 Conflict</c> if a duplicate is found.
+    ///       <strong>Service Client Authentication</strong> — the <c>X-Client-Id</c> and <c>X-Client-Key</c> headers must both be present and non-empty.
+    ///       The <c>ClientId</c> is looked up in the service client registry and the raw <c>ClientKey</c> is validated against the stored hash.
+    ///       Returns <c>401 Unauthorized</c> if either header is missing, the client is not found, or the key does not match.
     ///     </description>
     ///   </item>
     ///   <item>
     ///     <description>
-    ///       <strong>Event type validation</strong> — the event type must exist
-    ///       in the <c>EventCatalog</c>. Returns <c>400 Bad Request</c> for
-    ///       unknown types.
+    ///       <strong>Event Type Authorization</strong> — the event type provided in the request body must be in the service client's assigned event catalog.
+    ///       A client that was not granted permission to publish a given event type at onboarding will receive <c>403 Forbidden</c>.
     ///     </description>
     ///   </item>
     ///   <item>
     ///     <description>
-    ///       <strong>Payload validation</strong> — the JSON payload is validated
-    ///       against the catalog's declared fields using a dynamically constructed
-    ///       CLR type. Returns <c>400 Bad Request</c> if the payload is malformed
-    ///       or missing required fields, with each missing field named in the
-    ///       response message.
+    ///       <strong>Correlation ID Uniqueness</strong> — the correlation ID must be unique for the given event type. Duplicate correlation IDs are rejected with <c>409 Conflict</c> to prevent double-publishing.
+    ///     </description>
+    ///   </item>
+    ///   <item>
+    ///     <description>
+    ///       <strong>Payload Schema Validation</strong> — the JSON payload is validated against the field schema declared in the event catalog entry.
+    ///       Missing or unrecognised fields are rejected with <c>400 Bad Request</c> and a descriptive error identifying each failing field.
     ///     </description>
     ///   </item>
     /// </list>
-    /// <para>
-    /// On success the response data field contains the newly created event's ID
-    /// as a string, which can be used to correlate delivery records.
-    /// </para>
+    ///
+    /// On success the event is persisted and published to the internal delivery pipeline for fan-out to all registered subscribers.
+    /// Sample request:
+    ///
+    ///     POST /api/webhookevent
+    ///     X-Client-Id:  order-service-prod
+    ///     X-Client-Key: &lt;raw client key issued at onboarding&gt;
+    ///     Content-Type: application/json
+    ///
+    ///     {
+    ///         "eventType":     "OrderCreated",
+    ///         "payload":       "{ \"orderId\": \"abc-123\", \"customerId\": \"xyz-456\" }",
+    ///         "source":        "order-service-prod",
+    ///         "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    ///     }
+    ///
     /// </remarks>
     /// <param name="createWebhookEventRequest">
-    /// The event creation request, bound from the JSON request body. Must
-    /// include the event type, JSON payload, and source service identifier.
-    /// The correlation ID is optional but recommended for traceability.
+    /// The event payload including the event type, JSON body, source identifier, and an optional correlation ID. If no correlation ID is provided one will be generated automatically.
+    /// </param>
+    /// <param name="ct">
+    /// A cancellation token that can be used to cancel the operation before it completes.
     /// </param>
     /// <returns>
-    /// An <see cref="IActionResult"/> wrapping a
-    /// <see cref="GenericResponse{T}"/> of <see cref="string"/>:
-    /// <list type="bullet">
-    ///   <item><description><c>201 Created</c> — event persisted; data contains the new event ID.</description></item>
-    ///   <item><description><c>409 Conflict</c> — duplicate CorrelationId + EventType combination.</description></item>
-    ///   <item><description><c>400 Bad Request</c> — unknown event type, malformed payload, or missing required fields.</description></item>
-    ///   <item><description><c>500 Internal Server Error</c> — an unexpected error occurred.</description></item>
-    /// </list>
+    /// A success response confirming the event was accepted into the delivery pipeline, or a descriptive error response if any validation step fails.
     /// </returns>
+    /// <response code="201">Event accepted and queued for delivery to all registered subscribers.</response>
+    /// <response code="400">The payload failed schema validation — response identifies each failing field.</response>
+    /// <response code="401">The X-Client-Id or X-Client-Key header is missing, unknown, or invalid.</response>
+    /// <response code="403">The service client is not authorised to publish the specified event type.</response>
+    /// <response code="409">A duplicate correlation ID was detected for this event type.</response>
+    /// <response code="500">An unexpected server error occurred.</response>
     [HttpPost]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status409Conflict)]
@@ -238,7 +246,7 @@ public class WebhookEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [AllowAnonymous]
     [ServiceFilter(type: typeof(ClientValidationFilter))]
-    public async Task<IActionResult> CreateEvent([FromBody] CreateWebhookEventDto createWebhookEventRequest)
+    public async Task<IActionResult> CreateEvent([FromBody] CreateWebhookEventDto createWebhookEventRequest, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(CreateEvent));
         try
