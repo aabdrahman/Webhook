@@ -582,7 +582,7 @@ public class WebhookServiceClientCatalogServiceTests : IClassFixture<PostgreSqlF
 
         //Assert
         Assert.NotNull(result);
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.Equal("Operation Successful.", result.ResponseData);
         Assert.Equal("Catalog has been subscribed to successfully.", result.ResponseMessage, ignoreCase: true);

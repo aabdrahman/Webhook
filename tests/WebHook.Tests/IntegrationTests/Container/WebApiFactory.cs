@@ -36,6 +36,8 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
     public Mock<IUserService> UserServiceMock { get; } = new();
     public Mock<IOtpService> OtpServiceMock { get; } = new();
     public Mock<ICacheService> CacheServiceMock { get; } = new();
+    public Mock<IWebhookServiceClientService> ServiceClientServiceMock { get; } = new();
+    public Mock<IWebhookServiceClientCatalogService> ServiceClientCatalogServiceMock { get; } = new();
 
     // Stored as a field so ResetMocks can re-apply the no-op setup after clearing
     private Mock<CustomAuthenticationFilter>? _filterMock;
@@ -46,6 +48,8 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
         UserServiceMock.Reset();
         OtpServiceMock.Reset();
         CacheServiceMock.Reset();
+        ServiceClientServiceMock.Reset();
+        ServiceClientCatalogServiceMock.Reset();
 
         // Re-apply no-op AFTER reset — this is the critical line
         // Without this the filter runs real logic after mocks are cleared
@@ -69,11 +73,15 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IUserService>();
             services.RemoveAll<IOtpService>();
             services.RemoveAll<ICacheService>();
+            services.RemoveAll<IWebhookServiceClientService>();        
+            services.RemoveAll<IWebhookServiceClientCatalogService>();
 
             services.AddSingleton(AuthenticationServiceMock.Object);
             services.AddSingleton(UserServiceMock.Object);
             services.AddSingleton(OtpServiceMock.Object);
             services.AddSingleton(CacheServiceMock.Object);
+            services.AddSingleton(ServiceClientServiceMock.Object);
+            services.AddSingleton(ServiceClientCatalogServiceMock.Object);
 
             services.AddAuthentication()
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
