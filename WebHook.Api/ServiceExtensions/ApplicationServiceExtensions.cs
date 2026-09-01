@@ -258,6 +258,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<StaleClaimedDeliveryReleaseService>();
 
         services.AddScoped<CustomAuthenticationFilter>();
+        services.AddScoped<ClientValidationFilter>();
 
         services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(45)));
 

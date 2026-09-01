@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,11 +16,13 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
+using WebHook.Api.ApplicationFilters;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
+using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.IntegrationTests.Controllers;
 
@@ -573,7 +576,7 @@ public sealed class WebhookEventWebApiFactory
     : WebApplicationFactory<Program>
 {
     public Mock<IWebhookEventService> EventServiceMock { get; } = new();
-    public Mock<ICacheService>        CacheServiceMock { get; } = new();
+    public Mock<ICacheService> CacheServiceMock { get; } = new();
 
     public void ResetMocks()
     {
@@ -594,9 +597,16 @@ public sealed class WebhookEventWebApiFactory
         {
             services.RemoveAll<IWebhookEventService>();
             services.RemoveAll<ICacheService>();
+            services.RemoveAll<ClientValidationFilter>(); // add
 
             services.AddSingleton(EventServiceMock.Object);
             services.AddSingleton(CacheServiceMock.Object);
+
+            // Replace real filter with no-op — OnAuthorizationAsync always passes
+            services.AddScoped<ClientValidationFilter>(sp =>
+                new NoOpClientValidationFilter(
+                    sp.GetRequiredService<RepositoryContext>(),
+                    sp.GetRequiredService<IApplicationHasher>()));
 
             services.AddAuthentication()
                 .AddScheme<AuthenticationSchemeOptions, WebhookEventTestAuthHandler>(
@@ -605,7 +615,7 @@ public sealed class WebhookEventWebApiFactory
             services.PostConfigure<AuthenticationOptions>(opts =>
             {
                 opts.DefaultAuthenticateScheme = WebhookEventTestAuthHandler.SchemeName;
-                opts.DefaultChallengeScheme    = WebhookEventTestAuthHandler.SchemeName;
+                opts.DefaultChallengeScheme = WebhookEventTestAuthHandler.SchemeName;
             });
 
             services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
@@ -615,14 +625,9 @@ public sealed class WebhookEventWebApiFactory
             {
                 opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-                opts.AddPolicy("request-otp-limit", context =>
-                    RateLimitPartition.GetNoLimiter("test"));
-
-                opts.AddPolicy("validate-otp-limit", context =>
-                    RateLimitPartition.GetNoLimiter("test"));
-
-                opts.AddPolicy("per-user-rating", context =>
-                    RateLimitPartition.GetNoLimiter("test"));
+                opts.AddPolicy("request-otp-limit", _ => RateLimitPartition.GetNoLimiter("test"));
+                opts.AddPolicy("validate-otp-limit", _ => RateLimitPartition.GetNoLimiter("test"));
+                opts.AddPolicy("per-user-rating", _ => RateLimitPartition.GetNoLimiter("test"));
             });
         });
     }
@@ -668,4 +673,14 @@ public sealed class WebhookEventTestAuthHandler
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
+}
+
+public sealed class NoOpClientValidationFilter : ClientValidationFilter
+{
+    public NoOpClientValidationFilter(
+        RepositoryContext ctx,
+        IApplicationHasher hasher) : base(ctx, hasher) { }
+
+    public override Task OnAuthorizationAsync(AuthorizationFilterContext context)
+        => Task.CompletedTask;
 }
