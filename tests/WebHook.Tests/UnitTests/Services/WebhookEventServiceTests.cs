@@ -6,6 +6,7 @@ using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Entities;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Core.EventContracts.Publishers;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
 
@@ -15,14 +16,17 @@ public class WebhookEventServiceTests
 {
     private readonly DbContextOptions<RepositoryContext> _contextOptions;
     private readonly Mock<IApplicationPublisher> _applicationPublisherMock;
+    private readonly Mock<IAuthenticatedUserDetails> _authenticatedUserDetailsMock;
     public WebhookEventServiceTests()
     {
         _applicationPublisherMock = new Mock<IApplicationPublisher>();
+        _authenticatedUserDetailsMock = new Mock<IAuthenticatedUserDetails>();
 
         var builder = new DbContextOptionsBuilder<RepositoryContext>()
                             .UseInMemoryDatabase($"WebhookEventServiceTests_{Guid.NewGuid()}");
 
         _contextOptions = builder.Options;
+
 
         using var ctx = new RepositoryContext(_contextOptions);
         ctx.Database.EnsureCreated();
@@ -34,13 +38,37 @@ public class WebhookEventServiceTests
             BuildCatalogEntity(new List<string>() { "shipmentId", "shipmentStatus" }, "ShipmentDispatched"),
         };
         SeedEventCatalog(ctx, webhookEventCatalogs);
+        _eventCatalogs = ctx.WebHookEventCatalogs.ToList();
     }
 
-    private (RepositoryContext ctx, WebhookEventService svc) GetSut()
+    private List<WebHookEventCatalog> _eventCatalogs = []; 
+
+    private (RepositoryContext ctx, WebhookEventService svc) GetSut(IAuthenticatedUserDetails authenticatedUserDetails = null)
     {
         var context = new RepositoryContext(_contextOptions);
-        var svc = new WebhookEventService(context, _applicationPublisherMock.Object);
+        var svc = new WebhookEventService(context, _applicationPublisherMock.Object, authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object);
         return (context, svc);
+    }
+
+    private WebhookServiceClient BuildServiceClientEntity(Guid[] subscribedCatalogs, string clientId = "", string clientKey = "", string clientName = "", string createdBy = "") => new WebhookServiceClient()
+    {
+
+        ClientId = clientId,
+        ServiceClientName = clientName,
+        EventCatalogs = subscribedCatalogs.ToList().Select(x => new WebhookServiceClientEventCatalog() { EventCatalogId = x }).ToList(),
+        ClientKey = string.IsNullOrEmpty(clientKey) ? Random.Shared.GetHexString(16) : clientKey,
+        CreatedBy = string.IsNullOrEmpty(createdBy) ? Guid.NewGuid().ToString("N") : createdBy
+    };
+
+    private async Task<WebhookServiceClient> SeedServiceClient(string desired = "")
+    {
+        var catalogIds = string.IsNullOrEmpty(desired) ? _eventCatalogs.Select(x => x.Id).ToList() : _eventCatalogs.Where(x => x.NormalizedEventName == desired.ToUpper()).Select(x => x.Id).ToList();
+        var clientEntity = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service");
+        var context = new RepositoryContext(_contextOptions);
+        await context.WebhookServiceClients.AddAsync(clientEntity);
+        await context.SaveChangesAsync();
+        var createdEntity = await context.WebhookServiceClients.FindAsync(clientEntity.Id);
+        return createdEntity!;
     }
 
     private WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
@@ -82,10 +110,40 @@ public class WebhookEventServiceTests
                                                 };
 
     [Fact]
+    public async Task CreateEventAsync_ValidRequest_ServiceClientNotprofiled()
+    {
+        //Arrange
+        var (ctx, _) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var catalogIds = _eventCatalogs.Where(x => !x.NormalizedEventName.Contains("PaymentProcessed", StringComparison.OrdinalIgnoreCase)).Select(x => x.Id).ToList();
+        var clientEntity = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "order-service-prod", clientKey: "", clientName: "Order Service Client");
+        await ctx.WebhookServiceClients.AddAsync(clientEntity);
+        await ctx.SaveChangesAsync();
+
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(clientEntity.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(clientEntity.ClientKey);
+        var sut = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+
+        var createDto = BuildCreateWebhookEventDto(eventType: "PaymentProcessed", payload: "{\"paymentId\":\"a1234567\", \"paymentStatus\":\"Successful\"}");
+
+        //Act
+        var result = await sut.svc.CreateEventAsync(createDto);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful, result.ResponseMessage);
+        Assert.StartsWith("The service client is not profiled to raise the event ", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Contains(createDto.EventType, result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CreateEventAsync_ShouldReturnFailure_WhenEventTypeNotInCatalog()
     {
         // Arrange
-        var (ctx, svc) = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto(eventType: "NonExistentEvent");
         // Act
         var result = await svc.CreateEventAsync(createDto);
@@ -99,7 +157,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_ShouldReturnSuccess_WhenValidInput()
     {
         // Arrange
-        var (ctx, svc) = GetSut();
+        var seededClient = await SeedServiceClient(desired: "PaymentProcessed");
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto(eventType: "PaymentProcessed", payload: "{\"paymentId\":\"a1234567\", \"paymentStatus\":\"Successful\"}");
 
         // Act
@@ -121,7 +182,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_ShouldReturnFailure_WhenInvalidPayload()
     {
         // Arrange
-        var (ctx, svc) = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto(payload: "{\"invalidField\":\"value\"}");
         // Act
         var result = await svc.CreateEventAsync(createDto);
@@ -135,7 +199,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_ShouldReturnFailure_WhenCorrelationIdExists()
     {
         // Arrange
-        var (ctx, svc) = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var existingEvent = BuildWebhookEventEntity();
         existingEvent.EventType = existingEvent.EventType.ToUpper(); // Ensure the event type is in uppercase to match the catalog
         ctx.WebhookEvents.Add(existingEvent);
@@ -155,7 +222,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_CancellationRequested_ThrowsException_Returns500InternalServerError()
     {
         // Arrange
-        var (ctx, svc) = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto();
         using var cts = new CancellationTokenSource();
         cts.Cancel(); // Cancel the token immediately
@@ -171,7 +241,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_InvalidRequest_MissingFields_Returns400BadRequest()
     {
         //Arrange
-        var sut = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var sut = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto();
         createDto.PayLoad = "{\"custId\":\"12345\", \"customerName\":\"John Doe\"}"; // Simulate missing fields in payload
         _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));
@@ -190,7 +263,10 @@ public class WebhookEventServiceTests
     public async Task CreateEventAsync_InvalidRequest_EmptyPayload_Returns400BadRequest()
     {
         //Arrange
-        var sut = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        var sut = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto();
         createDto.PayLoad = "{}"; // Simulate missing fields in payload
         _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));
@@ -209,7 +285,11 @@ public class WebhookEventServiceTests
     public async Task CreateWebhookEventAsync_WhenPayloadIsInvalidJson_ReturnsBadRequest()
     {
         //Arrange
-        var sut = GetSut();
+        var seededClient = await SeedServiceClient();
+        _authenticatedUserDetailsMock.Setup(x => x.ClientId).Returns(seededClient.ClientId);
+        _authenticatedUserDetailsMock.Setup(x => x.ClientKey).Returns(seededClient.ClientKey);
+        //var (ctx, svc) = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
+        var sut = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var createDto = BuildCreateWebhookEventDto();
         createDto.PayLoad = "{Invalid Payload !!!"; // Simulate missing fields in payload
         _applicationPublisherMock.Setup(ap => ap.QueueEventRaised(It.IsAny<EventRaised>(), It.IsAny<CancellationToken>()));

@@ -8,6 +8,7 @@ using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookEvent;
 using WebHook.Core.Entities;
 using WebHook.Core.EventContracts.Publishers;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Core.Mapper;
 using WebHook.Infrastructure.Data_Persistence;
@@ -39,6 +40,7 @@ public sealed class WebhookEventService : IWebhookEventService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly IApplicationPublisher _applicationPublisher;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
     /// <summary>
     /// Initializes a new instance of <see cref="WebhookEventService"/>.
@@ -49,10 +51,14 @@ public sealed class WebhookEventService : IWebhookEventService
     /// <paramref name="applicationPublisher"/>
     /// The application configured publisher to publish to channels designated for eacj possible operation.
     /// </param>
-    public WebhookEventService(RepositoryContext repositoryContext, IApplicationPublisher applicationPublisher)
+    /// <paramref name="authenticatedUserDetails"/>
+    /// The authenticated user details is provided to ensure that we can extract the client key and client id when posting an event.
+    /// </param>
+    public WebhookEventService(RepositoryContext repositoryContext, IApplicationPublisher applicationPublisher, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
         _applicationPublisher = applicationPublisher;
+        _authenticatedUserDetails = authenticatedUserDetails;
         _logger = Log.ForContext(_className, nameof(WebhookEventService));
     }
 
@@ -129,7 +135,7 @@ public sealed class WebhookEventService : IWebhookEventService
 
         try
         {
-            _logger.Information("Creating webhook event - {0}", createWebhookEvent);
+            _logger.Information("Creating webhook event for client - {0}, {1}", createWebhookEvent, _authenticatedUserDetails.ClientId);
 
             //Check that the correlation id is unique
             bool isExistsCorrelationId = await _repositoryContext.WebhookEvents.AsNoTracking().AnyAsync(x => x.CorrelationId == createWebhookEvent.CorrelationId && x.EventType == createWebhookEvent.EventType.ToUpper(), ct);
@@ -152,6 +158,8 @@ public sealed class WebhookEventService : IWebhookEventService
                 _logger.Warning("Invalid event type - {0}", createWebhookEvent.EventType);
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid event type.", HttpStatusCode.BadRequest);
             }
+
+
 
             //Validate that the payload is correct JSON with raised event type object
             try
@@ -182,6 +190,16 @@ public sealed class WebhookEventService : IWebhookEventService
                 _logger.Error(ex, "An error occurred while validating the payload for event type - {0}, {1}", createWebhookEvent.EventType, createWebhookEvent.PayLoad);
                 return GenericResponse<string>.Failure("Operation Failed.", "Invalid payload for event type.", HttpStatusCode.BadRequest,
                                                         new ErrorDetail { ErrorMessage = ex.Message, ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "" });
+            }
+
+            //Vlaidating the client id and client key from the extracted details is not necessary because we have a filter that validates it already
+            //So, what we will validate is ensure that the clientId is profiled with the event it is trying to post.
+            bool isEventProfiled = await _repositoryContext.WebhookServiceClientEventCatalogs
+                                                .AnyAsync(x => x.serviceClient.ClientId == _authenticatedUserDetails.ClientId!.ToLower() && x.eventCatalog.NormalizedEventName == createWebhookEvent.EventType.ToUpper());
+            if (!isEventProfiled)
+            {
+                _logger.Warning("The event to create is not profiled for the provided client - {0}, {1}", _authenticatedUserDetails.ClientId, createWebhookEvent.EventType);
+                return GenericResponse<string>.Failure("Operation Failed.", $"The service client is not profiled to raise the event - {createWebhookEvent.EventType.ToLower()}", HttpStatusCode.BadRequest);
             }
 
             WebhookEvent webhookEvent = WebhookEventMapper.ToEntity(createWebhookEvent);

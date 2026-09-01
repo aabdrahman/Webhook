@@ -10,4 +10,6 @@ public interface IAuthenticatedUserDetails
     string userId { get; }
     string operationToken { get; }
     string? Origin { get; }
+    string? ClientId { get; }
+    string? ClientKey { get; }
 }

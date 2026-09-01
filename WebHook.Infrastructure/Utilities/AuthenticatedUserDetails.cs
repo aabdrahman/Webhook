@@ -28,4 +28,8 @@ public sealed class AuthenticatedUserDetails : IAuthenticatedUserDetails
     public string operationToken => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("X-Operation-Token", out var operationTokenValue) ? operationTokenValue.FirstOrDefault()! : "";
 
     public string? Origin => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("Origin", out var originValue) ? originValue.FirstOrDefault() : "";
+
+    public string? ClientId => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("X-Client-Id", out var clientIdValue) ? clientIdValue.FirstOrDefault() : "";
+
+    public string? ClientKey => _contextAccessor.HttpContext!.Request.Headers.TryGetValue("X-Client-Key", out var clientKeyValue) ? clientKeyValue.FirstOrDefault() : "";
 }
