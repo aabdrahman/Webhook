@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -11,6 +14,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.Threading.RateLimiting;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
 using WebHook.Core.Interfaces.Helpers;
@@ -499,6 +503,23 @@ public sealed class DeadLetterQueueWebApiFactory
             {
                 opts.DefaultAuthenticateScheme = DeadLetterTestAuthHandler.SchemeName;
                 opts.DefaultChallengeScheme = DeadLetterTestAuthHandler.SchemeName;
+            });
+
+            services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
+            services.RemoveAll<IOptionsChangeTokenSource<RateLimiterOptions>>();
+
+            services.AddRateLimiter(opts =>
+            {
+                opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                opts.AddPolicy("request-otp-limit", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
+
+                opts.AddPolicy("validate-otp-limit", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
+
+                opts.AddPolicy("per-user-rating", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
             });
         });
     }

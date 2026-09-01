@@ -45,8 +45,9 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
             _logger.Information("Subscribed event catalogs fetched successfully - {0}", serviceClientCatalogs);
 
             return serviceClientCatalogs.Any() ?
-                GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>.Failure(null, $"No subscribed event catalog for provided id - {serviceClientId}", HttpStatusCode.NotFound) :
-                GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>.Success(serviceClientCatalogs, "Subscribed event catalogs fetched successfully.", HttpStatusCode.OK);
+                GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>.Success(serviceClientCatalogs, "Subscribed event catalogs fetched successfully.", HttpStatusCode.OK) :
+                GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>.Failure(null, $"No subscribed event catalog for provided id - {serviceClientId}", HttpStatusCode.NotFound);
+                //GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>.Success(serviceClientCatalogs, "Subscribed event catalogs fetched successfully.", HttpStatusCode.OK);
         }
         catch (Exception ex)
         {
@@ -104,7 +105,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
                 if (serviceClient is null)
                 {
                     _logger.Warning("Service client with provided id does not exist - {0}", serviceClientId);
-                    return GenericResponse<string>.Failure("Operation Failed.", "Service client with provided name does not exist", HttpStatusCode.NotFound);
+                    return GenericResponse<string>.Failure("Operation Failed.", $"Service client with provided id does not exist: {serviceClientId}", HttpStatusCode.NotFound);
                 }
 
                 //Add the catalog-service-client entity.
@@ -119,8 +120,8 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
                 //Save chanegs to teh database
                 await _repositoryContext.SaveChangesAsync(ct);
 
-                _logger.Information("Service client subsctiption added successfully - {0}, {1}", serviceClientId, catalogName);
-                return GenericResponse<string>.Success("Operation Successful.", "Ctalog has been subscribed to successfully.", HttpStatusCode.OK);
+                _logger.Information("Service client subsctiption added successfully - {0}, {1}. Created By: {2}", serviceClientId, catalogName, _authenticatedUserDetails.userId);
+                return GenericResponse<string>.Success("Operation Successful.", "Catalog has been subscribed to successfully.", HttpStatusCode.OK);
 
             }
         }
@@ -153,7 +154,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
             await _repositoryContext.SaveChangesAsync(ct);
 
             _logger.Information("Event catalog unsubscribed successfully from user - {0}, {1}", serviceClientId, catalogName);
-            return GenericResponse<string>.Success("Operation Successful.", "Catalog subscribed succssfully.", HttpStatusCode.OK);
+            return GenericResponse<string>.Success("Operation Successful.", "Catalog unsubscribed from succssfully.", HttpStatusCode.OK);
         }
         catch (Exception ex)
         {

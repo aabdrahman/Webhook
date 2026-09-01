@@ -69,7 +69,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
             await _repositoryContext.SaveChangesAsync(ct);
 
             _logger.Information("Service cleint: {0} deactivated successfully. All subscribed catalogs also deactivated.", clientToDeactivate.ClientId);
-            return GenericResponse<string>.Success("Operation SUccessful.", "Service client successfully deactivated.", HttpStatusCode.NoContent);
+            return GenericResponse<string>.Success("Operation Successful.", "Service client successfully deactivated.", HttpStatusCode.NoContent);
 
         }
         catch (Exception ex)
@@ -87,14 +87,14 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         {
             _logger.Information("Get All Onboarded Clients. Include Deactivated - {0}", includeDeactivated);
 
-            var getClientsQueryable = includeDeactivated ? _repositoryContext.WebhookServiceClients : _repositoryContext.WebhookServiceClients.IgnoreQueryFilters();
+            var getClientsQueryable = includeDeactivated ?  _repositoryContext.WebhookServiceClients.IgnoreQueryFilters() : _repositoryContext.WebhookServiceClients;
 
             List<WebhookServiceClientDto> onboardedClients = await getClientsQueryable.Select(WebhookServiceClientMapper.ToDtoExpression()).ToListAsync(ct);
 
             _logger.Information("Onboarded cleints fetch reaturns {0} row(s).", onboardedClients.Count);
             return onboardedClients.Any() ?
-                GenericResponse<IReadOnlyList<WebhookServiceClientDto>>.Success(onboardedClients, "Onboarded cleints fetched successfully.", HttpStatusCode.OK) :
-                GenericResponse<IReadOnlyList<WebhookServiceClientDto>>.Failure(null, "No client ahs been onboarded yet.", HttpStatusCode.NotFound);
+                GenericResponse<IReadOnlyList<WebhookServiceClientDto>>.Success(onboardedClients, "Onboarded clients fetched successfully.", HttpStatusCode.OK) :
+                GenericResponse<IReadOnlyList<WebhookServiceClientDto>>.Failure(null, "No client has been onboarded yet.", HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -121,12 +121,12 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
             }
 
             _logger.Information("Onboarded client with id: {0} fetched successfully - {1}", clientId, onboardedClient);
-            return GenericResponse<WebhookServiceClientDto>.Success(onboardedClient, "Client fetcjed successfully", HttpStatusCode.OK);
+            return GenericResponse<WebhookServiceClientDto>.Success(onboardedClient, "Client fetched successfully", HttpStatusCode.OK);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while fetchin onboarded client deatils.");
-            return GenericResponse<WebhookServiceClientDto>.Failure(null, "", HttpStatusCode.InternalServerError, new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "", ErrorMessage = ex.Message });
+            return GenericResponse<WebhookServiceClientDto>.Failure(null, "An error occurred whule getting onboarded client details.", HttpStatusCode.InternalServerError, new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "", ErrorMessage = ex.Message });
         }
     }
 
@@ -152,12 +152,11 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
                                                 .Select(x => new { x.Id, x.NormalizedEventName })
                                                 .ToListAsync(ct);
 
-            var notExistingCatalogs = catalogsFromDb.ExceptBy(eventCatalogToSubscribe, x => x.NormalizedEventName).ToList();
+            var notExistingCatalogs = eventCatalogToSubscribe.Except(catalogsFromDb.Select(x => x.NormalizedEventName)).ToList();
             if (notExistingCatalogs.Any())
             {
-                string[] notExisitingCatalogNames = notExistingCatalogs.Select(x => x.NormalizedEventName).ToArray();
-                _logger.Warning("One or more provided catalog to subscribe does not exist or deactivated - {0}", notExisitingCatalogNames);
-                return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, $"One or more provided event catalog(s) does not exist - {string.Join(", ", notExisitingCatalogNames)}", HttpStatusCode.NotFound);
+                _logger.Warning("One or more provided catalog to subscribe does not exist or deactivated - {0}", notExistingCatalogs);
+                return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, $"One or more provided event catalog(s) does not exist - {string.Join(", ", notExistingCatalogs)}", HttpStatusCode.NotFound);
             }
 
             var isUserExist = await _repositoryContext.Users.AnyAsync(x => x.NormalizedEmail == _authenticatedUserDetails.emailAddress.ToUpper(), ct);
@@ -201,7 +200,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while onboarding client - {0}", createServiceClient.ServiceName);
-            return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, "An error occurred", HttpStatusCode.InternalServerError, new ErrorDetail()
+            return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, "An error occurred onboarding client.", HttpStatusCode.InternalServerError, new ErrorDetail()
             {
                 ErrorMessage = ex.Message,
                 ErrorTitle = ex.GetType().Name,

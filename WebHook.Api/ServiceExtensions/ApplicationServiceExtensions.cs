@@ -238,6 +238,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
+        services.AddScoped<IWebhookServiceClientService, WebhookServiceClientService>();
+        services.AddScoped<IWebhookServiceClientCatalogService, WebhookServiceClientCatalogService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();

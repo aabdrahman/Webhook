@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -12,6 +15,7 @@ using Org.BouncyCastle.Tls.Crypto;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.Threading.RateLimiting;
 using WebHook.Api.ApplicationFilters;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
@@ -90,6 +94,23 @@ public sealed class WebApiFactory : WebApplicationFactory<Program>
 
                 if (toRemove is not null)
                     opts.Filters.Remove(toRemove);
+            });
+
+            services.RemoveAll<IConfigureOptions<RateLimiterOptions>>();
+            services.RemoveAll<IOptionsChangeTokenSource<RateLimiterOptions>>();
+
+            services.AddRateLimiter(opts =>
+            {
+                opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                opts.AddPolicy("request-otp-limit", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
+
+                opts.AddPolicy("validate-otp-limit", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
+
+                opts.AddPolicy("per-user-rating", context =>
+                    RateLimitPartition.GetNoLimiter("test"));
             });
 
             // Build and store the filter mock so ResetMocks can re-apply setup
