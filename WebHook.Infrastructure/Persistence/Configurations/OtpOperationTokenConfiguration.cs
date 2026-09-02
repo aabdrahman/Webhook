@@ -15,6 +15,8 @@ public class OtpOperationTokenConfiguration : IEntityTypeConfiguration<OtpOperat
 
         builder.HasIndex(x => x.ExpiresAt);
 
+        builder.HasIndex(x => x.ConsumedAt);
+
         builder.HasIndex(x => x.UserId);
 
         builder.HasIndex(x => x.OtpVerificationId);

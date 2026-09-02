@@ -15,6 +15,10 @@ public sealed class WebhookServiceClientEventCatalogConfiguration : IEntityTypeC
 
         builder.HasIndex(x => x.EventCatalogId, "IX_ServiceClient_CatalogId");
 
+        builder.HasIndex(x => new { x.EventCatalogId, x.ServiceClientId }).IsUnique();
+
+        builder.HasIndex(x => x.DeactivatedAt);
+
         builder.HasIndex(x => x.CreatedAt, "IX_CreatedAt");
 
         builder.HasQueryFilter(x => !x.DeactivatedAt.HasValue);

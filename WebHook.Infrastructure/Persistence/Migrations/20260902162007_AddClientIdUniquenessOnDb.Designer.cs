@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WebHook.Infrastructure.Data_Persistence;
@@ -11,9 +12,11 @@ using WebHook.Infrastructure.Data_Persistence;
 namespace WebHook.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RepositoryContext))]
-    partial class RepositoryContextModelSnapshot : ModelSnapshot
+    [Migration("20260902162007_AddClientIdUniquenessOnDb")]
+    partial class AddClientIdUniquenessOnDb
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -164,8 +167,6 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConsumedAt");
-
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("ExpiresAt");
@@ -221,17 +222,11 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ConsumedAt");
-
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("ExpiresAt");
 
-                    b.HasIndex("Purpose");
-
                     b.HasIndex("UserId");
-
-                    b.HasIndex("ValidatedAt");
 
                     b.ToTable("OtpVerifications");
                 });
@@ -598,12 +593,7 @@ namespace WebHook.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CorrelationId");
-
-                    b.HasIndex("EventType");
-
-                    b.HasIndex(new[] { "CorrelationId", "EventType" }, "IX_Webhook_Event_CorrelationId_EventType")
-                        .IsUnique();
+                    b.HasIndex(new[] { "CorrelationId", "EventType" }, "IX_Webhook_Event_CorrelationId_EventType");
 
                     b.HasIndex(new[] { "CreatedAt" }, "IX_Webhook_Event_CreatedAt");
 
@@ -692,8 +682,6 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DeactivatedAt");
 
                     b.HasIndex("EventCatalogId", "ServiceClientId")
                         .IsUnique();

@@ -12,7 +12,11 @@ internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webho
 
         //builder.HasIndex(x => x.EventType, "IX_Webhook_Event_EventType");
 
-        builder.HasIndex(x => new { x.CorrelationId, x.EventType }, "IX_Webhook_Event_CorrelationId_EventType");
+        builder.HasIndex(x => new { x.CorrelationId, x.EventType }, "IX_Webhook_Event_CorrelationId_EventType").IsUnique();
+
+        builder.HasIndex(x => x.EventType);
+
+        builder.HasIndex(x => x.CorrelationId);
 
         builder.HasIndex(x => x.CreatedAt, "IX_Webhook_Event_CreatedAt");
 

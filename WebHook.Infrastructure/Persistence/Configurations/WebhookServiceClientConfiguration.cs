@@ -11,7 +11,7 @@ public sealed class WebhookServiceClientConfiguration : IEntityTypeConfiguration
     {
         builder.HasKey(x => x.Id);
 
-        builder.HasIndex(x => x.ClientId);
+        builder.HasIndex(x => x.ClientId).IsUnique();
 
         builder.HasIndex(x => x.CreatedAt);
 

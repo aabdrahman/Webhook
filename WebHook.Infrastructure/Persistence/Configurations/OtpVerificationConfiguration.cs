@@ -15,6 +15,12 @@ internal sealed class OtpVerificationConfiguration : IEntityTypeConfiguration<Ot
 
         builder.HasIndex(x => x.ExpiresAt);
 
+        builder.HasIndex(x => x.ConsumedAt);
+
+        builder.HasIndex(x => x.ValidatedAt);
+
+        builder.HasIndex(x => x.Purpose);
+
         builder.HasIndex(x => x.UserId);
 
         builder.Property(x => x.UserId)
