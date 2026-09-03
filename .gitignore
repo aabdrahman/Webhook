@@ -60,7 +60,7 @@ nunit-*.xml
 .vs/	
 /.vs/Webhook.slnx/v18/
 /.vs/Webhook.slnx/FileContentIndex/
-/.vs/Webhook.slnx/v18
+.vs/Webhook.slnx/v18
 /.vs/Webhook.slnx/DesignTimeBuild/
 /.vs/ProjectEvaluation
 /.vs/Webhook.slnx/config
@@ -68,3 +68,6 @@ nunit-*.xml
 /.vs/Webhook/CopilotIndices/18.7.1244.59975
 /.vs/Webhook.slnx/copilot-chat/09795c90/sessions
 /.vs/Webhook/CopilotIndices/
+/.vs/Webhook.slnx/v18/.suo
+/.vs/Webhook.slnx/v18/DocumentLayout.backup.json
+/.vs/Webhook.slnx/v18/DocumentLayout.json
