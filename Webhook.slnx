@@ -1,1 +1,6 @@
-<Solution />
+<Solution>
+  <Project Path="tests/WebHook.Tests/WebHook.Tests.csproj" Id="2a4bae89-0e1b-4e44-9518-c22f518978b3" />
+  <Project Path="WebHook.Api/WebHook.Api.csproj" />
+  <Project Path="WebHook.Core/WebHook.Core.csproj" />
+  <Project Path="WebHook.Infrastructure/WebHook.Infrastructure.csproj" />
+</Solution>
