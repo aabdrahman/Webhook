@@ -60,7 +60,7 @@ nunit-*.xml
 .vs/	
 /.vs/Webhook.slnx/v18/
 /.vs/Webhook.slnx/FileContentIndex/
-/.vs/Webhook.slnx/v18
+.vs/Webhook.slnx/v18
 /.vs/Webhook.slnx/DesignTimeBuild/
 /.vs/ProjectEvaluation
 /.vs/Webhook.slnx/config
