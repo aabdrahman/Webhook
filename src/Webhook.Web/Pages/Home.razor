@@ -1,7 +1,26 @@
 ﻿@page "/"
 
+@inject Helper.EnvironmentVariables environmentVariable
+
 <PageTitle>Home</PageTitle>
 
 <h1>Hello, world!</h1>
 
 Welcome to your new app.
+
+
+@code {
+
+    private string? _configValue;
+    private int _timeout = 0;
+
+    protected override void OnInitialized()
+    {
+        _configValue = environmentVariable.AppBaseUrl;
+        _timeout = environmentVariable.ApiTimeOutInSeconds;
+
+        Console.WriteLine($"AppBaseUrl: {_configValue}");
+        Console.WriteLine($"ApiTimeOutInSeconds: {_timeout}");
+    }
+
+}

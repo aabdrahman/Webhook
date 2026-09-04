@@ -1,0 +1,4 @@
+{
+  "AppBaseUrl": "https://localhost:5001/",
+  "ApiTimeOutInSeconds": 30
+}
