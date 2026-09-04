@@ -30,22 +30,9 @@ else
     throw new Exception("Failed to load environment variables from config.json");
 }
 
-// Register the HttpClient with the base address and timeout from the environment variables(this should be the api base address)
-builder.Services.AddHttpClient("Webhook.Web.ServerAPI", opts =>
-{
-    opts.BaseAddress = new Uri(environmentVariables.AppBaseUrl);
-    opts.Timeout = TimeSpan.FromSeconds(environmentVariables.ApiTimeOutInSeconds);
-});
-
-//Register blazor storage service
-builder.Services.AddBlazoredLocalStorage(opts =>
-{
-    opts.JsonSerializerOptions = new JsonSerializerOptions
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-        PropertyNameCaseInsensitive = true
-    };
-});
+builder.Services.AddApplicationAuthenticationStateProvider();
+builder.Services.ConfigureApplicationHttpClient(environmentVariables);
+builder.Services.ConfigureApplicationLocalStorage();
+builder.Services.AddApplicationHandlers();
 
 await builder.Build().RunAsync();

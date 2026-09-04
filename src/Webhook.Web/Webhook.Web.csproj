@@ -16,4 +16,8 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\WebHook.Core\WebHook.Core.csproj" />
+  </ItemGroup>
+
 </Project>
