@@ -1,0 +1,570 @@
+@page "/admin/dashboard"
+@attribute [Authorize(Roles = "Admin,ADMIN")]
+
+<PageTitle>Admin Dashboard — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading system overview..." />
+
+@if (!_isLoading)
+{
+    <!-- Greeting -->
+    <div class="dashboard-greeting">
+        <div>
+            <h1 class="page-title">System Overview</h1>
+            <p class="page-header-description">
+                Real-time view of the WebhookHub delivery pipeline.
+            </p>
+        </div>
+        <div class="dashboard-greeting-actions">
+            <a href="/admin/health" class="btn btn-secondary btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                Health Checks
+            </a>
+            <button class="btn btn-secondary btn-sm" @onclick="RefreshDashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10
+                             M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Row 1 — System entity counts -->
+    <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
+        <div class="metric-card">
+            <span class="metric-card-label">Total Users</span>
+            <span class="metric-card-value">@_totalUsers</span>
+            <span class="metric-card-sub">Registered accounts</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Total Subscriptions</span>
+            <span class="metric-card-value">@_totalSubscriptions</span>
+            <span class="metric-card-sub">Across all users</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Service Clients</span>
+            <span class="metric-card-value">@_totalServiceClients</span>
+            <span class="metric-card-sub">Onboarded internal services</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Event Types</span>
+            <span class="metric-card-value">@_totalEventTypes</span>
+            <span class="metric-card-sub">Active catalog entries</span>
+        </div>
+    </div>
+
+    <!-- Row 2 — Pipeline health metrics -->
+    <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary"
+         style="margin-bottom:var(--space-6);">
+        <div class="metric-card">
+            <span class="metric-card-label">Events Today</span>
+            <span class="metric-card-value">@_eventsToday</span>
+            <span class="metric-card-sub">Published across all clients</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Global Success Rate</span>
+            <span class="metric-card-value" style="color:@SuccessRateColor;">
+                @_successRate%
+            </span>
+            <span class="metric-card-sub">Delivery success today</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Pending</span>
+            <span class="metric-card-value" style="color:var(--color-warning);">
+                @_pendingDeliveries
+            </span>
+            <span class="metric-card-sub">Queued for delivery</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Dead Letters</span>
+            <span class="metric-card-value" style="color:var(--color-dead-letter);">
+                @_deadLetterCount
+            </span>
+            <span class="metric-card-sub">Awaiting admin retry</span>
+        </div>
+    </div>
+
+    <!-- Worker status + Health checks side by side -->
+    <div class="admin-dashboard-split" style="margin-bottom:var(--space-6);">
+
+        <!-- Worker status -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Worker Status</h2>
+                <a href="/admin/health" class="btn btn-ghost btn-sm">
+                    View health
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         style="width:14px;height:14px;">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </a>
+            </div>
+            <div class="card-body">
+                @if (_isLoadingWorkers)
+                {
+                    <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+                        @for (int i = 0; i < 6; i++)
+                        {
+                            <SkeletonLoader Shape="text" Width="180px" Height="20px" />
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="admin-worker-list">
+                        @foreach (var worker in _workers)
+                        {
+                            <div class="admin-worker-item">
+                                <StatusDot Status="@worker.Status"
+                                           Pulse="@(worker.Status == "Healthy")" />
+                                <span class="text-sm">@worker.Name</span>
+                                <Badge Value="@worker.Status"
+                                       Variant="custom"
+                                       Text="@worker.Status"
+                                       ShowDot="false" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Health checks summary -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Health Checks</h2>
+                <Badge Value="@_overallHealth"
+                       Variant="custom"
+                       Text="@_overallHealth"
+                       ShowDot="false" />
+            </div>
+            <div class="card-body" style="padding:0;">
+                @if (_isLoadingHealth)
+                {
+                    <div style="padding:var(--space-4);display:flex;
+                                flex-direction:column;gap:var(--space-3);">
+                        @for (int i = 0; i < 5; i++)
+                        {
+                            <SkeletonLoader Shape="text" Width="100%" Height="20px" />
+                        }
+                    </div>
+                }
+                else
+                {
+                    <ul class="admin-health-list">
+                        @foreach (var check in _healthChecks)
+                        {
+                            <li class="admin-health-item">
+                                <StatusDot Status="@check.Status" />
+                                <span class="text-sm admin-health-name">@check.Name</span>
+                                <span class="text-xs text-muted">
+                                    @check.DurationMs ms
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Service client activity + Top failing subscriptions -->
+    <div class="admin-dashboard-split" style="margin-bottom:var(--space-6);">
+
+        <!-- Service client activity -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Service Client Activity</h2>
+                <a href="/admin/service-clients" class="btn btn-ghost btn-sm">
+                    View all
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         style="width:14px;height:14px;">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </a>
+            </div>
+            <div class="card-body" style="padding:0;">
+                @if (_isLoadingClients)
+                {
+                    <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
+                }
+                else if (!_clientActivity.Any())
+                {
+                    <EmptyState Title="No activity"
+                                Description="No service clients have published events today."
+                                Icon="client" />
+                }
+                else
+                {
+                    <ul class="admin-client-activity-list">
+                        @foreach (var client in _clientActivity)
+                        {
+                            <li class="admin-client-activity-item">
+                                <div class="admin-client-activity-info">
+                                    <span class="text-sm table-mono">
+                                        @client.ClientId
+                                    </span>
+                                    <span class="text-xs text-muted">
+                                        @client.ServiceName
+                                    </span>
+                                </div>
+                                <div class="admin-client-activity-count">
+                                    <span class="text-sm font-semibold">
+                                        @client.EventsToday
+                                    </span>
+                                    <span class="text-xs text-muted">events</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+        <!-- Top failing subscriptions — system-wide -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Top Failing Subscriptions</h2>
+                <a href="/deliveries?status=Failed" class="btn btn-ghost btn-sm">
+                    View all
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         style="width:14px;height:14px;">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </a>
+            </div>
+            <div class="card-body" style="padding:0;">
+                @if (_isLoadingFailures)
+                {
+                    <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
+                }
+                else if (!_topFailures.Any())
+                {
+                    <EmptyState Title="No failing subscriptions"
+                                Description="All subscriptions are delivering successfully."
+                                Icon="delivery" />
+                }
+                else
+                {
+                    <ul class="admin-client-activity-list">
+                        @foreach (var sub in _topFailures)
+                        {
+                            <li class="admin-client-activity-item">
+                                <div class="admin-client-activity-info">
+                                    <span class="text-sm">@sub.Name</span>
+                                    <span class="text-xs text-muted truncate"
+                                          style="max-width:160px;"
+                                          title="@sub.CallbackUrl">
+                                        @sub.CallbackUrl
+                                    </span>
+                                </div>
+                                <div class="admin-client-activity-count">
+                                    <span class="text-sm font-semibold"
+                                          style="color:var(--color-danger);">
+                                        @sub.FailedCount
+                                    </span>
+                                    <span class="text-xs text-muted">failed</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Recent system events -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Recent System Events</h2>
+            <span class="text-sm text-muted">All sources</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+            @if (_isLoadingEvents)
+            {
+                <TableSkeleton Rows="6" Columns="5" />
+            }
+            else if (!_recentEvents.Any())
+            {
+                <EmptyState Title="No recent events"
+                            Description="No events have been published today."
+                            Icon="webhook" />
+            }
+            else
+            {
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Event Type</th>
+                                <th>Source</th>
+                                <th>Correlation ID</th>
+                                <th>Deliveries</th>
+                                <th>Published</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var evt in _recentEvents)
+                            {
+                                <tr>
+                                    <td class="table-mono text-sm">@evt.EventType</td>
+                                    <td class="text-sm table-mono">@evt.Source</td>
+                                    <td>
+                                        <CopyButton Value="@evt.CorrelationId.ToString()"
+                                                    DisplayText="@($"{evt.CorrelationId.ToString()[..8]}...")"
+                                                    ShowField="true" />
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @evt.DeliveryCount
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @evt.PublishedAt.ToString("HH:mm:ss")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool _isLoading        = true;
+    private bool _isLoadingWorkers = true;
+    private bool _isLoadingHealth  = true;
+    private bool _isLoadingClients = true;
+    private bool _isLoadingFailures = true;
+    private bool _isLoadingEvents  = true;
+
+    // Entity counts
+    private int _totalUsers         = 0;
+    private int _totalSubscriptions = 0;
+    private int _totalServiceClients = 0;
+    private int _totalEventTypes    = 0;
+
+    // Pipeline metrics
+    private int    _eventsToday      = 0;
+    private double _successRate      = 0;
+    private int    _pendingDeliveries = 0;
+    private int    _deadLetterCount  = 0;
+
+    // Section data
+    private string                   _overallHealth  = "Unknown";
+    private List<WorkerItem>         _workers        = [];
+    private List<HealthCheckItem>    _healthChecks   = [];
+    private List<ClientActivityItem> _clientActivity = [];
+    private List<FailingSubItem>     _topFailures    = [];
+    private List<SystemEventItem>    _recentEvents   = [];
+
+    // -------------------------------------------------------------------------
+    // Computed
+    // -------------------------------------------------------------------------
+
+    private string SuccessRateColor => _successRate switch
+    {
+        >= 95 => "var(--color-success)",
+        >= 80 => "var(--color-warning)",
+        _     => "var(--color-danger)"
+    };
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+        => await LoadDashboardAsync();
+
+    private async Task LoadDashboardAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // TODO: replace with real parallel service calls
+            // var metricsTask = AdminService.GetSystemMetricsAsync();
+            // await Task.WhenAll(metricsTask);
+            // var metrics = metricsTask.Result.ResponseData;
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            _totalUsers          = success ? 48  : 0;
+            _totalSubscriptions  = success ? 124 : 0;
+            _totalServiceClients = success ? 6   : 0;
+            _totalEventTypes     = success ? 12  : 0;
+            _eventsToday         = success ? 842 : 0;
+            _successRate         = success ? 97.3 : 0;
+            _pendingDeliveries   = success ? 7   : 0;
+            _deadLetterCount     = success ? 11  : 0;
+
+            _isLoading = false;
+            StateHasChanged();
+
+            // Load sections progressively
+            await Task.WhenAll(
+                LoadWorkersAndHealthAsync(),
+                LoadClientActivityAsync(),
+                LoadTopFailuresAsync(),
+                LoadRecentEventsAsync());
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadWorkersAndHealthAsync()
+    {
+        _isLoadingWorkers = true;
+        _isLoadingHealth  = true;
+
+        await Task.Delay(400);
+
+        // TODO: replace with real health check call
+        // var result = await HealthService.GetHealthAsync();
+
+        _workers =
+        [
+            new("EventRaisedWorker",                "Healthy"),
+            new("PendingRaisedEventWorker",          "Healthy"),
+            new("DeliveryWorker",                    "Healthy"),
+            new("RetryWorker",                       "Degraded"),
+            new("StaleClaimedDeliveryReleaseWorker", "Healthy"),
+            new("EmailProcessorWorker",              "Healthy"),
+        ];
+
+        _healthChecks =
+        [
+            new("postgresql",         "Healthy",   12.3),
+            new("email-queue",        "Healthy",   0.1),
+            new("dead-letter-queue",  "Degraded",  1.8),
+            new("pending-deliveries", "Healthy",   2.1),
+            new("stale-processing",   "Healthy",   0.9),
+        ];
+
+        _overallHealth = _healthChecks.Any(h => h.Status == "Unhealthy")
+            ? "Unhealthy"
+            : _healthChecks.Any(h => h.Status == "Degraded")
+                ? "Degraded"
+                : "Healthy";
+
+        _isLoadingWorkers = false;
+        _isLoadingHealth  = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadClientActivityAsync()
+    {
+        _isLoadingClients = true;
+
+        await Task.Delay(500);
+
+        // TODO: replace with real service call
+        // var result = await AdminService.GetClientActivityAsync();
+
+        _clientActivity =
+        [
+            new("order-service-prod",   "Order Management Service", 312),
+            new("payment-gateway-prod", "Payment Gateway",          198),
+            new("notification-prod",    "Notification Service",     87),
+        ];
+
+        _isLoadingClients = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadTopFailuresAsync()
+    {
+        _isLoadingFailures = true;
+
+        await Task.Delay(600);
+
+        // TODO: replace with real service call
+        // var result = await AdminService.GetTopFailingSubscriptionsAsync();
+
+        _topFailures =
+        [
+            new("Order Service Sub",   "https://orders.internal/webhook", 24),
+            new("CRM Sub",             "https://crm.internal/hooks",      16),
+            new("Notification Sub",    "https://notify.internal/events",  8),
+        ];
+
+        _isLoadingFailures = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadRecentEventsAsync()
+    {
+        _isLoadingEvents = true;
+
+        await Task.Delay(700);
+
+        // TODO: replace with real service call
+        // var result = await AdminService.GetRecentEventsAsync(limit: 10);
+
+        _recentEvents =
+        [
+            new("OrderCreated",    "order-service-prod",   Guid.NewGuid(), 9,  DateTimeOffset.UtcNow.AddMinutes(-1)),
+            new("PaymentReceived", "payment-gateway-prod", Guid.NewGuid(), 4,  DateTimeOffset.UtcNow.AddMinutes(-3)),
+            new("OrderCancelled",  "order-service-prod",   Guid.NewGuid(), 9,  DateTimeOffset.UtcNow.AddMinutes(-7)),
+            new("UserRegistered",  "notification-prod",    Guid.NewGuid(), 2,  DateTimeOffset.UtcNow.AddMinutes(-12)),
+            new("OrderCreated",    "order-service-prod",   Guid.NewGuid(), 9,  DateTimeOffset.UtcNow.AddMinutes(-18)),
+        ];
+
+        _isLoadingEvents = false;
+        StateHasChanged();
+    }
+
+    private async Task RefreshDashboard()
+        => await LoadDashboardAsync();
+
+    // -------------------------------------------------------------------------
+    // Local view models
+    // -------------------------------------------------------------------------
+
+    private sealed record WorkerItem(string Name, string Status);
+
+    private sealed record HealthCheckItem(
+        string Name,
+        string Status,
+        double DurationMs);
+
+    private sealed record ClientActivityItem(
+        string ClientId,
+        string ServiceName,
+        int    EventsToday);
+
+    private sealed record FailingSubItem(
+        string Name,
+        string CallbackUrl,
+        int    FailedCount);
+
+    private sealed record SystemEventItem(
+        string         EventType,
+        string         Source,
+        Guid           CorrelationId,
+        int            DeliveryCount,
+        DateTimeOffset PublishedAt);
+}

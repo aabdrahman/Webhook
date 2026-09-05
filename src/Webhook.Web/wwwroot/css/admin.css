@@ -1,0 +1,97 @@
+/* =============================================================================
+   Admin pages styles
+   ============================================================================= */
+
+/* Two column split layout */
+.admin-dashboard-split {
+    display:               grid;
+    grid-template-columns: 1fr 1fr;
+    gap:                   var(--space-6);
+    align-items:           start;
+}
+
+/* Worker list */
+.admin-worker-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            var(--space-3);
+}
+
+.admin-worker-item {
+    display:         flex;
+    align-items:     center;
+    gap:             var(--space-3);
+    justify-content: space-between;
+}
+
+/* Health check list */
+.admin-health-list {
+    display:        flex;
+    flex-direction: column;
+}
+
+.admin-health-item {
+    display:       flex;
+    align-items:   center;
+    gap:           var(--space-3);
+    padding:       var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.admin-health-item:last-child {
+    border-bottom: none;
+}
+
+.admin-health-name {
+    flex:          1;
+    color:         var(--color-text-secondary);
+    font-family:   var(--font-mono);
+    font-size:     var(--text-xs);
+}
+
+/* Client activity list */
+.admin-client-activity-list {
+    display:        flex;
+    flex-direction: column;
+}
+
+.admin-client-activity-item {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             var(--space-4);
+    padding:         var(--space-3) var(--space-4);
+    border-bottom:   1px solid var(--color-border-subtle);
+    transition:      background var(--transition-fast);
+}
+
+.admin-client-activity-item:last-child {
+    border-bottom: none;
+}
+
+.admin-client-activity-item:hover {
+    background: var(--color-surface-3);
+}
+
+.admin-client-activity-info {
+    display:        flex;
+    flex-direction: column;
+    gap:            2px;
+    flex:           1;
+    overflow:       hidden;
+}
+
+.admin-client-activity-count {
+    display:        flex;
+    flex-direction: column;
+    align-items:    flex-end;
+    gap:            2px;
+    flex-shrink:    0;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .admin-dashboard-split {
+        grid-template-columns: 1fr;
+    }
+}
