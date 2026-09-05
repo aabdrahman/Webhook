@@ -6,6 +6,8 @@ public record class WebhookSubscriptionDto
     public string Name { get; set; }
     public DateTimeOffset CreatedDate { get; set; }
     public string SecretKey { get; set; }
+    public string CallBackUrl { get; set; }
+    public bool IsActive { get; set; }
     public IReadOnlyList<string> SubscribedFields { get; set; } = [];
     public IReadOnlyList<string> SubscribedEvents { get; set; } = [];
 }

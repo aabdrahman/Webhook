@@ -1,0 +1,56 @@
+/* =============================================================================
+   Subscriptions page styles
+   ============================================================================= */
+
+/* Clickable table row */
+.table-row-clickable {
+    cursor: pointer;
+}
+
+.table-row-clickable:hover td {
+    background: var(--color-surface-3);
+}
+
+/* Subscription name */
+.subscription-name {
+    font-family:  var(--font-body);
+    font-weight:  var(--weight-semibold);
+    color:        var(--color-text-primary);
+}
+
+/* Modal detail rows */
+.subscription-modal-details {
+    display:        flex;
+    flex-direction: column;
+    gap:            var(--space-3);
+    margin-bottom:  var(--space-5);
+    background:     var(--color-surface-1);
+    border:         1px solid var(--color-border-subtle);
+    border-radius:  var(--radius-md);
+    padding:        var(--space-4);
+}
+
+.subscription-modal-row {
+    display:     flex;
+    align-items: flex-start;
+    gap:         var(--space-4);
+}
+
+.subscription-modal-label {
+    font-family:  var(--font-body);
+    font-size:    var(--text-xs);
+    font-weight:  var(--weight-semibold);
+    color:        var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    min-width:    100px;
+    flex-shrink:  0;
+    padding-top:  2px;
+}
+
+.subscription-modal-value {
+    font-family: var(--font-body);
+    font-size:   var(--text-sm);
+    color:       var(--color-text-primary);
+    word-break:  break-all;
+}

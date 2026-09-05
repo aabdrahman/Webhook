@@ -1,0 +1,414 @@
+@page "/subscriptions"
+@inject NavigationManager Navigation
+
+<PageTitle>Subscriptions — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading subscriptions..." />
+
+@if (!_isLoading)
+{
+    @* <PageHeader Title="Subscriptions"
+                Description="Manage your webhook subscriptions."
+                BadgeValue="@_subscriptions.Count.ToString()"
+                BadgeVariant="custom"
+                ActionText="New Subscription"
+                OnAction="NavigateToCreate" /> *@
+
+    <PageHeader Title="Subscriptions"
+                Description="Manage your webhook subscriptions."
+                BadgeValue="@_subscriptions.Count.ToString()"
+                BadgeType="custom"
+                BadgeCssClass="badge-inactive"
+                ActionText="New Subscription"
+                OnAction="NavigateToCreate" />
+
+    <!-- Error alert -->
+    <Alert Message="@_errorMessage" />
+
+    @if (_subscriptions.Count == 0 && string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <EmptyState Title="No subscriptions yet"
+                    Description="Create your first subscription to start receiving webhook events."
+                    ActionText="New Subscription"
+                    OnAction="NavigateToCreate"
+                    Icon="subscription" />
+    }
+    else
+    {
+        <!-- Subscriptions table -->
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Callback URL</th>
+                                <th>Events</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var sub in _subscriptions)
+                            {
+                                <tr class="table-row-clickable"
+                                    @onclick="() => NavigateToDetail(sub.Id)">
+                                    <td>
+                                        <span class="subscription-name">@sub.Name</span>
+                                    </td>
+                                    <td class="table-mono truncate"
+                                        style="max-width:220px;"
+                                        title="@sub.CallBackUrl">
+                                        @sub.CallBackUrl
+                                    </td>
+                                    <td>
+                                        <span class="text-sm text-muted">
+                                            @sub.SubscribedEvents.Count event@(sub.SubscribedEvents.Count != 1 ? "s" : "")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <Badge Value="@(sub.IsActive ? "Active" : "Inactive")"
+                                               Variant="subscription" />
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @sub.CreatedDate.ToString("MMM dd, yyyy")
+                                    </td>
+                                    <td @onclick:stopPropagation="true">
+                                        <div class="table-actions">
+                                            <!-- Activate / Deactivate -->
+                                            <button class="btn btn-ghost btn-sm"
+                                                    @onclick="() => OpenToggleModal(sub)"
+                                                    title="@(sub.IsActive ? "Deactivate" : "Activate")">
+                                                @if (sub.IsActive)
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;color:var(--color-warning);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="8" y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                                else
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;color:var(--color-success);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="12" y1="8" x2="12" y2="16" />
+                                                        <line x1="8"  y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                            </button>
+
+                                            <!-- Delete -->
+                                            <button class="btn btn-ghost btn-sm"
+                                                    @onclick="() => OpenDeleteModal(sub)"
+                                                    title="Delete">
+                                                <svg viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor" stroke-width="2"
+                                                     stroke-linecap="round" stroke-linejoin="round"
+                                                     style="width:15px;height:15px;color:var(--color-danger);">
+                                                    <polyline points="3 6 5 6 21 6" />
+                                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                                    <path d="M10 11v6M14 11v6" />
+                                                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Activate / Deactivate modal -->
+@if (_selectedSubscription is not null)
+{
+    <Modal @bind-IsOpen="_showToggleModal"
+           Title="@(_selectedSubscription.IsActive ? "Deactivate Subscription" : "Activate Subscription")"
+           ConfirmText="@(_selectedSubscription.IsActive ? "Deactivate" : "Activate")"
+           ConfirmVariant="@(_selectedSubscription.IsActive ? "danger" : "primary")"
+           IsConfirming="@_isToggling"
+           OnConfirm="HandleToggle"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Name</span>
+                <span class="subscription-modal-value">@_selectedSubscription.Name</span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Callback URL</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_selectedSubscription.CallBackUrl
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_selectedSubscription.IsActive ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Subscribed Events</span>
+                <span class="subscription-modal-value text-sm">
+                    @string.Join(", ", _selectedSubscription.SubscribedEvents)
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="@(_selectedSubscription.IsActive
+                   ? "Deactivating this subscription will stop all event deliveries to the callback URL."
+                   : "Activating this subscription will resume event deliveries to the callback URL.")" />
+
+        <Alert Message="@_toggleErrorMessage" />
+
+    </Modal>
+}
+
+<!-- Delete modal -->
+@if (_selectedSubscription is not null)
+{
+    <Modal @bind-IsOpen="_showDeleteModal"
+           Title="Delete Subscription"
+           ConfirmText="Delete"
+           ConfirmVariant="danger"
+           IsConfirming="@_isDeleting"
+           OnConfirm="HandleDelete"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Name</span>
+                <span class="subscription-modal-value">@_selectedSubscription.Name</span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Callback URL</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_selectedSubscription.CallBackUrl
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Events</span>
+                <span class="subscription-modal-value text-sm">
+                    @string.Join(", ", _selectedSubscription.SubscribedEvents)
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="error"
+               Title="This action cannot be undone."
+               Message="Deleting this subscription will permanently remove it and stop all event deliveries." />
+
+        <Alert Message="@_deleteErrorMessage" />
+
+    </Modal>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading    = true;
+    private string _errorMessage = string.Empty;
+
+    private List<WebhookSubscriptionDto> _subscriptions = [];
+
+    // Toggle modal
+    private bool                   _showToggleModal    = false;
+    private bool                   _isToggling         = false;
+    private string                 _toggleErrorMessage = string.Empty;
+    private WebhookSubscriptionDto? _selectedSubscription;
+
+    // Delete modal
+    private bool   _showDeleteModal    = false;
+    private bool   _isDeleting         = false;
+    private string _deleteErrorMessage = string.Empty;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+        => await LoadSubscriptionsAsync();
+
+    private async Task LoadSubscriptionsAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await SubscriptionService.GetUserSubscriptionsAsync();
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _subscriptions = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load subscriptions. Please try again.";
+                return;
+            }
+
+            _subscriptions =
+            [
+                new WebhookSubscriptionDto
+                {
+                    Id               = Guid.NewGuid(),
+                    Name             = "Order Service Sub",
+                    CallBackUrl      = "https://orders.internal/webhook",
+                    IsActive         = true,
+                    SubscribedEvents = ["OrderCreated", "OrderCancelled"],
+                    CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
+                },
+                new WebhookSubscriptionDto
+                {
+                    Id               = Guid.NewGuid(),
+                    Name             = "CRM Sub",
+                    CallBackUrl      = "https://crm.internal/hooks",
+                    IsActive         = false,
+                    SubscribedEvents = ["UserRegistered"],
+                    CreatedDate      = DateTimeOffset.UtcNow.AddDays(-5)
+                }
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    private void NavigateToCreate()
+        => Navigation.NavigateTo("/subscriptions/create");
+
+    private void NavigateToDetail(Guid id)
+        => Navigation.NavigateTo($"/subscriptions/{id}");
+
+    // -------------------------------------------------------------------------
+    // Modal handlers
+    // -------------------------------------------------------------------------
+
+    private void OpenToggleModal(WebhookSubscriptionDto sub)
+    {
+        _selectedSubscription = sub;
+        _toggleErrorMessage   = string.Empty;
+        _showToggleModal      = true;
+    }
+
+    private void OpenDeleteModal(WebhookSubscriptionDto sub)
+    {
+        _selectedSubscription = sub;
+        _deleteErrorMessage   = string.Empty;
+        _showDeleteModal      = true;
+    }
+
+    private void CloseModals()
+    {
+        _showToggleModal      = false;
+        _showDeleteModal      = false;
+        _selectedSubscription = null;
+        _toggleErrorMessage   = string.Empty;
+        _deleteErrorMessage   = string.Empty;
+    }
+
+    private async Task HandleToggle()
+    {
+        if (_selectedSubscription is null) return;
+
+        _toggleErrorMessage = string.Empty;
+        _isToggling         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // GenericResponse<string> result;
+            // if (_selectedSubscription.IsActive)
+            //     result = await SubscriptionService.DeactivateAsync(_selectedSubscription.Id);
+            // else
+            //     result = await SubscriptionService.ActivateAsync(_selectedSubscription.Id);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _toggleErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _toggleErrorMessage = "Operation failed. Please try again.";
+                return;
+            }
+
+            // Update local state
+            _selectedSubscription.IsActive = !_selectedSubscription.IsActive;
+            CloseModals();
+        }
+        finally
+        {
+            _isToggling = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        if (_selectedSubscription is null) return;
+
+        _deleteErrorMessage = string.Empty;
+        _isDeleting         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await SubscriptionService.DeleteAsync(_selectedSubscription.Id);
+            // if (!result.IsSuccessful)
+            // {
+            //     _deleteErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _deleteErrorMessage = "Failed to delete subscription. Please try again.";
+                return;
+            }
+
+            _subscriptions.Remove(_selectedSubscription);
+            CloseModals();
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+}
