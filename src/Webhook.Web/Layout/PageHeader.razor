@@ -62,11 +62,16 @@
             <h1 class="page-title">@Title</h1>
             @if (!string.IsNullOrWhiteSpace(BadgeValue))
             {
-                <Badge Value="@BadgeValue"
+                @* <Badge Value="@BadgeValue"
                        Type="@BadgeType"
                        CssClass="@BadgeCssClass"
                        ShowDot="false"
-                       Label="@BadgeValue" />
+                       Label="@BadgeValue" /> *@
+
+                <Badge Value="@BadgeValue"
+                       Variant="@BadgeType"
+                       ShowDot="false"
+                       Text="@BadgeValue" />
             }
         </div>
         @if (!string.IsNullOrWhiteSpace(Description))

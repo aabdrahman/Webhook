@@ -1,0 +1,449 @@
+@page "/dashboard"
+
+<PageTitle>Dashboard — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading dashboard..." />
+
+@if (!_isLoading)
+{
+    <!-- Greeting -->
+    <div class="dashboard-greeting">
+        <div>
+            <h1 class="page-title">@_greeting, @_firstName</h1>
+            <p class="page-header-description">
+                Here is an overview of your webhook activity.
+            </p>
+        </div>
+        <div class="dashboard-greeting-actions">
+            <button class="btn btn-secondary btn-sm" @onclick="RefreshDashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10
+                             M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Row 1 — Primary metrics -->
+    <div class="dashboard-metrics-grid">
+        <div class="metric-card">
+            <span class="metric-card-label">Total Subscriptions</span>
+            <span class="metric-card-value">@_totalSubscriptions</span>
+            <span class="metric-card-sub">All registered subscriptions</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Active Subscriptions</span>
+            <span class="metric-card-value" style="color:var(--color-success);">
+                @_activeSubscriptions
+            </span>
+            <span class="metric-card-sub">Currently receiving events</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Success Rate</span>
+            <span class="metric-card-value" style="color:@SuccessRateColor;">
+                @_successRate%
+            </span>
+            <span class="metric-card-sub">Delivery success today</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Dead Letters</span>
+            <span class="metric-card-value" style="color:var(--color-dead-letter);">
+                @_deadLetterCount
+            </span>
+            <span class="metric-card-sub">Awaiting manual retry</span>
+        </div>
+    </div>
+
+    <!-- Row 2 — Secondary metrics -->
+    <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary">
+        <div class="metric-card">
+            <span class="metric-card-label">Events Today</span>
+            <span class="metric-card-value">@_eventsToday</span>
+            <span class="metric-card-sub">Published by internal services</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Deliveries Today</span>
+            <span class="metric-card-value">@_deliveriesToday</span>
+            <span class="metric-card-sub">Total delivery attempts</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Pending</span>
+            <span class="metric-card-value" style="color:var(--color-warning);">
+                @_pendingDeliveries
+            </span>
+            <span class="metric-card-sub">Queued for delivery</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-card-label">Retries Today</span>
+            <span class="metric-card-value" style="color:var(--color-warning);">
+                @_retriesToday
+            </span>
+            <span class="metric-card-sub">Failed and retried deliveries</span>
+        </div>
+    </div>
+
+    <!-- Worker status strip -->
+    <div class="card" style="margin-bottom:var(--space-6);">
+        <div class="card-header">
+            <h2 class="card-title">System Status</h2>
+            <span class="text-muted text-sm">Background worker liveness</span>
+        </div>
+        <div class="card-body">
+            @if (_isLoadingWorkers)
+            {
+                <div class="dashboard-worker-strip">
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <SkeletonLoader Shape="text" Width="120px" Height="24px" />
+                    }
+                </div>
+            }
+            else if (!_workers.Any())
+            {
+                <p class="text-muted text-sm">Worker status unavailable.</p>
+            }
+            else
+            {
+                <div class="dashboard-worker-strip">
+                    @foreach (var worker in _workers)
+                    {
+                        <div class="dashboard-worker-item">
+                            <StatusDot Status="@worker.Status"
+                                       Pulse="@(worker.Status == "Healthy")" />
+                            <span class="text-sm">@worker.Name</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Recent delivery activity -->
+    <div class="card" style="margin-bottom:var(--space-6);">
+        <div class="card-header">
+            <h2 class="card-title">Recent Delivery Activity</h2>
+            <a href="/deliveries" class="btn btn-ghost btn-sm">
+                View all
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </a>
+        </div>
+        <div class="card-body" style="padding:0;">
+            @if (_isLoadingDeliveries)
+            {
+                <TableSkeleton Rows="5" Columns="5" ShowHeader="true" />
+            }
+            else if (!_recentDeliveries.Any())
+            {
+                <EmptyState Title="No recent deliveries"
+                            Description="Deliveries will appear here once events are published."
+                            Icon="delivery" />
+            }
+            else
+            {
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Event Type</th>
+                                <th>Subscription</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var delivery in _recentDeliveries)
+                            {
+                                <tr>
+                                    <td class="table-mono">@delivery.EventType</td>
+                                    <td>@delivery.SubscriptionName</td>
+                                    <td>
+                                        <Badge Value="@delivery.Status" Variant="delivery" />
+                                    </td>
+                                    <td class="text-muted text-sm">
+                                        @delivery.DurationMs ms
+                                    </td>
+                                    <td class="text-muted text-sm">
+                                        @delivery.CreatedAt.ToString("HH:mm:ss")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Top failing subscriptions -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Top Failing Subscriptions</h2>
+            <a href="/deliveries?status=Failed" class="btn btn-ghost btn-sm">
+                View all
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </a>
+        </div>
+        <div class="card-body" style="padding:0;">
+            @if (_isLoadingFailures)
+            {
+                <TableSkeleton Rows="3" Columns="4" ShowHeader="true" />
+            }
+            else if (!_topFailingSubscriptions.Any())
+            {
+                <EmptyState Title="No failing subscriptions"
+                            Description="All your subscriptions are delivering successfully."
+                            Icon="delivery" />
+            }
+            else
+            {
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subscription</th>
+                                <th>Callback URL</th>
+                                <th>Failed Deliveries</th>
+                                <th>Dead Letters</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var sub in _topFailingSubscriptions)
+                            {
+                                <tr>
+                                    <td>@sub.Name</td>
+                                    <td class="table-mono truncate"
+                                        style="max-width:200px;"
+                                        title="@sub.CallbackUrl">
+                                        @sub.CallbackUrl
+                                    </td>
+                                    <td>
+                                        <span style="color:var(--color-danger);
+                                                     font-weight:var(--weight-semibold);">
+                                            @sub.FailedCount
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span style="color:var(--color-dead-letter);
+                                                     font-weight:var(--weight-semibold);">
+                                            @sub.DeadLetterCount
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading          = true;
+    private bool   _isLoadingWorkers   = true;
+    private bool   _isLoadingDeliveries = true;
+    private bool   _isLoadingFailures  = true;
+
+    private string _greeting   = "Good morning";
+    private string _firstName  = "there";
+    private string _lastName = string.Empty;
+
+    // Primary metrics
+    private int    _totalSubscriptions  = 0;
+    private int    _activeSubscriptions = 0;
+    private double _successRate         = 0;
+    private int    _deadLetterCount     = 0;
+
+    // Secondary metrics
+    private int _eventsToday      = 0;
+    private int _deliveriesToday  = 0;
+    private int _pendingDeliveries = 0;
+    private int _retriesToday     = 0;
+
+    // Lists
+    private List<WorkerStatusItem>       _workers                 = [];
+    private List<RecentDeliveryItem>     _recentDeliveries        = [];
+    private List<FailingSubscriptionItem> _topFailingSubscriptions = [];
+
+    // -------------------------------------------------------------------------
+    // Computed
+    // -------------------------------------------------------------------------
+
+    private string SuccessRateColor => _successRate switch
+    {
+        >= 95 => "var(--color-success)",
+        >= 80 => "var(--color-warning)",
+        _     => "var(--color-danger)"
+    };
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGreetingAsync();
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadGreetingAsync()
+    {
+        var hour = DateTime.Now.Hour;
+        _greeting = hour switch
+        {
+            < 12 => "Good morning",
+            < 17 => "Good afternoon",
+            _    => "Good evening"
+        };
+
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        var email     = authState.User.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
+
+        _firstName = authState.User.FindFirstValue(ClaimTypes.GivenName) ?? authState.User.FindFirstValue("given_name") ?? "anonymous";
+        _lastName = authState.User.FindFirstValue(ClaimTypes.Surname) ?? authState.User.FindFirstValue("family_name") ?? string.Empty;
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // TODO: replace with real parallel service calls
+            // var metricsTask   = DashboardService.GetMetricsAsync();
+            // var workersTask   = HealthService.GetWorkerStatusAsync();
+            // var delivTask     = DeliveryService.GetRecentAsync(limit: 10);
+            // var failuresTask  = SubscriptionService.GetTopFailingAsync(limit: 5);
+            // await Task.WhenAll(metricsTask, workersTask, delivTask, failuresTask);
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            // Fake metrics
+            _totalSubscriptions  = success ? 12 : 0;
+            _activeSubscriptions = success ? 9  : 0;
+            _successRate         = success ? 94.2 : 0;
+            _deadLetterCount     = success ? 3  : 0;
+            _eventsToday         = success ? 148 : 0;
+            _deliveriesToday     = success ? 312 : 0;
+            _pendingDeliveries   = success ? 4  : 0;
+            _retriesToday        = success ? 17 : 0;
+
+            _isLoading = false;
+            StateHasChanged();
+
+            // Load sections independently so page feels progressive
+            await LoadWorkersAsync();
+            await LoadRecentDeliveriesAsync();
+            await LoadTopFailuresAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadWorkersAsync()
+    {
+        _isLoadingWorkers = true;
+
+        await Task.Delay(400);
+
+        // TODO: replace with real health check call
+        // var result = await HealthService.GetHealthAsync();
+        _workers =
+        [
+            new("EventRaisedWorker",               "Healthy"),
+            new("PendingRaisedEventWorker",         "Healthy"),
+            new("DeliveryWorker",                   "Healthy"),
+            new("RetryWorker",                      "Degraded"),
+            new("StaleClaimedDeliveryReleaseWorker","Healthy"),
+            new("EmailProcessorWorker",             "Healthy"),
+        ];
+
+        _isLoadingWorkers = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadRecentDeliveriesAsync()
+    {
+        _isLoadingDeliveries = true;
+
+        await Task.Delay(600);
+
+        // TODO: replace with real delivery service call
+        // var result = await DeliveryService.GetRecentAsync(limit: 10);
+        _recentDeliveries =
+        [
+            new("OrderCreated",    "Order Service Sub",   "Delivered",   142, DateTimeOffset.UtcNow.AddMinutes(-2)),
+            new("PaymentReceived", "Payment Sub",         "Delivered",   98,  DateTimeOffset.UtcNow.AddMinutes(-5)),
+            new("OrderCancelled",  "Order Service Sub",   "Failed",      3012,DateTimeOffset.UtcNow.AddMinutes(-8)),
+            new("OrderCreated",    "Notification Sub",    "Delivered",   201, DateTimeOffset.UtcNow.AddMinutes(-12)),
+            new("UserRegistered",  "CRM Sub",             "DeadLetter",  0,   DateTimeOffset.UtcNow.AddMinutes(-20)),
+        ];
+
+        _isLoadingDeliveries = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadTopFailuresAsync()
+    {
+        _isLoadingFailures = true;
+
+        await Task.Delay(500);
+
+        // TODO: replace with real subscription service call
+        // var result = await SubscriptionService.GetTopFailingAsync(limit: 5);
+        _topFailingSubscriptions =
+        [
+            new("Order Service Sub",   "https://orders.internal/webhook",   14, 2),
+            new("CRM Sub",             "https://crm.internal/hooks",        8,  1),
+            new("Notification Sub",    "https://notify.internal/events",    3,  0),
+        ];
+
+        _isLoadingFailures = false;
+        StateHasChanged();
+    }
+
+    private async Task RefreshDashboard()
+        => await LoadDashboardAsync();
+
+    // -------------------------------------------------------------------------
+    // Local view models — replace with DTOs from WebHook.Core when wiring
+    // -------------------------------------------------------------------------
+
+    private sealed record WorkerStatusItem(string Name, string Status);
+
+    private sealed record RecentDeliveryItem(
+        string          EventType,
+        string          SubscriptionName,
+        string          Status,
+        int             DurationMs,
+        DateTimeOffset  CreatedAt);
+
+    private sealed record FailingSubscriptionItem(
+        string Name,
+        string CallbackUrl,
+        int    FailedCount,
+        int    DeadLetterCount);
+}

@@ -77,7 +77,8 @@
                 <div class="navbar-dropdown" @onclick:stopPropagation="true">
                     <div class="navbar-dropdown-header">
                         <span class="navbar-dropdown-email">@_userEmail</span>
-                        <Badge Value="@_userRole" Type="role" ShowDot="false" />
+                        @* <Badge Value="@_userRole" Type="role" ShowDot="false" /> *@
+                        <Badge Value="@_userRole" Variant="role" ShowDot="false" />
                     </div>
 
                     <div class="navbar-dropdown-divider"></div>

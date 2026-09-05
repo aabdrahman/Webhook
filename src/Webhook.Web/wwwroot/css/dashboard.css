@@ -1,0 +1,58 @@
+/* =============================================================================
+   Dashboard page styles
+   ============================================================================= */
+
+.dashboard-greeting {
+    display:         flex;
+    align-items:     flex-start;
+    justify-content: space-between;
+    gap:             var(--space-4);
+    margin-bottom:   var(--space-6);
+    flex-wrap:       wrap;
+}
+
+.dashboard-greeting-actions {
+    display:     flex;
+    align-items: center;
+    gap:         var(--space-3);
+    flex-shrink: 0;
+}
+
+/* Primary metrics grid — 4 columns */
+.dashboard-metrics-grid {
+    display:               grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:                   var(--space-4);
+    margin-bottom:         var(--space-6);
+}
+
+/* Secondary metrics grid — 4 columns, slightly smaller cards */
+.dashboard-metrics-grid-secondary .metric-card-value {
+    font-size: var(--text-2xl);
+}
+
+/* Worker status strip */
+.dashboard-worker-strip {
+    display:   flex;
+    flex-wrap: wrap;
+    gap:       var(--space-6);
+}
+
+.dashboard-worker-item {
+    display:     flex;
+    align-items: center;
+    gap:         var(--space-2);
+}
+
+/* Responsive — collapse to 2 columns on smaller screens */
+@media (max-width: 900px) {
+    .dashboard-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .dashboard-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+}
