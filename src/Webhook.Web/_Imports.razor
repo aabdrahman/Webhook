@@ -1,5 +1,6 @@
 ﻿@using System.Net.Http
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
@@ -8,3 +9,16 @@
 @using Microsoft.JSInterop
 @using Webhook.Web
 @using Webhook.Web.Layout
+
+@* Application using imports *@
+@using Webhook.Web.Components
+@using Webhook.Web.ApplicationAuthenticationHandler
+@using Webhook.Web.Helper
+@using WebHook.Core
+@using WebHook.Core.DataTransferObjects
+
+
+@* Application global injects *@
+@inject NavigationManager navigationManager
+@inject AuthenticationStateProvider authenticationStateProvider
+@inject EnvironmentVariables environmentVariables

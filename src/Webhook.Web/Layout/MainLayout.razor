@@ -3,7 +3,7 @@
 @* MainLayout.razor *@
 <div class="app-shell">
     <Sidebar />
-    @* <Navbar /> *@
+    <Navbar OnLogout="HandleLogout" />
     <main class="main-content">
         <div class="page-container">
             @Body
@@ -12,3 +12,11 @@
 </div>
 
 <ToastContainer />   @* ← this must be outside the app-shell grid *@
+
+@code {
+    private async Task HandleLogout()
+    {
+        await ((UserJwtAuthenticationStateProvider)authenticationStateProvider).NotifyUserLogout();
+        navigationManager.NavigateTo("/login");
+    }
+}

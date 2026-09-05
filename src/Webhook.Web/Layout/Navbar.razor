@@ -1,0 +1,242 @@
+@*
+    Navbar — top navigation bar
+
+    Renders the page breadcrumb on the left and user actions on the right.
+    Sits in MainLayout.razor inside the app-shell grid.
+
+    The breadcrumb is built automatically from the current URL path.
+    The user dropdown shows the authenticated user's email and role,
+    and provides a logout action.
+
+    Parameters: none — reads from NavigationManager and AuthenticationStateProvider
+*@
+
+@implements IDisposable
+
+<header class="navbar">
+
+    <!-- Left — breadcrumb -->
+    <div class="navbar-left">
+        <nav class="navbar-breadcrumb" aria-label="Breadcrumb">
+            <span>WebhookHub</span>
+            @foreach (var crumb in _breadcrumbs)
+            {
+                <span class="navbar-breadcrumb-separator">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </span>
+                @if (crumb.IsLast)
+                {
+                    <span class="navbar-breadcrumb-current">@crumb.Label</span>
+                }
+                else
+                {
+                    <a href="@crumb.Href">@crumb.Label</a>
+                }
+            }
+        </nav>
+    </div>
+
+    <!-- Right — actions -->
+    <div class="navbar-right">
+
+        <!-- Notifications placeholder -->
+        <button class="navbar-icon-btn" aria-label="Notifications" title="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+        </button>
+
+        <!-- Divider -->
+        <div class="navbar-divider" aria-hidden="true"></div>
+
+        <!-- User menu -->
+        <div class="navbar-user-menu" @onclick="ToggleDropdown">
+            <div class="navbar-user-trigger">
+                <div class="navbar-user-avatar">
+                    @_userInitials
+                </div>
+                <div class="navbar-user-info">
+                    <span class="navbar-user-email">@_userEmail</span>
+                    <span class="navbar-user-role">@_userRole</span>
+                </div>
+                <svg class="navbar-chevron @(_dropdownOpen ? "navbar-chevron-open" : "")"
+                     viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                </svg>
+            </div>
+
+            @if (_dropdownOpen)
+            {
+                <div class="navbar-dropdown" @onclick:stopPropagation="true">
+                    <div class="navbar-dropdown-header">
+                        <span class="navbar-dropdown-email">@_userEmail</span>
+                        <Badge Value="@_userRole" Type="role" ShowDot="false" />
+                    </div>
+
+                    <div class="navbar-dropdown-divider"></div>
+
+                    <button class="navbar-dropdown-item"
+                            @onclick="NavigateToProfile">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        Profile
+                    </button>
+
+                    <button class="navbar-dropdown-item"
+                            @onclick="NavigateToChangePassword">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                        Change Password
+                    </button>
+
+                    <div class="navbar-dropdown-divider"></div>
+
+                    <button class="navbar-dropdown-item navbar-dropdown-item-danger"
+                            @onclick="HandleLogout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                        Sign Out
+                    </button>
+                </div>
+            }
+        </div>
+
+    </div>
+
+</header>
+
+<!-- Backdrop to close dropdown when clicking outside -->
+@if (_dropdownOpen)
+{
+    <div class="navbar-backdrop" @onclick="CloseDropdown"></div>
+}
+
+@code {
+
+    /// <summary>
+    /// Raised when the user clicks Sign Out.
+    /// Your AuthenticationStateProvider handles clearing the token.
+    /// </summary>
+    [Parameter] public EventCallback OnLogout { get; set; }
+
+    private bool   _dropdownOpen = false;
+    private string _userEmail    = string.Empty;
+    private string _userInitials = "U";
+    private string _userRole     = "User";
+
+    private List<BreadcrumbItem> _breadcrumbs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserAsync();
+        BuildBreadcrumb();
+        navigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private async Task LoadUserAsync()
+    {
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        var user      = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                     ?? user.FindFirst("email")?.Value
+                     ?? string.Empty;
+
+            _userEmail    = email;
+            _userInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "U";
+            _userRole     = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
+        }
+    }
+
+    private void BuildBreadcrumb()
+    {
+        _breadcrumbs.Clear();
+
+        var path     = new Uri(navigationManager.Uri).AbsolutePath.TrimStart('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        var accumulated = string.Empty;
+
+        for (int i = 0; i < segments.Length; i++)
+        {
+            accumulated += $"/{segments[i]}";
+            _breadcrumbs.Add(new BreadcrumbItem
+            {
+                Label  = FormatSegment(segments[i]),
+                Href   = accumulated,
+                IsLast = i == segments.Length - 1
+            });
+        }
+    }
+
+    private static string FormatSegment(string segment)
+    {
+        // Convert kebab-case and camelCase to Title Case
+        var words = segment
+            .Replace("-", " ")
+            .Replace("_", " ");
+
+        return System.Globalization.CultureInfo.CurrentCulture
+            .TextInfo.ToTitleCase(words);
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        BuildBreadcrumb();
+        CloseDropdown();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleDropdown() => _dropdownOpen = !_dropdownOpen;
+    private void CloseDropdown()  => _dropdownOpen = false;
+
+    private void NavigateToProfile()
+    {
+        CloseDropdown();
+        navigationManager.NavigateTo("/profile");
+    }
+
+    private void NavigateToChangePassword()
+    {
+        CloseDropdown();
+        navigationManager.NavigateTo("/change-password");
+    }
+
+    private async Task HandleLogout()
+    {
+        CloseDropdown();
+        await OnLogout.InvokeAsync();
+    }
+
+    public void Dispose()
+    {
+        navigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+
+    private sealed class BreadcrumbItem
+    {
+        public string Label  { get; set; } = string.Empty;
+        public string Href   { get; set; } = string.Empty;
+        public bool   IsLast { get; set; }
+    }
+}

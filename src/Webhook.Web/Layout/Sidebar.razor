@@ -1,6 +1,4 @@
-@using Microsoft.AspNetCore.Components.Authorization
-@inject NavigationManager Navigation
-@inject AuthenticationStateProvider AuthStateProvider
+
 
 <nav class="sidebar">
 
@@ -134,7 +132,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
         var user      = authState.User;
 
         if (user.Identity?.IsAuthenticated == true)
@@ -150,5 +148,5 @@
     }
 
     private void NavigateToProfile()
-        => Navigation.NavigateTo("/profile");
+        => navigationManager.NavigateTo("/profile");
 }
