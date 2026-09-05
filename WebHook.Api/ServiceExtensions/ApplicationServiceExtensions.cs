@@ -458,7 +458,9 @@ internal static class ApplicationServiceExtensions
             {
                 config.WithOrigins(corsConfig["AllowedOrigins"]?.Split(";", StringSplitOptions.TrimEntries) ?? [])
                     .WithMethods(corsConfig["AllowedMethods"]?.Split(",", StringSplitOptions.TrimEntries) ?? [])
-                    .WithHeaders(corsConfig["AllowedHeaders"]?.Split(",", StringSplitOptions.TrimEntries) ?? []);
+                    //.WithHeaders(corsConfig["AllowedHeaders"]?.Split(",", StringSplitOptions.TrimEntries) ?? [])
+                    .AllowAnyHeader()
+                    .WithExposedHeaders(corsConfig["AllowedHeaders"]?.Split(",", StringSplitOptions.TrimEntries) ?? []);
             });
         });
     }
