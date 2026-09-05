@@ -1,0 +1,154 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<nav class="sidebar">
+
+    <!-- Logo -->
+    <div class="sidebar-logo">
+        <div class="sidebar-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="sidebar-logo-text">WebhookHub</span>
+    </div>
+
+    <!-- Nav items -->
+    <div class="sidebar-nav">
+
+        <!-- Main -->
+        <div>
+            <p class="sidebar-section-label">Main</p>
+            <div class="sidebar-section-items">
+                <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
+                    <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    Dashboard
+                </NavLink>
+
+                <NavLink class="nav-item" href="/subscriptions">
+                    <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    Subscriptions
+                </NavLink>
+
+                <NavLink class="nav-item" href="/deliveries">
+                    <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    Deliveries
+                </NavLink>
+
+                <NavLink class="nav-item" href="/dead-letters">
+                    <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    Dead Letters
+                </NavLink>
+            </div>
+        </div>
+
+        <!-- Admin — only shown to Admin role -->
+        <AuthorizeView Roles="Admin,ADMIN">
+            <Authorized>
+                <div>
+                    <p class="sidebar-section-label">Admin</p>
+                    <div class="sidebar-section-items">
+                        <NavLink class="nav-item" href="/admin/event-catalog">
+                            <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                            </svg>
+                            Event Catalog
+                        </NavLink>
+
+                        <NavLink class="nav-item" href="/admin/service-clients">
+                            <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" />
+                                <line x1="8" y1="21" x2="16" y2="21" />
+                                <line x1="12" y1="17" x2="12" y2="21" />
+                            </svg>
+                            Service Clients
+                        </NavLink>
+
+                        <NavLink class="nav-item" href="/admin/users">
+                            <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
+                            Users
+                        </NavLink>
+
+                        <NavLink class="nav-item" href="/admin/health">
+                            <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                            </svg>
+                            Health
+                        </NavLink>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+    </div>
+
+    <!-- User footer -->
+    <div class="sidebar-footer">
+        <div class="sidebar-user" @onclick="NavigateToProfile">
+            <div class="sidebar-user-avatar">
+                @UserInitials
+            </div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name">@UserName</div>
+                <div class="sidebar-user-role">@UserRole</div>
+            </div>
+        </div>
+    </div>
+
+</nav>
+
+@code {
+    private string UserName     { get; set; } = "User";
+    private string UserInitials { get; set; } = "U";
+    private string UserRole     { get; set; } = "USER";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user      = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                     ?? user.FindFirst("email")?.Value
+                     ?? "User";
+
+            UserName     = email;
+            UserInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "U";
+            UserRole     = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
+        }
+    }
+
+    private void NavigateToProfile()
+        => Navigation.NavigateTo("/profile");
+}

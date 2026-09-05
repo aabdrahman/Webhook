@@ -1,0 +1,49 @@
+@*
+    StatusDot — coloured indicator dot for health check and worker statuses
+
+    Parameters:
+    - Status:  "Healthy" | "Degraded" | "Unhealthy" | "Unknown" (default: "Unknown")
+    - Pulse:   animates the dot with a pulse — use for live/active states (default: false)
+    - Label:   optional text label rendered next to the dot
+    - Size:    "sm" | "md" | "lg" (default: "md")
+
+    Usage:
+        <StatusDot Status="Healthy" />
+        <StatusDot Status="@check.Status" Label="@check.Name" />
+        <StatusDot Status="Healthy" Pulse="true" Label="EventRaisedWorker" />
+        <StatusDot Status="Unhealthy" Size="lg" />
+*@
+
+<span class="status-dot-wrapper @SizeClass">
+    <span class="status-dot @StatusClass @(Pulse ? "status-dot-pulse" : "")"
+          title="@Status"
+          aria-label="@Status">
+    </span>
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <span class="status-dot-label">@Label</span>
+    }
+</span>
+
+@code {
+
+    [Parameter] public string Status { get; set; } = "Unknown";
+    [Parameter] public bool   Pulse  { get; set; } = false;
+    [Parameter] public string Label  { get; set; } = string.Empty;
+    [Parameter] public string Size   { get; set; } = "md";
+
+    private string StatusClass => Status.ToLowerInvariant() switch
+    {
+        "healthy"   => "status-dot-healthy",
+        "degraded"  => "status-dot-degraded",
+        "unhealthy" => "status-dot-unhealthy",
+        _           => "status-dot-unknown"
+    };
+
+    private string SizeClass => Size switch
+    {
+        "sm" => "status-dot-wrapper-sm",
+        "lg" => "status-dot-wrapper-lg",
+        _    => "status-dot-wrapper-md"
+    };
+}

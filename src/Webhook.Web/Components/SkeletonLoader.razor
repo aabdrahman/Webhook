@@ -1,0 +1,49 @@
+@*
+    SkeletonLoader — a single shimmer placeholder element
+
+    Parameters:
+    - Shape:  "text" | "text-lg" | "circle" | "button" | "card" (default: "text")
+    - Width:  inline width override e.g. "60%", "120px" (default: "100%")
+    - Height: inline height override e.g. "14px" (default: driven by shape class)
+*@
+
+<div class="skeleton @ShapeClass"
+     style="@StyleString"
+     aria-hidden="true">
+</div>
+
+@code {
+
+    [Parameter] public string Shape  { get; set; } = "text";
+    [Parameter] public string Width  { get; set; } = "100%";
+    [Parameter] public string Height { get; set; } = "";
+
+    private string ShapeClass => Shape switch
+    {
+        "text-lg" => "skeleton-text-lg",
+        "circle"  => "skeleton-circle",
+        "button"  => "skeleton-btn",
+        "card"    => "skeleton-card",
+        _         => "skeleton-text"
+    };
+
+    private string StyleString
+    {
+        get
+        {
+            var styles = new System.Text.StringBuilder();
+
+            if (!string.IsNullOrWhiteSpace(Width))
+                styles.Append($"width:{Width};");
+
+            if (!string.IsNullOrWhiteSpace(Height))
+                styles.Append($"height:{Height};");
+
+            // Circle needs equal width and height
+            if (Shape == "circle" && string.IsNullOrWhiteSpace(Height))
+                styles.Append($"height:{Width};");
+
+            return styles.ToString();
+        }
+    }
+}

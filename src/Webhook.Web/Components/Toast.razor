@@ -1,0 +1,112 @@
+@using Webhook.Web.Helper
+@using WebhookHub.Client.Services
+@*
+    Toast — a single toast notification card.
+    Rendered by ToastContainer — not used directly in pages.
+
+    Parameters:
+    - ToastMessage: the toast data from ToastService
+    - OnDismiss:    callback to remove this toast from the queue
+*@
+
+<div class="toast toast-@TypeClass @(_exiting ? "toast-exit" : "")"
+     role="alert"
+     aria-live="polite"
+     aria-atomic="true">
+
+    <!-- Icon -->
+    <div class="toast-icon">
+        @if (ToastMessage.Type == ToastType.Success)
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+        }
+        else if (ToastMessage.Type == ToastType.Error)
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8"  x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+        }
+        else if (ToastMessage.Type == ToastType.Warning)
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0
+                         1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9"  x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+        }
+        else
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8"  x2="12" y2="8.01" />
+                <line x1="12" y1="12" x2="12" y2="16" />
+            </svg>
+        }
+    </div>
+
+    <!-- Body -->
+    <div class="toast-body">
+        @if (!string.IsNullOrWhiteSpace(ToastMessage.Title))
+        {
+            <div class="toast-title">@ToastMessage.Title</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(ToastMessage.Message))
+        {
+            <div class="toast-message">@ToastMessage.Message</div>
+        }
+    </div>
+
+    <!-- Dismiss -->
+    <button class="toast-close"
+            @onclick="DismissAsync"
+            aria-label="Dismiss notification">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6"  y2="18" />
+            <line x1="6"  y1="6" x2="18" y2="18" />
+        </svg>
+    </button>
+
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public ToastMessage ToastMessage { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public EventCallback<Guid> OnDismiss { get; set; }
+
+    private bool _exiting = false;
+
+    private string TypeClass => ToastMessage.Type switch
+    {
+        ToastType.Success => "success",
+        ToastType.Error   => "error",
+        ToastType.Warning => "warning",
+        _                 => "info"
+    };
+
+    /// <summary>
+    /// Plays the exit animation then notifies the container to remove.
+    /// </summary>
+    private async Task DismissAsync()
+    {
+        _exiting = true;
+        StateHasChanged();
+
+        // Wait for the CSS exit animation to finish before removing from DOM
+        await Task.Delay(200);
+        await OnDismiss.InvokeAsync(ToastMessage.Id);
+    }
+}

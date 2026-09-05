@@ -1,0 +1,117 @@
+@*
+    EmptyState — shown when a list endpoint returns an empty result
+
+    Parameters:
+    - Title:           heading text (required)
+    - Description:     explanatory subtext
+    - ActionText:      label for the optional action button
+    - OnAction:        callback for the action button
+    - ActionVariant:   button variant for the action (default: "primary")
+    - Icon:            "webhook" | "subscription" | "delivery" | "catalog"
+                       | "client" | "user" | "deadletter" | "health" | "generic"
+                       (default: "generic")
+
+    Usage:
+        <EmptyState Title="No subscriptions yet"
+                    Description="Create your first subscription to start receiving events."
+                    ActionText="Create Subscription"
+                    OnAction="NavigateToCreate"
+                    Icon="subscription" />
+
+        <EmptyState Title="No dead letters"
+                    Description="All deliveries are healthy."
+                    Icon="deadletter" />
+*@
+
+<div class="empty-state">
+
+    <div class="empty-state-icon">
+        @GetIcon()
+    </div>
+
+    <div>
+        <h3 class="empty-state-title">@Title</h3>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <p class="empty-state-description">@Description</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ActionText) && OnAction.HasDelegate)
+    {
+        <LoadingButton Text="@ActionText"
+                       Variant="@ActionVariant"
+                       OnClick="OnAction" />
+    }
+
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string        Description   { get; set; } = string.Empty;
+    [Parameter] public string        ActionText    { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnAction      { get; set; }
+    [Parameter] public string        ActionVariant { get; set; } = "primary";
+    [Parameter] public string        Icon          { get; set; } = "generic";
+
+    private RenderFragment GetIcon() => Icon switch
+    {
+        "subscription" => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                          </svg>,
+
+        "delivery"     => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                          </svg>,
+
+        "catalog"      => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                          </svg>,
+
+        "client"       => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <rect x="2" y="3" width="20" height="14" rx="2" />
+                              <line x1="8"  y1="21" x2="16" y2="21" />
+                              <line x1="12" y1="17" x2="12" y2="21" />
+                          </svg>,
+
+        "user"         => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                              <circle cx="12" cy="7" r="4" />
+                          </svg>,
+
+        "deadletter"   => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8"  x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>,
+
+        "health"       => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                          </svg>,
+
+        "webhook"      => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                          </svg>,
+
+        _              => @<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8"  x2="12" y2="16" />
+                              <line x1="8"  y1="12" x2="16" y2="12" />
+                          </svg>
+    };
+}

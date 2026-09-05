@@ -4,30 +4,60 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Webhook.Web</title>
+    <meta name="description" content="WebhookHub — Reliable webhook delivery for your internal services." />
+    <meta name="theme-color" content="#0F1117" />
+
+    <title>WebhookHub</title>
+
     <base href="/" />
-    <link rel="preload" id="webassembly" />
+
+    <!-- Preconnect for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Comfortaa:wght@300..700&family=Righteous&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap"
+          rel="stylesheet" />
+
+    <!-- CSS -->
     <link rel="stylesheet" href="css/app.css" />
-    <!-- If you add any scoped CSS files, uncomment the following to load them
-    <link href="Webhook.Web.styles.css" rel="stylesheet" /> -->
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/pages/auth.css" />
+    <link rel="stylesheet" href="WebhookHub.Client.styles.css" />
+
+    <!-- SCRIPTS -->
     <script type="importmap"></script>
 </head>
 
 <body>
+
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <!-- App loading splash — shown until Blazor boots -->
+        <div class="app-loading">
+            <div class="app-loading-logo">
+                <div class="app-loading-logo-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                </div>
+                <span class="app-loading-text">WebhookHub</span>
+            </div>
+            <div class="app-loading-spinner">
+                <div class="spinner spinner-md"></div>
+            </div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        An unhandled error occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
     </div>
+
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+
 </body>
 
 </html>

@@ -1,0 +1,129 @@
+@*
+    Badge — status label component
+
+    Parameters:
+    - Value:    the status string to display and map to a colour
+    - Variant:  "delivery" | "active" | "role" | "custom" (default: auto-detected from Value)
+    - ShowDot:  shows a coloured dot before the label (default: true)
+    - Text:     overrides the display label — uses Value if not set
+
+    Auto-detection maps these values automatically:
+        Delivery:   Delivered, Pending, Failed, DeadLetter, Processing
+        Active:     Active, Inactive, true, false
+        Role:       Admin, ADMIN, User, USER
+
+    Usage:
+        <Badge Value="Delivered" />
+        <Badge Value="@delivery.Status.ToString()" />
+        <Badge Value="@(client.IsActive ? "Active" : "Inactive")" />
+        <Badge Value="Admin" />
+        <Badge Value="custom" Text="On Hold" ShowDot="false" />
+*@
+
+<span class="badge @BadgeClass">
+    @if (ShowDot)
+    {
+        <span class="badge-dot"></span>
+    }
+    @DisplayText
+</span>
+
+@code {
+
+    [Parameter] public string Value   { get; set; } = string.Empty;
+    [Parameter] public string Variant { get; set; } = string.Empty;
+    [Parameter] public bool   ShowDot { get; set; } = true;
+    [Parameter] public string Text    { get; set; } = string.Empty;
+
+    private string DisplayText => !string.IsNullOrWhiteSpace(Text)
+        ? Text
+        : FormatLabel(Value);
+
+    private string BadgeClass => ResolveClass(Value, Variant);
+
+    // -------------------------------------------------------------------------
+    // Class resolution
+    // -------------------------------------------------------------------------
+
+    private static string ResolveClass(string value, string variant)
+    {
+        var normalised = value.ToLowerInvariant().Trim();
+
+        // Explicit variant overrides auto-detection
+        if (IsDeliveryVariant(variant) || IsDeliveryValue(normalised))
+        {
+            return normalised switch
+            {
+                "delivered"                                     => "badge-delivered",
+                "pending"                                       => "badge-pending",
+                "failed"                                        => "badge-failed",
+                "deadletter" or "dead_letter" or "dead letter"  => "badge-dead-letter",
+                "processing"                                    => "badge-processing",
+                _                                               => "badge-inactive"
+            };
+        }
+
+        if (IsActiveVariant(variant) || IsActiveValue(normalised))
+        {
+            return normalised is "active" or "true"
+                ? "badge-active"
+                : "badge-inactive";
+        }
+
+        if (IsRoleVariant(variant) || IsRoleValue(normalised))
+        {
+            return normalised is "admin" or "administrator"
+                ? "badge-admin"
+                : "badge-inactive";
+        }
+
+        return "badge-inactive";
+    }
+
+    // -------------------------------------------------------------------------
+    // Label formatting
+    // -------------------------------------------------------------------------
+
+    private static string FormatLabel(string value) =>
+        value.ToLowerInvariant().Trim() switch
+        {
+            "deadletter" or "dead_letter" => "Dead Letter",
+            "true"                        => "Active",
+            "false"                       => "Inactive",
+            _ => System.Globalization.CultureInfo.CurrentCulture
+                       .TextInfo.ToTitleCase(value.ToLower())
+        };
+
+    // -------------------------------------------------------------------------
+    // Variant and value detection helpers
+    // -------------------------------------------------------------------------
+
+    private static bool IsDeliveryVariant(string v) =>
+        v.Equals("delivery", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsActiveVariant(string v) =>
+        v.Equals("active", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRoleVariant(string v) =>
+        v.Equals("role", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> DeliveryValues =
+    [
+        "delivered", "pending", "failed",
+        "deadletter", "dead_letter", "dead letter", "processing"
+    ];
+
+    private static readonly HashSet<string> ActiveValues =
+    [
+        "active", "inactive", "true", "false"
+    ];
+
+    private static readonly HashSet<string> RoleValues =
+    [
+        "admin", "user", "administrator"
+    ];
+
+    private static bool IsDeliveryValue(string v) => DeliveryValues.Contains(v);
+    private static bool IsActiveValue(string v)   => ActiveValues.Contains(v);
+    private static bool IsRoleValue(string v)     => RoleValues.Contains(v);
+}

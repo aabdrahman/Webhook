@@ -1,0 +1,95 @@
+/* =============================================================================
+   WebhookHub — Auth Pages
+   Login, Register, OTP, Change Password
+   ============================================================================= */
+
+/* OTP input group */
+.otp-inputs {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             var(--space-3);
+}
+
+.otp-input {
+    width:          52px;
+    height:         56px;
+    text-align:     center;
+    font-family:    var(--font-mono);
+    font-size:      var(--text-xl);
+    font-weight:    var(--weight-bold);
+    background:     var(--color-surface-2);
+    border:         1px solid var(--color-border);
+    border-radius:  var(--radius-md);
+    color:          var(--color-text-primary);
+    caret-color:    var(--color-primary);
+    transition:     border-color var(--transition-base),
+                    box-shadow   var(--transition-base);
+}
+
+.otp-input:focus {
+    outline:      none;
+    border-color: var(--color-primary);
+    box-shadow:   0 0 0 3px var(--color-primary-glow);
+}
+
+.otp-input.filled {
+    border-color: var(--color-success);
+    background:   var(--color-success-muted);
+}
+
+/* OTP expiry countdown */
+.otp-countdown {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             var(--space-2);
+    font-family:     var(--font-mono);
+    font-size:       var(--text-sm);
+    color:           var(--color-text-muted);
+    margin-top:      var(--space-4);
+}
+
+.otp-countdown.expiring {
+    color: var(--color-danger);
+}
+
+.otp-countdown svg {
+    width:  14px;
+    height: 14px;
+}
+
+/* Password strength indicator */
+.password-strength {
+    display:        flex;
+    flex-direction: column;
+    gap:            var(--space-2);
+    margin-top:     var(--space-2);
+}
+
+.password-strength-bars {
+    display: flex;
+    gap:     var(--space-1);
+}
+
+.password-strength-bar {
+    flex:          1;
+    height:        3px;
+    border-radius: var(--radius-full);
+    background:    var(--color-border);
+    transition:    background var(--transition-base);
+}
+
+.password-strength-bar.weak   { background: var(--color-danger);  }
+.password-strength-bar.medium { background: var(--color-warning); }
+.password-strength-bar.strong { background: var(--color-success); }
+
+.password-strength-label {
+    font-family: var(--font-body);
+    font-size:   var(--text-xs);
+    color:       var(--color-text-muted);
+}
+
+.password-strength-label.weak   { color: var(--color-danger);  }
+.password-strength-label.medium { color: var(--color-warning); }
+.password-strength-label.strong { color: var(--color-success); }

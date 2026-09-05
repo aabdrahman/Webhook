@@ -14,6 +14,8 @@ public static class ApplicationServiceExtensions
         services.AddScoped<RefreshTokenHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
+
+        services.AddSingleton<ToastService>();
     }
 
     internal static void AddApplicationAuthenticationStateProvider(this IServiceCollection services)

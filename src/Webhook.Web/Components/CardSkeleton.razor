@@ -1,0 +1,67 @@
+@*
+    CardSkeleton — shimmer placeholder for card-based loading states
+
+    Parameters:
+    - Count: number of skeleton cards to render (default: 3)
+    - Variant: "metric" | "list" | "detail" (default: "list")
+        metric — dashboard stat card shape (label + large number + sub text)
+        list   — subscription/client card shape (title + 2 lines + badge)
+        detail — single detail card shape (heading + multiple field rows)
+*@
+
+<div class="@GridClass" aria-hidden="true" aria-label="Loading...">
+    @for (int i = 0; i < Count; i++)
+    {
+        <div class="skeleton-card">
+            @if (Variant == "metric")
+            {
+                <!-- Metric card: label, big number, sub -->
+                <SkeletonLoader Shape="text" Width="45%" />
+                <SkeletonLoader Shape="text-lg" Width="35%" Height="32px" />
+                <SkeletonLoader Shape="text" Width="60%" />
+            }
+            else if (Variant == "detail")
+            {
+                <!-- Detail card: heading, then field rows -->
+                <SkeletonLoader Shape="text-lg" Width="55%" />
+                <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
+                    @for (int f = 0; f < 4; f++)
+                    {
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <SkeletonLoader Shape="text" Width="30%" Height="10px" />
+                            <SkeletonLoader Shape="text" Width="@FieldWidths[f % FieldWidths.Length]" />
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <!-- List card: title + 2 description lines + badge -->
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                    <SkeletonLoader Shape="text-lg" Width="45%" />
+                    <SkeletonLoader Shape="text" Width="60px" Height="22px" />
+                </div>
+                <SkeletonLoader Shape="text" Width="80%" />
+                <SkeletonLoader Shape="text" Width="65%" />
+                <div style="display:flex;gap:8px;margin-top:4px;">
+                    <SkeletonLoader Shape="button" Width="90px" Height="30px" />
+                    <SkeletonLoader Shape="button" Width="70px" Height="30px" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+
+    [Parameter] public int    Count   { get; set; } = 3;
+    [Parameter] public string Variant { get; set; } = "list";
+
+    private static readonly string[] FieldWidths = ["75%", "60%", "85%", "50%"];
+
+    private string GridClass => Variant switch
+    {
+        "metric" => "card-skeleton-grid card-skeleton-grid-metric",
+        _        => "card-skeleton-grid"
+    };
+}

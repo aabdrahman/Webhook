@@ -1,0 +1,55 @@
+@*
+    TableSkeleton — shimmer placeholder for list/table data loading states
+
+    Parameters:
+    - Rows:    number of skeleton rows to render (default: 5)
+    - Columns: number of columns per row (default: 4)
+    - ShowHeader: whether to render a skeleton header row (default: true)
+*@
+
+<div class="table-wrapper" aria-hidden="true" aria-label="Loading data...">
+    <table class="table">
+
+        @if (ShowHeader)
+        {
+            <thead>
+                <tr>
+                    @for (int c = 0; c < Columns; c++)
+                    {
+                        <th>
+                            <SkeletonLoader Shape="text"
+                                            Width="@HeaderWidths[c % HeaderWidths.Length]" />
+                        </th>
+                    }
+                </tr>
+            </thead>
+        }
+
+        <tbody>
+            @for (int r = 0; r < Rows; r++)
+            {
+                <tr>
+                    @for (int c = 0; c < Columns; c++)
+                    {
+                        <td>
+                            <SkeletonLoader Shape="text"
+                                            Width="@RowWidths[c % RowWidths.Length]" />
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+
+    </table>
+</div>
+
+@code {
+
+    [Parameter] public int  Rows       { get; set; } = 5;
+    [Parameter] public int  Columns    { get; set; } = 4;
+    [Parameter] public bool ShowHeader { get; set; } = true;
+
+    // Stagger widths so skeleton rows look natural rather than identical
+    private static readonly string[] HeaderWidths = ["55%", "70%", "45%", "60%", "40%"];
+    private static readonly string[] RowWidths    = ["75%", "60%", "80%", "50%", "65%"];
+}

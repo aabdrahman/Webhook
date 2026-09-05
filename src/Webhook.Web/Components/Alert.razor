@@ -1,0 +1,108 @@
+@*
+    Alert — inline message component
+
+    Parameters:
+    - Type:        "error" | "success" | "warning" | "info" (default: "error")
+    - Title:       optional bold heading above the message
+    - Message:     the alert body text
+    - Dismissible: shows a close button (default: false)
+    - Visible:     controls visibility — bind to a bool in the parent (default: true)
+
+    Usage:
+        <Alert Message="@_errorMessage" />
+        <Alert Type="success" Message="Subscription created." Dismissible="true" />
+        <Alert Type="warning" Title="Key expiring" Message="Rotate your client key." />
+        <Alert Type="error" Message="@_error" Visible="@(!string.IsNullOrEmpty(_error))" />
+*@
+
+@if (Visible && !string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert alert-@Type" role="alert">
+
+        <!-- Icon -->
+        <div class="alert-icon">
+            @if (Type == "error")
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8"  x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+            }
+            else if (Type == "success")
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            }
+            else if (Type == "warning")
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0
+                             1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9"  x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+            }
+            else
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8"  x2="12" y2="8.01" />
+                    <line x1="12" y1="12" x2="12" y2="16" />
+                </svg>
+            }
+        </div>
+
+        <!-- Body -->
+        <div class="alert-body">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <div class="alert-title">@Title</div>
+            }
+            <div class="alert-message">@Message</div>
+        </div>
+
+        <!-- Dismiss button -->
+        @if (Dismissible)
+        {
+            <button class="alert-dismiss"
+                    @onclick="Dismiss"
+                    aria-label="Dismiss">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6"  y2="18" />
+                    <line x1="6"  y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        }
+
+    </div>
+}
+
+@code {
+
+    [Parameter] public string Type        { get; set; } = "error";
+    [Parameter] public string Title       { get; set; } = string.Empty;
+    [Parameter] public string Message     { get; set; } = string.Empty;
+    [Parameter] public bool   Dismissible { get; set; } = false;
+    [Parameter] public bool   Visible     { get; set; } = true;
+
+    /// <summary>
+    /// Raised when the user dismisses the alert.
+    /// Bind to a bool in the parent to hide the alert:
+    ///   <Alert @bind-Visible="_showAlert" Dismissible="true" ... />
+    /// </summary>
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    private async Task Dismiss()
+    {
+        Visible = false;
+        await VisibleChanged.InvokeAsync(false);
+    }
+}

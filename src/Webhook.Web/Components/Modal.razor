@@ -1,0 +1,144 @@
+@*
+    Modal — overlay dialog for confirmations and detail views
+
+    Parameters:
+    - IsOpen:          controls visibility — bind to a bool in the parent (required)
+    - Title:           modal heading text (required)
+    - Size:            "sm" | "md" | "lg" (default: "md")
+    - OnClose:         callback when user dismisses via X or backdrop click
+    - ConfirmText:     label for the confirm button (default: "Confirm")
+    - CancelText:      label for the cancel button (default: "Cancel")
+    - OnConfirm:       callback for the confirm button
+    - IsConfirming:    puts the confirm button in loading state (default: false)
+    - ConfirmVariant:  button variant for confirm — "primary" | "danger" (default: "primary")
+    - ShowFooter:      renders the default footer with confirm/cancel (default: true)
+    - ChildContent:    the modal body — any Razor content
+    - FooterContent:   optional custom footer replacing the default buttons
+
+    Usage — destructive confirmation:
+        <Modal IsOpen="@_showDeleteModal"
+               Title="Delete Subscription"
+               ConfirmText="Delete"
+               ConfirmVariant="danger"
+               IsConfirming="@_isDeleting"
+               OnConfirm="HandleDelete"
+               OnClose="CloseModal">
+            <p>This will permanently delete <strong>@_subscription.Name</strong>.</p>
+            <p>This action cannot be undone.</p>
+        </Modal>
+
+    Usage — detail view with no footer:
+        <Modal IsOpen="@_showDetail"
+               Title="Delivery Attempt"
+               Size="lg"
+               ShowFooter="false"
+               OnClose="CloseDetail">
+            <DeliveryAttemptDetail Attempt="@_selectedAttempt" />
+        </Modal>
+*@
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop" @onclick="HandleBackdropClick">
+        <div class="modal modal-@SizeClass"
+             @onclick:stopPropagation="true"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="modal-title">
+
+            <!-- Header -->
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-title">@Title</h2>
+                <button class="modal-close"
+                        @onclick="HandleClose"
+                        aria-label="Close dialog">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6"  y2="18" />
+                        <line x1="6"  y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+                @ChildContent
+            </div>
+
+            <!-- Footer -->
+            @if (ShowFooter)
+            {
+                <div class="modal-footer">
+                    @if (FooterContent is not null)
+                    {
+                        @FooterContent
+                    }
+                    else
+                    {
+                        <button class="btn btn-ghost btn-sm"
+                                @onclick="HandleClose"
+                                disabled="@IsConfirming">
+                            @CancelText
+                        </button>
+
+                        <LoadingButton Text="@ConfirmText"
+                                       LoadingText="@ConfirmText..."
+                                       IsLoading="@IsConfirming"
+                                       Variant="@ConfirmVariant"
+                                       Size="sm"
+                                       OnClick="HandleConfirm" />
+                    }
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter, EditorRequired]
+    public bool IsOpen { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string          Size            { get; set; } = "md";
+    [Parameter] public EventCallback   OnClose         { get; set; }
+    [Parameter] public string          ConfirmText     { get; set; } = "Confirm";
+    [Parameter] public string          CancelText      { get; set; } = "Cancel";
+    [Parameter] public EventCallback   OnConfirm       { get; set; }
+    [Parameter] public bool            IsConfirming    { get; set; } = false;
+    [Parameter] public string          ConfirmVariant  { get; set; } = "primary";
+    [Parameter] public bool            ShowFooter      { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent    { get; set; }
+    [Parameter] public RenderFragment? FooterContent   { get; set; }
+
+    /// <summary>Two-way bind support — @bind-IsOpen="..."</summary>
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    private string SizeClass => Size switch
+    {
+        "sm" => "modal-sm",
+        "lg" => "modal-lg",
+        _    => ""
+    };
+
+    private async Task HandleClose()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleBackdropClick()
+    {
+        // Do not close on backdrop click if a confirmation is in progress
+        if (IsConfirming) return;
+        await HandleClose();
+    }
+
+    private async Task HandleConfirm()
+    {
+        await OnConfirm.InvokeAsync();
+    }
+}

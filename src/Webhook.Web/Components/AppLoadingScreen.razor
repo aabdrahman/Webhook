@@ -1,0 +1,27 @@
+@*
+    AppLoadingScreen — full viewport loading splash
+
+    Shown by App.razor during the <Authorizing> state — while
+    JwtAuthenticationStateProvider resolves the token from localStorage.
+    Also used as the fallback inside AuthorizeRouteView while auth state loads.
+
+    No parameters — this is a fixed full-screen component.
+*@
+
+<div class="app-loading" role="status" aria-label="Loading WebhookHub...">
+
+    <div class="app-loading-logo">
+        <div class="app-loading-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="app-loading-text">WebhookHub</span>
+    </div>
+
+    <div class="app-loading-spinner">
+        <Spinner Size="md" Label="Loading WebhookHub..." />
+    </div>
+
+</div>

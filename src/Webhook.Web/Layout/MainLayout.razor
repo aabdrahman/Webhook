@@ -1,3 +1,14 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+@* MainLayout.razor *@
+<div class="app-shell">
+    <Sidebar />
+    @* <Navbar /> *@
+    <main class="main-content">
+        <div class="page-container">
+            @Body
+        </div>
+    </main>
+</div>
+
+<ToastContainer />   @* ← this must be outside the app-shell grid *@
