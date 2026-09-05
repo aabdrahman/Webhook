@@ -84,9 +84,9 @@
                 <label class="form-label form-label-required" for="password">
                     Password
                 </label>
-                <a href="/forgot-password" class="auth-forgot-link">
+                @* <a href="/forgot-password" class="auth-forgot-link">
                     Forgot password?
-                </a>
+                </a> *@
             </div>
             <div class="form-input-wrapper">
                 <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
@@ -131,7 +131,12 @@
             </div>
             <ValidationMessage For="@(() => _model.Password)" class="form-error" />
         </div>
-
+        <!-- Forgot password section -->
+        <div class="auth-forgot-row">
+            <a href="/forgot-password" class="auth-forgot-link">
+                Forgot password?
+            </a>
+        </div>
         <!-- Submit -->
         <LoadingButton Text="Sign In"
                        LoadingText="Signing in..."
@@ -160,8 +165,8 @@
     /// Your side: call AuthService.LoginAsync and return the error message
     /// on failure or an empty string on success.
     /// </summary>
-    [Parameter]
-    public Func<string, string, Task<string>>? OnLogin { get; set; }
+    // [Parameter]
+    // public Func<string, string, Task<string>>? OnLogin { get; set; }
 
     // -------------------------------------------------------------------------
     // State
@@ -190,15 +195,16 @@
 
         try
         {
-            if (OnLogin is not null)
-            {
-                var error = await OnLogin(_model.UserNameOrEmailAddress, _model.Password);
+            await Task.Delay(1000);
+            var loginResult = await loginHandler.HandleAsync(_model);
+            
+            _errorMessage = loginResult.successStatus ? string.Empty : loginResult.responseMessage;
 
-                if (!string.IsNullOrWhiteSpace(error))
-                {
-                    _errorMessage = error;
-                    return;
-                }
+            //_errorMessage = DateTime.Now.Second % 2 == 0 ? "Invalid username or password." : "An error occurred while processing operation.";
+            
+            if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                return;
             }
 
             // Navigate to returnUrl or dashboard on success

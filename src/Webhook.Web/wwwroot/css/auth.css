@@ -101,7 +101,8 @@
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-8);
+    gap: var(--space-5);
+    margin-top: var(--space-4);
 }
 
 /* Label row — label + forgot password link side by side */
@@ -112,7 +113,7 @@
     gap: var(--space-2);
 }
 
-.auth-forgot-link {
+/*.auth-forgot-link {
     font-family: var(--font-body);
     font-size: var(--text-xs);
     color: var(--color-text-muted);
@@ -121,5 +122,21 @@
 
 .auth-forgot-link:hover {
     color: var(--color-primary);
+}*/
+
+.auth-forgot-link {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-primary);
+    transition: color var(--transition-base);
 }
- 
+
+.auth-forgot-link:hover {
+    color: var(--color-text-link-hover);
+}
+
+.auth-forgot-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: calc(var(--space-2) * -1); /* ensures it is closer to the password field */
+}

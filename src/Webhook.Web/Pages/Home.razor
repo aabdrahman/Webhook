@@ -1,7 +1,5 @@
 ﻿@page "/"
-@using Webhook.Web.Components
-
-@inject Helper.EnvironmentVariables environmentVariable
+@layout AuthLayout
 
 <PageTitle>Home</PageTitle>
 
@@ -9,31 +7,12 @@
 
 Welcome to your new app.
 
-@if (_isLoading)
-{
-    <CardSkeleton />
-}
-else
-{
-    <p>AppBaseUrl: @_configValue</p>
-    <p>ApiTimeOutInSeconds: @_timeout</p>
-}
-
 
 @code {
 
     private string? _configValue;
     private int _timeout = 0;
     private bool _isLoading = true;
-
-    protected override void OnInitialized()
-    {
-        _configValue = environmentVariable.AppBaseUrl;
-        _timeout = environmentVariable.ApiTimeOutInSeconds;
-
-        Console.WriteLine($"AppBaseUrl: {_configValue}");
-        Console.WriteLine($"ApiTimeOutInSeconds: {_timeout}");
-    }
 
     protected override async Task OnInitializedAsync()
     {

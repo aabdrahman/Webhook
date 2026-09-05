@@ -24,7 +24,7 @@
     text-decoration: none;
     user-select: none;
     height: 38px;
-    margin-top: var(--space-6);
+/*    margin-top: var(--space-6);*/
 }
 
     .btn:disabled,
@@ -148,14 +148,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    padding: var(--space-4) 0;
+/*    padding: var(--space-4) 0;*/
 }
 
 .form-label {
     font-family: var(--font-body);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     letter-spacing: var(--tracking-wide);
 }
 
@@ -194,14 +194,14 @@
     padding-right: var(--space-10);
 }
 
-    .form-input:focus,
-    .form-textarea:focus,
-    .form-select:focus {
-        outline: none;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px var(--color-primary-glow);
-        background: var(--color-surface-3);
-    }
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+    background: var(--color-surface-3);
+}
 
 .form-input::placeholder,
 .form-textarea::placeholder {
@@ -243,9 +243,9 @@
     transition: color var(--transition-base);
 }
 
-    .form-input-icon-right:hover {
-        color: var(--color-text-primary);
-    }
+.form-input-icon-right:hover {
+    color: var(--color-text-primary);
+}
 
 .form-input.has-icon-left {
     padding-left: var(--space-10);

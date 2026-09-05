@@ -364,10 +364,10 @@
 
 .auth-card {
     width: 100%;
-    max-width: 420px;
+    max-width: 520px;
     background: var(--color-surface-1);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-2xl);
     padding: var(--space-8);
     position: relative;
     z-index: 1;

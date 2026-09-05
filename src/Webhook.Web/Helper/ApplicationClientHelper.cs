@@ -4,6 +4,7 @@ public static class ApplicationClientHelper
 {
     public static string StorageKey = "tokenDetails";
     public static string OperationTokenKey = "operationToken";
-    public static string ApplicationHttpClientName = "Webhook.Web.ServerAPI";
+    public static string ApplicationHttpClientNameSecure = "Webhook.Web.ServerAPI.Secure";
+    public static string ApplicationHttpClientNameOpen = "Webhook.Web.ServerAPI.Open";
     public static string ApplicationBearerHeader = "Bearer";
 }

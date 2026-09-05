@@ -20,7 +20,7 @@ public class RefreshTokenHandler
 
     public async Task<string?> RefreshTokenAsync(TokenDto sessionToken)
     {
-        var httpClient = _httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientName);
+        var httpClient = _httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameOpen);
        
         var response = await httpClient.PostAsJsonAsync("api/Authentication/refresh", sessionToken);
 

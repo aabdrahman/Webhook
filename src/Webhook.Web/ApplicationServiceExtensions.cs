@@ -13,6 +13,7 @@ public static class ApplicationServiceExtensions
     internal static void AddApplicationHandlers(this IServiceCollection services)
     {
         services.AddScoped<RefreshTokenHandler>();
+        services.AddScoped<LoginHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
@@ -41,10 +42,16 @@ public static class ApplicationServiceExtensions
 
     internal static void ConfigureApplicationHttpClient(this IServiceCollection services, EnvironmentVariables environmentVariables)
     {
-        services.AddHttpClient(ApplicationClientHelper.ApplicationHttpClientName, client =>
+        services.AddHttpClient(ApplicationClientHelper.ApplicationHttpClientNameSecure, client =>
         {
             client.BaseAddress = new Uri(environmentVariables.AppBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(environmentVariables.ApiTimeOutInSeconds);
         }).AddHttpMessageHandler<AuthenticationTokenHandler>();
+
+        services.AddHttpClient(ApplicationClientHelper.ApplicationHttpClientNameOpen, client =>
+        {
+            client.BaseAddress = new Uri(environmentVariables.AppBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(environmentVariables.ApiTimeOutInSeconds);
+        });
     }
 }
