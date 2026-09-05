@@ -1,0 +1,497 @@
+@page "/deliveries"
+@inject NavigationManager Navigation
+@inject ToastService Toast
+@using Microsoft.AspNetCore.WebUtilities
+
+<PageTitle>Deliveries — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading deliveries..." />
+
+@if (!_isLoading)
+{
+    <PageHeader Title="Deliveries"
+                Description="View and manage webhook delivery history." />
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body">
+            <div class="deliveries-filters">
+
+                <!-- Subscription filter -->
+                <div class="form-group">
+                    <label class="form-label" for="subFilter">Subscription</label>
+                    <select id="subFilter"
+                            class="form-select"
+                            @bind="_filterSubscriptionId"
+                            @bind:after="ApplyFilters">
+                        <option value="">All subscriptions</option>
+                        @foreach (var sub in _subscriptions)
+                        {
+                            <option value="@sub.Id">@sub.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Status filter -->
+                <div class="form-group">
+                    <label class="form-label" for="statusFilter">Status</label>
+                    <select id="statusFilter"
+                            class="form-select"
+                            @bind="_filterStatus"
+                            @bind:after="ApplyFilters">
+                        <option value="">All statuses</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Processing">Processing</option>
+                        <option value="DeadLetter">Dead Letter</option>
+                    </select>
+                </div>
+
+                <!-- Date from -->
+                <div class="form-group">
+                    <label class="form-label" for="dateFrom">From</label>
+                    <input id="dateFrom"
+                           type="date"
+                           class="form-input"
+                           @bind="_filterDateFrom"
+                           @bind:after="ApplyFilters" />
+                </div>
+
+                <!-- Date to -->
+                <div class="form-group">
+                    <label class="form-label" for="dateTo">To</label>
+                    <input id="dateTo"
+                           type="date"
+                           class="form-input"
+                           @bind="_filterDateTo"
+                           @bind:after="ApplyFilters" />
+                </div>
+
+                <!-- Clear filters -->
+                <div class="form-group" style="justify-content:center;align-items:center;">
+                    <label class="form-label" style="visibility:hidden;">clear</label>
+                    <button class="btn btn-ghost btn-sm"
+                            @onclick="ClearFilters">
+                        Clear filters
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Error -->
+    <Alert Message="@_errorMessage" />
+
+    <!-- Table -->
+    @if (_isFiltering)
+    {
+        <TableSkeleton Rows="8" Columns="6" />
+    }
+    else if (!_deliveries.Any())
+    {
+        <EmptyState Title="No deliveries found"
+                    Description="No deliveries match your current filters."
+                    Icon="delivery" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Event Type</th>
+                                <th>Subscription</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Retry Count</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var delivery in _deliveries)
+                            {
+                                <tr class="table-row-clickable"
+                                    @onclick="() => NavigateToAttempts(delivery.Id)">
+                                    <td class="table-mono text-sm">
+                                        @delivery.EventType
+                                    </td>
+                                    <td class="text-sm">
+                                        @delivery.SubscriptionName
+                                    </td>
+                                    <td>
+                                        <Badge Value="@delivery.Status"
+                                               Variant="delivery" />
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @(delivery.DurationMs > 0 ? $"{delivery.DurationMs} ms" : "—")
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @delivery.RetryCount
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @delivery.CreatedAt.ToString("MMM dd, HH:mm")
+                                    </td>
+                                    <td @onclick:stopPropagation="true">
+                                        @if (delivery.Status == "DeadLetter")
+                                        {
+                                            <button class="btn btn-outline btn-sm"
+                                                    @onclick="() => OpenRetryModal(delivery)"
+                                                    title="Manual retry">
+                                                <svg viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor" stroke-width="2"
+                                                     stroke-linecap="round" stroke-linejoin="round"
+                                                     style="width:13px;height:13px;">
+                                                    <polyline points="23 4 23 10 17 10" />
+                                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                                </svg>
+                                                Retry
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination — commented out until ready -->
+                @*
+                <div class="deliveries-pagination">
+                    <span class="text-sm text-muted">
+                        Page @_currentPage of @_totalPages
+                    </span>
+                    <div class="pagination">
+                        <button class="pagination-btn"
+                                disabled="@(_currentPage == 1)"
+                                @onclick="PreviousPage">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                 style="width:14px;height:14px;">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        @for (int p = 1; p <= _totalPages; p++)
+                        {
+                            int page = p;
+                            <button class="pagination-btn @(_currentPage == page ? "active" : "")"
+                                    @onclick="() => GoToPage(page)">
+                                @page
+                            </button>
+                        }
+                        <button class="pagination-btn"
+                                disabled="@(_currentPage == _totalPages)"
+                                @onclick="NextPage">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                 style="width:14px;height:14px;">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                *@
+            </div>
+        </div>
+    }
+}
+
+<!-- Manual retry modal -->
+@if (_selectedDelivery is not null)
+{
+    <Modal @bind-IsOpen="_showRetryModal"
+           Title="Manual Retry"
+           ConfirmText="Retry Delivery"
+           ConfirmVariant="primary"
+           IsConfirming="@_isRetrying"
+           OnConfirm="HandleRetry"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Event Type</span>
+                <span class="subscription-modal-value table-mono">
+                    @_selectedDelivery.EventType
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Subscription</span>
+                <span class="subscription-modal-value">
+                    @_selectedDelivery.SubscriptionName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@_selectedDelivery.Status" Variant="delivery" />
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Retry Count</span>
+                <span class="subscription-modal-value">
+                    @_selectedDelivery.RetryCount
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="info"
+               Message="This will re-queue the delivery for processing. The retry count will be incremented." />
+
+        <Alert Message="@_retryErrorMessage" />
+
+    </Modal>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading   = true;
+    private bool   _isFiltering = false;
+    private string _errorMessage = string.Empty;
+
+    // Filters
+    private string   _filterSubscriptionId = string.Empty;
+    private string   _filterStatus         = string.Empty;
+    private DateTime? _filterDateFrom      = null;
+    private DateTime? _filterDateTo        = null;
+
+    // Data
+    private List<DeliveryItem>       _deliveries    = [];
+    private List<SubscriptionOption> _subscriptions = [];
+
+    // Retry modal
+    private bool         _showRetryModal    = false;
+    private bool         _isRetrying        = false;
+    private string       _retryErrorMessage = string.Empty;
+    private DeliveryItem? _selectedDelivery;
+
+    // Pagination state — ready for when pagination is enabled
+    private int _currentPage = 1;
+    private int _pageSize    = 20;
+    private int _totalPages  = 1;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Read subscriptionId query param and pre-apply filter
+        var uri   = new Uri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("subscriptionId", out var subId)
+            && !string.IsNullOrWhiteSpace(subId))
+        {
+            _filterSubscriptionId = subId.ToString();
+        }
+
+        await LoadSubscriptionsAsync();
+        await LoadDeliveriesAsync();
+    }
+
+    private async Task LoadSubscriptionsAsync()
+    {
+        // TODO: replace with real service call
+        // var result = await SubscriptionService.GetUserSubscriptionsAsync();
+        // _subscriptions = result.ResponseData
+        //     ?.Select(s => new SubscriptionOption(s.Id.ToString(), s.Name))
+        //     .ToList() ?? [];
+
+        await Task.Delay(200);
+
+        _subscriptions =
+        [
+            new(Guid.NewGuid().ToString(), "Order Service Sub"),
+            new(Guid.NewGuid().ToString(), "CRM Sub"),
+            new(Guid.NewGuid().ToString(), "Notification Sub"),
+        ];
+    }
+
+    private async Task LoadDeliveriesAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await DeliveryService.GetAsync(new DeliveryFilterDto
+            // {
+            //     SubscriptionId = _filterSubscriptionId,
+            //     Status         = _filterStatus,
+            //     From           = _filterDateFrom,
+            //     To             = _filterDateTo,
+            //     Page           = _currentPage,
+            //     PageSize       = _pageSize
+            // });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            //
+            // _deliveries  = result.ResponseData.Items.ToList();
+            // _totalPages  = result.ResponseData.TotalPages;
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load deliveries. Please try again.";
+                return;
+            }
+
+            _deliveries =
+            [
+                new(Guid.NewGuid(), "OrderCreated",    "Order Service Sub", "Delivered",  142,  0, DateTimeOffset.UtcNow.AddMinutes(-2)),
+                new(Guid.NewGuid(), "PaymentReceived", "CRM Sub",           "Failed",     3012, 3, DateTimeOffset.UtcNow.AddMinutes(-8)),
+                new(Guid.NewGuid(), "OrderCancelled",  "Order Service Sub", "DeadLetter", 0,    5, DateTimeOffset.UtcNow.AddMinutes(-20)),
+                new(Guid.NewGuid(), "UserRegistered",  "Notification Sub",  "Pending",    0,    0, DateTimeOffset.UtcNow.AddMinutes(-1)),
+                new(Guid.NewGuid(), "OrderCreated",    "Order Service Sub", "Delivered",  201,  0, DateTimeOffset.UtcNow.AddMinutes(-35)),
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Filters
+    // -------------------------------------------------------------------------
+
+    private async Task ApplyFilters()
+    {
+        _isFiltering  = true;
+        _currentPage  = 1;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            await LoadDeliveriesAsync();
+        }
+        finally
+        {
+            _isFiltering = false;
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        _filterSubscriptionId = string.Empty;
+        _filterStatus         = string.Empty;
+        _filterDateFrom       = null;
+        _filterDateTo         = null;
+        await ApplyFilters();
+    }
+
+    // -------------------------------------------------------------------------
+    // Pagination — ready for when enabled
+    // -------------------------------------------------------------------------
+
+    private async Task GoToPage(int page)
+    {
+        _currentPage = page;
+        await LoadDeliveriesAsync();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_currentPage > 1)
+            await GoToPage(_currentPage - 1);
+    }
+
+    private async Task NextPage()
+    {
+        if (_currentPage < _totalPages)
+            await GoToPage(_currentPage + 1);
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    private void NavigateToAttempts(Guid deliveryId)
+        => Navigation.NavigateTo($"/deliveries/{deliveryId}/attempts");
+
+    // -------------------------------------------------------------------------
+    // Retry modal
+    // -------------------------------------------------------------------------
+
+    private void OpenRetryModal(DeliveryItem delivery)
+    {
+        _selectedDelivery  = delivery;
+        _retryErrorMessage = string.Empty;
+        _showRetryModal    = true;
+    }
+
+    private void CloseModals()
+    {
+        _showRetryModal   = false;
+        _selectedDelivery = null;
+        _retryErrorMessage = string.Empty;
+    }
+
+    private async Task HandleRetry()
+    {
+        if (_selectedDelivery is null) return;
+
+        _retryErrorMessage = string.Empty;
+        _isRetrying        = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await DeliveryService.RetryAsync(_selectedDelivery.Id);
+            // if (!result.IsSuccessful)
+            // {
+            //     _retryErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _retryErrorMessage = "Failed to retry delivery. Please try again.";
+                return;
+            }
+
+            Toast.ShowSuccess("Delivery queued for retry successfully.");
+            CloseModals();
+            await LoadDeliveriesAsync();
+        }
+        finally
+        {
+            _isRetrying = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local view models
+    // -------------------------------------------------------------------------
+
+    private sealed record DeliveryItem(
+        Guid           Id,
+        string         EventType,
+        string         SubscriptionName,
+        string         Status,
+        int            DurationMs,
+        int            RetryCount,
+        DateTimeOffset CreatedAt);
+
+    private sealed record SubscriptionOption(
+        string Id,
+        string Name);
+}
