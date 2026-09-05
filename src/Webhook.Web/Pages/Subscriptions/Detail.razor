@@ -1,0 +1,677 @@
+@page "/subscriptions/{Id:guid}"
+@inject NavigationManager Navigation
+@inject ToastService Toast
+
+<PageTitle>Subscription Detail — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading subscription..." />
+
+@if (!_isLoading && _subscription is not null)
+{
+    <PageHeader Title="@_subscription.Name"
+                Description="@_subscription.CallBackUrl"
+                ActionText="@(_subscription.IsActive ? "Deactivate" : "Activate")"
+                ActionVariant="@(_subscription.IsActive ? "danger" : "primary")"
+                OnAction="OpenToggleModal">
+        <AdditionalActions>
+            <button class="btn btn-ghost btn-sm"
+                    @onclick="OpenDeleteModal"
+                    style="color:var(--color-danger);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+                Delete
+            </button>
+        </AdditionalActions>
+    </PageHeader>
+
+    <Alert Message="@_errorMessage" />
+
+    <div class="detail-layout">
+
+        <!-- Left column -->
+        <div class="detail-left">
+
+            <!-- Details card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Details</h2>
+                    <Badge Value="@(_subscription.IsActive ? "Active" : "Inactive")"
+                           Variant="subscription" />
+                </div>
+                <div class="card-body">
+                    <div class="detail-fields">
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Name</span>
+                            <span class="detail-field-value">@_subscription.Name</span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Callback URL</span>
+                            <span class="detail-field-value table-mono text-sm">
+                                @_subscription.CallBackUrl
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Created</span>
+                            <span class="detail-field-value text-sm">
+                                @_subscription.CreatedDate.ToString("MMM dd, yyyy HH:mm")
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Secret Key</span>
+                            <div class="detail-field-value">
+                                <div class="detail-secret-row">
+                                    <CopyButton Value="@_subscription.SecretKey"
+                                                DisplayText="@(_showSecretKey ? _subscription.SecretKey : "••••••••••••••••")" />
+                                    <button class="btn btn-ghost btn-sm"
+                                            @onclick="ToggleSecretKey"
+                                            title="@(_showSecretKey ? "Hide secret key" : "Reveal secret key")">
+                                        @if (_showSecretKey)
+                                        {
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;">
+                                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+                                                a18.45 18.45 0 0 1 5.06-5.94" />
+                                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+                                                a18.5 18.5 0 0 1-2.16 3.19" />
+                                                <line x1="1" y1="1" x2="23" y2="23" />
+                                            </svg>
+                                            <p>Hide</p>
+                                        }
+                                        else
+                                        {
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                <circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                            <p>Reveal</p>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent deliveries -->
+            <div class="card" style="margin-top:var(--space-4);">
+                <div class="card-header">
+                    <h2 class="card-title">Recent Deliveries</h2>
+                    <a href="/deliveries?subscriptionId=@Id"
+                       class="btn btn-ghost btn-sm">
+                        View all
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             style="width:14px;height:14px;">
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    @if (_isLoadingDeliveries)
+                    {
+                        <TableSkeleton Rows="4" Columns="4" />
+                    }
+                    else if (!_recentDeliveries.Any())
+                    {
+                        <EmptyState Title="No deliveries yet"
+                                    Description="Deliveries will appear here once events are published."
+                                    Icon="delivery" />
+                    }
+                    else
+                    {
+                        <div class="table-wrapper" style="border:none;border-radius:0;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Event Type</th>
+                                        <th>Status</th>
+                                        <th>Duration</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var delivery in _recentDeliveries)
+                                    {
+                                        <tr>
+                                            <td class="table-mono text-sm">
+                                                @delivery.EventType
+                                            </td>
+                                            <td>
+                                                <Badge Value="@delivery.Status"
+                                                       Variant="delivery" />
+                                            </td>
+                                            <td class="text-sm text-muted">
+                                                @delivery.DurationMs ms
+                                            </td>
+                                            <td class="text-sm text-muted">
+                                                @delivery.CreatedAt.ToString("HH:mm:ss")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column — subscribed events -->
+        <div class="detail-right">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Subscribed Events</h2>
+                    <button class="btn btn-outline btn-sm"
+                            @onclick="OpenAddEventModal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                             style="width:13px;height:13px;">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add Event
+                    </button>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    @if (!_subscription.SubscribedEvents.Any())
+                    {
+                        <EmptyState Title="No events subscribed"
+                                    Description="Add events to start receiving deliveries."
+                                    Icon="webhook" />
+                    }
+                    else
+                    {
+                        <ul class="event-picker-list">
+                            @foreach (var evt in _subscription.SubscribedEvents)
+                            {
+                                <li class="event-picker-item">
+                                    <span class="event-picker-item-name table-mono">
+                                        @evt
+                                    </span>
+                                    <button type="button"
+                                            class="btn btn-ghost btn-sm"
+                                            @onclick="() => OpenRemoveEventModal(evt)"
+                                            title="Remove event">
+                                        <svg viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor" stroke-width="2"
+                                             stroke-linecap="round" stroke-linejoin="round"
+                                             style="width:14px;height:14px;
+                                                    color:var(--color-danger);">
+                                            <line x1="18" y1="6"  x2="6"  y2="18" />
+                                            <line x1="6"  y1="6"  x2="18" y2="18" />
+                                        </svg>
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@if (!_isLoading && _subscription is null && string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <EmptyState Title="Subscription not found"
+                Description="The subscription you are looking for does not exist."
+                ActionText="Back to Subscriptions"
+                OnAction="NavigateBack"
+                Icon="subscription" />
+}
+
+<!-- Toggle modal -->
+<Modal @bind-IsOpen="_showToggleModal"
+       Title="@(_subscription?.IsActive == true ? "Deactivate Subscription" : "Activate Subscription")"
+       ConfirmText="@(_subscription?.IsActive == true ? "Deactivate" : "Activate")"
+       ConfirmVariant="@(_subscription?.IsActive == true ? "danger" : "primary")"
+       IsConfirming="@_isToggling"
+       OnConfirm="HandleToggle"
+       OnClose="CloseModals">
+
+    @if (_subscription is not null)
+    {
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Name</span>
+                <span class="subscription-modal-value">@_subscription.Name</span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_subscription.IsActive ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+        </div>
+        <Alert Type="warning"
+               Message="@(_subscription.IsActive
+                   ? "Deactivating will stop all event deliveries to this subscription."
+                   : "Activating will resume event deliveries to this subscription.")" />
+        <Alert Message="@_toggleErrorMessage" />
+    }
+</Modal>
+
+<!-- Delete modal -->
+<Modal @bind-IsOpen="_showDeleteModal"
+       Title="Delete Subscription"
+       ConfirmText="Delete"
+       ConfirmVariant="danger"
+       IsConfirming="@_isDeleting"
+       OnConfirm="HandleDelete"
+       OnClose="CloseModals">
+
+    @if (_subscription is not null)
+    {
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Name</span>
+                <span class="subscription-modal-value">@_subscription.Name</span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Callback URL</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_subscription.CallBackUrl
+                </span>
+            </div>
+        </div>
+        <Alert Type="error"
+               Title="This action cannot be undone."
+               Message="Deleting this subscription will permanently remove it and stop all deliveries." />
+        <Alert Message="@_deleteErrorMessage" />
+    }
+</Modal>
+
+<!-- Remove event modal -->
+<Modal @bind-IsOpen="_showRemoveEventModal"
+       Title="Remove Event"
+       ConfirmText="Remove"
+       ConfirmVariant="danger"
+       IsConfirming="@_isRemovingEvent"
+       OnConfirm="HandleRemoveEvent"
+       OnClose="CloseModals">
+
+    <div class="subscription-modal-details">
+        <div class="subscription-modal-row">
+            <span class="subscription-modal-label">Event</span>
+            <span class="subscription-modal-value table-mono">@_selectedEvent</span>
+        </div>
+    </div>
+    <Alert Type="warning"
+           Message="Removing this event will stop deliveries for it on this subscription." />
+    <Alert Message="@_removeEventErrorMessage" />
+</Modal>
+
+<!-- Add event modal -->
+<Modal @bind-IsOpen="_showAddEventModal"
+       Title="Add Event"
+       ShowFooter="false"
+       OnClose="CloseModals"
+       Size="sm">
+
+    @if (_isLoadingCatalog)
+    {
+        <Spinner Centered="true" />
+    }
+    else if (!_availableCatalogEvents.Any())
+    {
+        <p class="text-sm text-muted" style="text-align:center;padding:var(--space-4) 0;">
+            All available events are already subscribed.
+        </p>
+    }
+    else
+    {
+        <ul class="event-picker-list" style="max-height:320px;overflow-y:auto;">
+            @foreach (var evt in _availableCatalogEvents)
+            {
+                <li class="event-picker-item">
+                    <span class="event-picker-item-name table-mono">@evt</span>
+                    <LoadingButton Text="Add"
+                                   LoadingText="Adding..."
+                                   IsLoading="@(_isAddingEvent && _addingEventName == evt)"
+                                   Variant="outline"
+                                   Size="sm"
+                                   OnClick="() => HandleAddEvent(evt)" />
+                </li>
+            }
+        </ul>
+    }
+</Modal>
+
+@code {
+
+    [Parameter] public Guid Id { get; set; }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool                   _isLoading          = true;
+    private bool                   _isLoadingDeliveries = true;
+    private bool                   _isLoadingCatalog   = false;
+    private string                 _errorMessage       = string.Empty;
+    private bool                   _showSecretKey      = false;
+    private WebhookSubscriptionDto? _subscription;
+
+    // Recent deliveries
+    private List<DeliveryItem> _recentDeliveries = [];
+
+    // Available catalog events not yet subscribed
+    private List<string> _availableCatalogEvents = [];
+
+    // Toggle modal
+    private bool   _showToggleModal  = false;
+    private bool   _isToggling       = false;
+    private string _toggleErrorMessage = string.Empty;
+
+    // Delete modal
+    private bool   _showDeleteModal  = false;
+    private bool   _isDeleting       = false;
+    private string _deleteErrorMessage = string.Empty;
+
+    // Remove event modal
+    private bool   _showRemoveEventModal   = false;
+    private bool   _isRemovingEvent        = false;
+    private string _selectedEvent          = string.Empty;
+    private string _removeEventErrorMessage = string.Empty;
+
+    // Add event modal
+    private bool   _showAddEventModal = false;
+    private bool   _isAddingEvent     = false;
+    private string _addingEventName   = string.Empty;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubscriptionAsync();
+        await LoadRecentDeliveriesAsync();
+    }
+
+    private async Task LoadSubscriptionAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await SubscriptionService.GetByIdAsync(Id);
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _subscription = result.ResponseData;
+
+            await Task.Delay(600);
+
+            _subscription = new WebhookSubscriptionDto
+            {
+                Id               = Id,
+                Name             = "Order Service Sub",
+                CallBackUrl      = "https://orders.internal/webhook",
+                IsActive         = true,
+                SubscribedEvents = new List<string> { "OrderCreated", "OrderCancelled" },
+                SecretKey        = "sk_live_abc123xyz456def789",
+                CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
+            };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadRecentDeliveriesAsync()
+    {
+        _isLoadingDeliveries = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await DeliveryService.GetBySubscriptionAsync(Id, limit: 5);
+            // _recentDeliveries = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(400);
+
+            _recentDeliveries =
+            [
+                new("OrderCreated",   "Delivered", 142,  DateTimeOffset.UtcNow.AddMinutes(-2)),
+                new("OrderCancelled", "Failed",    3012, DateTimeOffset.UtcNow.AddMinutes(-8)),
+                new("OrderCreated",   "Delivered", 201,  DateTimeOffset.UtcNow.AddMinutes(-15)),
+            ];
+        }
+        finally
+        {
+            _isLoadingDeliveries = false;
+        }
+    }
+
+    private async Task LoadAvailableCatalogEventsAsync()
+    {
+        _isLoadingCatalog = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.GetAllAsync();
+            // var all    = result.ResponseData?.Select(e => e.EventCatalogName) ?? [];
+            // _availableCatalogEvents = all
+            //     .Where(e => !_subscription!.SubscribedEvents.Contains(e))
+            //     .ToList();
+
+            await Task.Delay(400);
+
+            var all = new List<string>
+                { "OrderCreated", "OrderCancelled", "PaymentReceived",
+                  "UserRegistered", "OrderShipped" };
+
+            _availableCatalogEvents = all
+                .Where(e => !(_subscription?.SubscribedEvents.Contains(e) ?? false))
+                .ToList();
+        }
+        finally
+        {
+            _isLoadingCatalog = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Secret key
+    // -------------------------------------------------------------------------
+
+    private void ToggleSecretKey() => _showSecretKey = !_showSecretKey;
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    private void NavigateBack()
+        => Navigation.NavigateTo("/subscriptions");
+
+    // -------------------------------------------------------------------------
+    // Modal openers
+    // -------------------------------------------------------------------------
+
+    private void OpenToggleModal()
+    {
+        _toggleErrorMessage = string.Empty;
+        _showToggleModal    = true;
+    }
+
+    private void OpenDeleteModal()
+    {
+        _deleteErrorMessage = string.Empty;
+        _showDeleteModal    = true;
+    }
+
+    private void OpenRemoveEventModal(string eventName)
+    {
+        _selectedEvent           = eventName;
+        _removeEventErrorMessage = string.Empty;
+        _showRemoveEventModal    = true;
+    }
+
+    private async Task OpenAddEventModal()
+    {
+        _showAddEventModal = true;
+        await LoadAvailableCatalogEventsAsync();
+    }
+
+    private void CloseModals()
+    {
+        _showToggleModal      = false;
+        _showDeleteModal      = false;
+        _showRemoveEventModal = false;
+        _showAddEventModal    = false;
+        _selectedEvent        = string.Empty;
+        _toggleErrorMessage   = string.Empty;
+        _deleteErrorMessage   = string.Empty;
+        _removeEventErrorMessage = string.Empty;
+    }
+
+    // -------------------------------------------------------------------------
+    // Action handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleToggle()
+    {
+        _toggleErrorMessage = string.Empty;
+        _isToggling         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            await Task.Delay(800);
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _toggleErrorMessage = "Operation failed. Please try again.";
+                return;
+            }
+
+            _subscription!.IsActive = !_subscription.IsActive;
+            Toast.ShowSuccess(
+                _subscription.IsActive
+                    ? "Subscription activated successfully."
+                    : "Subscription deactivated successfully.");
+
+            CloseModals();
+        }
+        finally
+        {
+            _isToggling = false;
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        _deleteErrorMessage = string.Empty;
+        _isDeleting         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            await Task.Delay(800);
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _deleteErrorMessage = "Failed to delete subscription. Please try again.";
+                return;
+            }
+
+            Toast.ShowSuccess("Subscription deleted successfully.");
+            Navigation.NavigateTo("/subscriptions");
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private async Task HandleRemoveEvent()
+    {
+        _removeEventErrorMessage = string.Empty;
+        _isRemovingEvent         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            await Task.Delay(600);
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _removeEventErrorMessage = "Failed to remove event. Please try again.";
+                return;
+            }
+
+            _subscription!.SubscribedEvents.ToList().Remove(_selectedEvent);
+            Toast.ShowSuccess($"{_selectedEvent} removed from subscription.");
+            CloseModals();
+        }
+        finally
+        {
+            _isRemovingEvent = false;
+        }
+    }
+
+    private async Task HandleAddEvent(string eventName)
+    {
+        _addingEventName = eventName;
+        _isAddingEvent   = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            await Task.Delay(600);
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                Toast.ShowError($"Failed to add {eventName}. Please try again.");
+                return;
+            }
+
+            _subscription!.SubscribedEvents.ToList().Add(eventName);
+            _availableCatalogEvents.Remove(eventName);
+            Toast.ShowSuccess($"{eventName} added to subscription.");
+        }
+        finally
+        {
+            _isAddingEvent   = false;
+            _addingEventName = string.Empty;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local view models
+    // -------------------------------------------------------------------------
+
+    private sealed record DeliveryItem(
+        string         EventType,
+        string         Status,
+        int            DurationMs,
+        DateTimeOffset CreatedAt);
+}

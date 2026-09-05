@@ -156,4 +156,71 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+
+/* =============================================================================
+   Subscription Detail page
+   ============================================================================= */
+
+/* Two column layout */
+.detail-layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.detail-left {
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-right {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Detail fields */
+.detail-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.detail-field-label {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+}
+
+.detail-field-value {
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+    word-break: break-all;
+}
+
+/* Secret key row */
+.detail-secret-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .detail-layout {
+        grid-template-columns: 1fr;
+    }
+}
  

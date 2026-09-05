@@ -1,0 +1,107 @@
+@*
+    CopyButton — copies a value to clipboard and briefly shows a checkmark
+
+    Parameters:
+    - Value:       the text to copy (required)
+    - DisplayText: truncated text shown in the field (default: same as Value)
+    - Label:       accessible aria-label for the copy button (default: "Copy")
+    - ShowField:   renders a mono-spaced display field alongside the button (default: true)
+
+    Usage:
+        <CopyButton Value="@client.ClientKey" />
+        <CopyButton Value="@subscription.SecretKey" DisplayText="••••••••••••" />
+        <CopyButton Value="@correlationId.ToString()" ShowField="true" />
+        <CopyButton Value="@someId" ShowField="false" />  @* icon-only button
+*@
+
+@if (ShowField)
+{
+    <div class="copy-field">
+        <span class="copy-field-value" title="@Value">@DisplayValue</span>
+        <button class="copy-btn"
+                @onclick="CopyAsync"
+                aria-label="@Label"
+                title="@Label">
+            @if (_copied)
+            {
+                <!-- Checkmark icon — shown briefly after copy -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                     style="color: var(--color-success);">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
+            }
+            else
+            {
+                <!-- Copy icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+            }
+        </button>
+    </div>
+}
+else
+{
+    <button class="copy-btn"
+            @onclick="CopyAsync"
+            aria-label="@Label"
+            title="@(_copied ? "Copied!" : Label)">
+        @if (_copied)
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                 style="color: var(--color-success);">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
+        }
+        else
+        {
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+        }
+    </button>
+}
+
+@code {
+
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter] public string DisplayText { get; set; } = string.Empty;
+    [Parameter] public string Label       { get; set; } = "Copy to clipboard";
+    [Parameter] public bool   ShowField   { get; set; } = true;
+
+    private bool _copied = false;
+
+    private string DisplayValue => !string.IsNullOrWhiteSpace(DisplayText)
+        ? DisplayText
+        : Value;
+
+    private async Task CopyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Value)) return;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", Value);
+            _copied = true;
+            StateHasChanged();
+
+            // Reset icon after 2 seconds
+            await Task.Delay(2000);
+            _copied = false;
+            StateHasChanged();
+        }
+        catch
+        {
+            // Clipboard API not available — silently ignore
+            // Could fall back to a JS execCommand approach if needed
+        }
+    }
+}
