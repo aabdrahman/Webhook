@@ -1,0 +1,22 @@
+/* =============================================================================
+   Dead Letters page styles
+   ============================================================================= */
+
+.dead-letters-filters {
+    display:               grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap:                   var(--space-4);
+    align-items:           end;
+}
+
+@media (max-width: 700px) {
+    .dead-letters-filters {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .dead-letters-filters {
+        grid-template-columns: 1fr;
+    }
+}

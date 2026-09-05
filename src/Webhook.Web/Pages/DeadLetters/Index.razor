@@ -1,0 +1,412 @@
+@page "/dead-letters"
+@inject NavigationManager Navigation
+@inject ToastService Toast
+
+<PageTitle>Dead Letters — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading dead letters..." />
+
+@if (!_isLoading)
+{
+    <PageHeader Title="Dead Letters"
+                Description="Deliveries that have exhausted all retry attempts." />
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body">
+            <div class="dead-letters-filters">
+
+                <!-- Date from -->
+                <div class="form-group">
+                    <label class="form-label" for="dateFrom">From</label>
+                    <input id="dateFrom"
+                           type="date"
+                           class="form-input"
+                           @bind="_filterDateFrom"
+                           @bind:after="ApplyFilters" />
+                </div>
+
+                <!-- Date to -->
+                <div class="form-group">
+                    <label class="form-label" for="dateTo">To</label>
+                    <input id="dateTo"
+                           type="date"
+                           class="form-input"
+                           @bind="_filterDateTo"
+                           @bind:after="ApplyFilters" />
+                </div>
+
+                <!-- Retried filter -->
+                <div class="form-group">
+                    <label class="form-label" for="retriedFilter">Status</label>
+                    <select id="retriedFilter"
+                            class="form-select"
+                            @bind="_filterRetried"
+                            @bind:after="ApplyFilters">
+                        <option value="">All</option>
+                        <option value="false">Not retried</option>
+                        <option value="true">Retried</option>
+                    </select>
+                </div>
+
+                <!-- Clear -->
+                <div class="form-group" style="justify-content:flex-end;">
+                    <label class="form-label" style="visibility:hidden;">clear</label>
+                    <button class="btn btn-ghost btn-sm" @onclick="ClearFilters">
+                        Clear filters
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <Alert Message="@_errorMessage" />
+
+    @if (_isFiltering)
+    {
+        <TableSkeleton Rows="6" Columns="6" />
+    }
+    else if (!_deadLetters.Any())
+    {
+        <EmptyState Title="No dead letters found"
+                    Description="@(HasActiveFilters
+                        ? "No dead letters match your current filters."
+                        : "All deliveries are healthy — no dead letters to show.")"
+                    Icon="deadletter" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Event Type</th>
+                                <th>Subscription</th>
+                                <th>Retry Count</th>
+                                <th>Retried</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var dl in _deadLetters)
+                            {
+                                <tr class="table-row-clickable"
+                                    @onclick="() => NavigateToAttempts(dl.DeliveryId)">
+                                    <td class="table-mono text-sm">
+                                        @dl.EventType
+                                    </td>
+                                    <td class="text-sm">
+                                        @dl.SubscriptionName
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @dl.RetryCount
+                                    </td>
+                                    <td>
+                                        @if (dl.RetriedAt.HasValue)
+                                        {
+                                            <div style="display:flex;flex-direction:column;gap:2px;">
+                                                <Badge Value="Retried"
+                                                       Variant="custom"
+                                                       Text="Retried" />
+                                                <span class="text-xs text-muted">
+                                                    @dl.RetriedAt.Value.ToString("MMM dd, HH:mm")
+                                                </span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <Badge Value="Pending"
+                                                   Variant="custom"
+                                                   Text="Not retried" />
+                                        }
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @dl.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                    </td>
+                                    <td @onclick:stopPropagation="true">
+                                        <button class="btn btn-outline btn-sm"
+                                                @onclick="() => OpenRetryModal(dl)"
+                                                title="Manual retry">
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:13px;height:13px;">
+                                                <polyline points="23 4 23 10 17 10" />
+                                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                            </svg>
+                                            Retry
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Retry modal -->
+@if (_selectedDeadLetter is not null)
+{
+    <Modal @bind-IsOpen="_showRetryModal"
+           Title="Manual Retry"
+           ConfirmText="Retry Delivery"
+           ConfirmVariant="primary"
+           IsConfirming="@_isRetrying"
+           OnConfirm="HandleRetry"
+           OnClose="CloseModal">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Event Type</span>
+                <span class="subscription-modal-value table-mono">
+                    @_selectedDeadLetter.EventType
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Subscription</span>
+                <span class="subscription-modal-value">
+                    @_selectedDeadLetter.SubscriptionName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Retry Count</span>
+                <span class="subscription-modal-value">
+                    @_selectedDeadLetter.RetryCount
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Created</span>
+                <span class="subscription-modal-value text-sm">
+                    @_selectedDeadLetter.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="info"
+               Message="This will re-queue the delivery for processing. The retry cycle will be incremented by one." />
+
+        <Alert Message="@_retryErrorMessage" />
+
+    </Modal>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading    = true;
+    private bool   _isFiltering  = false;
+    private string _errorMessage = string.Empty;
+
+    // Filters
+    private DateTime? _filterDateFrom = null;
+    private DateTime? _filterDateTo   = null;
+    private string    _filterRetried  = string.Empty;
+
+    // Data
+    private List<DeadLetterItem> _deadLetters = [];
+
+    // Retry modal
+    private bool           _showRetryModal    = false;
+    private bool           _isRetrying        = false;
+    private string         _retryErrorMessage = string.Empty;
+    private DeadLetterItem? _selectedDeadLetter;
+
+    // -------------------------------------------------------------------------
+    // Computed
+    // -------------------------------------------------------------------------
+
+    private bool HasActiveFilters =>
+        _filterDateFrom.HasValue ||
+        _filterDateTo.HasValue   ||
+        !string.IsNullOrWhiteSpace(_filterRetried);
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+        => await LoadDeadLettersAsync();
+
+    private async Task LoadDeadLettersAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await DeadLetterService.GetAsync(new DeadLetterFilterDto
+            // {
+            //     From     = _filterDateFrom,
+            //     To       = _filterDateTo,
+            //     Retried  = string.IsNullOrWhiteSpace(_filterRetried)
+            //                    ? null
+            //                    : bool.Parse(_filterRetried)
+            // });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _deadLetters = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load dead letters. Please try again.";
+                return;
+            }
+
+            _deadLetters =
+            [
+                new DeadLetterItem(
+                    Guid.NewGuid(), Guid.NewGuid(),
+                    "OrderCreated",    "Order Service Sub",
+                    5, null,
+                    DateTimeOffset.UtcNow.AddHours(-2)),
+
+                new DeadLetterItem(
+                    Guid.NewGuid(), Guid.NewGuid(),
+                    "PaymentReceived", "CRM Sub",
+                    5, DateTimeOffset.UtcNow.AddMinutes(-30),
+                    DateTimeOffset.UtcNow.AddHours(-5)),
+
+                new DeadLetterItem(
+                    Guid.NewGuid(), Guid.NewGuid(),
+                    "UserRegistered",  "Notification Sub",
+                    5, null,
+                    DateTimeOffset.UtcNow.AddDays(-1)),
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Filters
+    // -------------------------------------------------------------------------
+
+    private async Task ApplyFilters()
+    {
+        _isFiltering = true;
+        try
+        {
+            await LoadDeadLettersAsync();
+        }
+        finally
+        {
+            _isFiltering = false;
+        }
+    }
+
+    private async Task ClearFilters()
+    {
+        _filterDateFrom = null;
+        _filterDateTo   = null;
+        _filterRetried  = string.Empty;
+        await ApplyFilters();
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    private void NavigateToAttempts(Guid deliveryId)
+        => Navigation.NavigateTo($"/deliveries/{deliveryId}/attempts");
+
+    // -------------------------------------------------------------------------
+    // Retry modal
+    // -------------------------------------------------------------------------
+
+    private void OpenRetryModal(DeadLetterItem dl)
+    {
+        _selectedDeadLetter = dl;
+        _retryErrorMessage  = string.Empty;
+        _showRetryModal     = true;
+    }
+
+    private void CloseModal()
+    {
+        _showRetryModal     = false;
+        _selectedDeadLetter = null;
+        _retryErrorMessage  = string.Empty;
+    }
+
+    private async Task HandleRetry()
+    {
+        if (_selectedDeadLetter is null) return;
+
+        _retryErrorMessage = string.Empty;
+        _isRetrying        = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await DeadLetterService.RetryAsync(
+            //     _selectedDeadLetter.DeliveryId,
+            //     _selectedDeadLetter.Id);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _retryErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _retryErrorMessage = "Failed to retry delivery. Please try again.";
+                return;
+            }
+
+            // Update local state — mark as retried
+            var index = _deadLetters.IndexOf(_selectedDeadLetter);
+            if (index >= 0)
+            {
+                _deadLetters[index] = _selectedDeadLetter with
+                {
+                    RetriedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            Toast.ShowSuccess("Delivery queued for retry successfully.");
+            CloseModal();
+        }
+        finally
+        {
+            _isRetrying = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local view model
+    // -------------------------------------------------------------------------
+
+    private sealed record DeadLetterItem(
+        Guid            Id,
+        Guid            DeliveryId,
+        string          EventType,
+        string          SubscriptionName,
+        int             RetryCount,
+        DateTimeOffset? RetriedAt,
+        DateTimeOffset  CreatedAt);
+}
