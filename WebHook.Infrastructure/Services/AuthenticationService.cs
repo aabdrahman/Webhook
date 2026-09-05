@@ -327,7 +327,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
 
             _logger.Information("User OTP requested successfully. Requested OTP - {0}. Queue Email response: {1}. Email COntent Generated - {2}", generatedOTP, queueEmailResult, !string.IsNullOrEmpty(emailContent));
-            return GenericResponse<string>.Success("Operation Successful.", "OTP sent successfully.", HttpStatusCode.OK);
+            return GenericResponse<string>.Success($"{requestingUser.NormalizedEmail}", "OTP sent successfully.", HttpStatusCode.OK);
 
         }
         catch (Exception ex)

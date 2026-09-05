@@ -1,0 +1,227 @@
+@page "/request-otp"
+@layout AuthLayout
+
+
+<PageTitle>Request OTP — WebhookHub</PageTitle>
+
+<div class="auth-card">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="auth-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="auth-logo-text">WebhookHub</span>
+    </div>
+
+    @if (_isInitializing)
+    {
+        <div class="auth-form">
+            <SkeletonLoader Shape="text-lg" Width="55%" />
+            <SkeletonLoader Shape="text"    Width="80%" />
+            <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);">
+                <SkeletonLoader Shape="text"   Width="35%" Height="10px" />
+                <SkeletonLoader Shape="button" Width="100%" Height="42px" />
+            </div>
+            <SkeletonLoader Shape="button" Width="100%" Height="42px" />
+        </div>
+    }
+    else
+    {
+        <!-- Heading -->
+        <h1 class="auth-heading">@_heading</h1>
+        <p class="auth-subheading">@_subheading</p>
+
+        <Alert Type="success"
+               Message="@_successMessage"
+               Visible="@(!string.IsNullOrWhiteSpace(_successMessage))" />
+
+        <!-- API error alert -->
+        <Alert Message="@_errorMessage" />
+
+        <!-- Form -->
+        <EditForm Model="_model"
+                  OnValidSubmit="HandleRequestOtp"
+                  class="auth-form">
+
+            <DataAnnotationsValidator />
+
+            <!-- Email or username -->
+            <div class="form-group">
+                <label class="form-label form-label-required" for="usernameoremail">
+                    Email address or username
+                </label>
+                <div class="form-input-wrapper">
+                    <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9
+                                 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <InputText id="usernameoremail"
+                               @bind-Value="_model.UserNameOrEmailAddress"
+                               class="form-input has-icon-left"
+                               placeholder="you@example.com or username"
+                               autocomplete="username"
+                               disabled="@_isLoading" />
+                </div>
+                <ValidationMessage For="@(() => _model.UserNameOrEmailAddress)"
+                                   class="form-error" />
+                <span class="form-help">
+                    We will send a one-time password to the email address
+                    associated with your account.
+                </span>
+            </div>
+
+            <!-- Submit -->
+            <LoadingButton Text="Send OTP"
+                           LoadingText="Sending..."
+                           IsLoading="@_isLoading"
+                           FullWidth="true"
+                           Type="submit" Disabled="@(!string.IsNullOrEmpty(_successMessage))" />
+
+        </EditForm>
+
+        <!-- Back link -->
+        <p class="auth-footer-text">
+            <a href="@_backUrl" class="auth-back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="15 18 9 12 15 6" />
+                </svg>
+                @_backLabel
+            </a>
+        </p>
+    }
+
+</div>
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // Parameters
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called on valid submit.
+    /// Receives the email/username entered by the user.
+    /// Your side: call AuthService.RequestOtpAsync and store the email
+    /// in localStorage before returning.
+    /// Returns error message on failure or empty string on success.
+    /// </summary>
+    // [Parameter]
+    // public Func<string, Task<string>>? OnRequestOtp { get; set; }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private RequestOtpDto _model;
+    private OtpPurpose _otpPurpose;
+    private bool _isInitializing = true;
+    private bool _isLoading      = false;
+    private string _errorMessage   = string.Empty;
+
+    // Resolved from query string
+    private string _purpose   = string.Empty;
+    private string _returnUrl = string.Empty;
+
+    // Dynamic text based on purpose
+    private string _heading   = string.Empty;
+    private string _subheading = string.Empty;
+    private string _backUrl   = "/login";
+    private string _backLabel = "Back to sign in";
+    private string _successMessage;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override void OnInitialized()
+    {
+        var uri   = new Uri(navigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        _purpose   = query.TryGetValue("purpose",   out var p) ? p.ToString().ToLower() : string.Empty;
+        _returnUrl = query.TryGetValue("returnUrl", out var r) ? r.ToString() : "/";
+
+        // Set heading and back link based on purpose
+        (_heading, _subheading, _backUrl, _backLabel, _otpPurpose) = _purpose switch
+        {
+            "changepassword" => (
+                "Forgot your password?",
+                "Enter your email or username and we will send you a one-time password to reset it.",
+                "/login",
+                "Back to sign in",
+                OtpPurpose.PasswordReset),
+
+            "deactivateprofile" => (
+                "Verify your identity",
+                "To deactivate your account we need to verify your identity. Enter your email or username below.",
+                "/",
+                "Back to dashboard",
+                OtpPurpose.DeactivateProfile),
+
+            _ => (
+                "Request a one-time password",
+                "Enter your email address or username to receive a one-time password.",
+                "/login",
+                "Back to sign in",
+                OtpPurpose.PasswordReset)
+        };
+
+        _model = new RequestOtpDto
+        {
+            Purpose = _otpPurpose
+        };
+
+        _isInitializing = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleRequestOtp()
+    {
+        _errorMessage = string.Empty;
+        _isLoading = true; _successMessage = string.Empty;
+
+        try
+        {
+            //var result = await requestOtpHandler.HandleAsync(_model);
+            await Task.Delay(10000); // Simulate API call delay
+            var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message");
+            _errorMessage = result.successStatus ? string.Empty : result.responseMessage;
+            if (!result.successStatus && !string.IsNullOrEmpty(_errorMessage))
+            {
+                return;
+            }
+
+            _successMessage = "A one-time password has been sent to your email address. Please check your inbox and spam folder.";
+            StateHasChanged(); //This forces the page to show the success message before navigating away after some time. Otherwise, the user won't see the message because the page will navigate away immediately.
+
+            // Give user time to read the message
+            await Task.Delay(2500);
+            // Navigate to validate-otp carrying purpose and returnUrl
+            var destination = QueryHelpers.AddQueryString(
+                "/validate-otp",
+                new Dictionary<string, string?>
+                {
+                    ["purpose"] = _purpose,
+                    ["returnUrl"] = _returnUrl
+                });
+
+            navigationManager.NavigateTo(destination);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

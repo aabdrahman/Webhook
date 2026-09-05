@@ -1,6 +1,9 @@
 ﻿@using WebHook.Core.DataTransferObjects.Authentication
 @using Webhook.Web.Handlers.Authentication
+@using WebHook.Core.Constants
 
 @inject ILocalStorageService localStorageService
 @inject LoginHandler loginHandler
 @inject RegisterUserHandler registerUserHandler
+@inject RequestOtpHandler requestOtpHandler
+@inject ValidateOtpHandler validateOtpHandler

@@ -9,4 +9,5 @@ public static class ApplicationClientHelper
     public static string ApplicationBearerHeader = "Bearer";
     public static string RegisteredUserEmailKey = "registeredUserEmail";
     public static string RememberMeKey = "BrowserLoggedInKey";
+    public static string OtpRequestedUser = "OtpRequestedUserEmail";
 }

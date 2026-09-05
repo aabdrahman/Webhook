@@ -1,0 +1,346 @@
+@page "/validate-otp"
+@layout AuthLayout
+
+<PageTitle>Verify OTP — WebhookHub</PageTitle>
+
+<div class="auth-card">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="auth-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="auth-logo-text">WebhookHub</span>
+    </div>
+
+    @if (_isInitializing)
+    {
+        <div class="auth-form" style="align-items:center;">
+            <SkeletonLoader Shape="text-lg" Width="60%" />
+            <SkeletonLoader Shape="text"    Width="75%" />
+            <div class="otp-input-group" style="margin-top:var(--space-4);">
+                @for (int i = 0; i < 6; i++)
+                {
+                    <div class="skeleton otp-input" style="height:56px;"></div>
+                }
+            </div>
+            <SkeletonLoader Shape="button" Width="100%" Height="42px" />
+        </div>
+    }
+    else
+    {
+        <!-- Heading -->
+        <h1 class="auth-heading">Check your email</h1>
+        <p class="auth-subheading">
+            Enter the 6-digit code we sent to your registered email address.
+        </p>
+
+        <!-- Verify response alert -->
+        <Alert Type="@(_verifySuccess ? "success" : "error")"
+               Message="@_verifyMessage"
+               Visible="@(!string.IsNullOrWhiteSpace(_verifyMessage))" />
+
+        <!-- Resend response alert -->
+        <Alert Type="@(_resendSuccess ? "success" : "info")"
+               Message="@_resendMessage"
+               Visible="@(!string.IsNullOrWhiteSpace(_resendMessage))" />
+
+        <div class="auth-form" style="align-items:center;">
+
+            <!-- OTP inputs -->
+            <div class="otp-input-group">
+                @for (int i = 0; i < 6; i++)
+                {
+                    int index = i;
+                    <input @key="@_inputKeys[index]"
+                           type="text"
+                           inputmode="numeric"
+                           pattern="[0-9]*"
+                           maxlength="1"
+                           class="otp-input @(!string.IsNullOrEmpty(_otpValues[index]) ? "filled" : "")"
+                           value="@_otpValues[index]"
+                           @oninput="(e) => HandleInput(e, index)"
+                           @onkeydown="(e) => HandleKeyDown(e, index)"
+                           @ref="_inputRefs[index]"
+                           disabled="@(_isBusy || _verifySuccess)"
+                           aria-label="@($"OTP digit {index + 1}")" />
+                }
+            </div>
+
+            <!-- Busy indicator -->
+            @if (_isBusy)
+            {
+                @* <Spinner Size="md" Label="Verifying..." /> *@
+                <PageSpinner Visible="@_isBusy" Label="Verifying..." />
+            }
+
+            <!-- Countdown / resend -->
+            <div class="otp-countdown @(_timer <= 10 ? "expiring" : "")">
+                @if (_resendDisabled)
+                {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span>Resend code in @_timer s</span>
+                }
+                else
+                {
+                    <button class="btn btn-ghost btn-sm"
+                            @onclick="ResendCode"
+                            disabled="@_isBusy">
+                        Resend code
+                    </button>
+                }
+            </div>
+
+        </div>
+
+        <!-- Back link -->
+        <p class="auth-footer-text">
+            <a href="/request-otp?purpose=@_purpose&returnUrl=@Uri.EscapeDataString(_returnUrl)"
+               class="auth-back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="15 18 9 12 15 6" />
+                </svg>
+                Request a new code
+            </a>
+        </p>
+    }
+
+</div>
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // Parameters
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called when all 6 digits are entered.
+    /// Your side: read email from localStorage, call AuthService.ValidateOtpAsync,
+    /// store the operation token, clear the email from localStorage.
+    /// Returns error message on failure or empty string on success.
+    /// </summary>
+   // [Parameter]
+    //public Func<string, Task<string>>? OnValidateOtp { get; set; }
+
+    /// <summary>
+    /// Called when the user clicks Resend Code.
+    /// Your side: read email from localStorage, call AuthService.RequestOtpAsync.
+    /// Returns error message on failure or empty string on success.
+    /// </summary>
+    [Parameter]
+    public Func<Task<string>>? OnResendOtp { get; set; }
+
+    // -------------------------------------------------------------------------
+    // OTP input state — adapted from uploaded OtpInput.razor
+    // -------------------------------------------------------------------------
+
+    private readonly string[]  _otpValues = new string[6];
+    private readonly Guid[] _inputKeys = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToArray();
+    private readonly ElementReference[] _inputRefs = new ElementReference[6];
+
+    private bool _isBusy = false;
+    private bool _resendDisabled = true;
+    private int  _timer = 75;
+
+    // -------------------------------------------------------------------------
+    // Alert state
+    // -------------------------------------------------------------------------
+
+    private string _verifyMessage = string.Empty;
+    private bool _verifySuccess = false;
+    private string _resendMessage = string.Empty;
+    private bool _resendSuccess = false;
+
+    // -------------------------------------------------------------------------
+    // Page state
+    // -------------------------------------------------------------------------
+
+    private bool   _isInitializing = true;
+    private string _purpose        = string.Empty;
+    private string _returnUrl      = "/";
+
+    private bool IsIncomplete => _otpValues.Any(string.IsNullOrEmpty);
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override void OnInitialized()
+    {
+        var uri   = new Uri(navigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        _purpose   = query.TryGetValue("purpose",   out var p) ? p.ToString() : string.Empty;
+        _returnUrl = query.TryGetValue("returnUrl", out var r) ? r.ToString() : "/";
+
+        _isInitializing = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isInitializing)
+        {
+            // Auto-focus first input and start countdown on first render
+            await _inputRefs[0].FocusAsync();
+            await StartCountdownAsync();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // OTP input handlers — adapted from uploaded OtpInput.razor
+    // -------------------------------------------------------------------------
+
+    private async Task HandleInput(ChangeEventArgs e, int index)
+    {
+        var inputValue = e.Value?.ToString();
+
+        // Clear alerts on new input
+        _verifyMessage = string.Empty;
+        _resendMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(inputValue))
+        {
+            _otpValues[index] = string.Empty;
+            return;
+        }
+
+        var lastChar = inputValue[^1].ToString();
+
+        // Only allow digits — reset and refocus if non-digit entered
+        if (!int.TryParse(lastChar, out _) || !char.IsDigit(lastChar[0]))
+        {
+            _otpValues[index] = string.Empty;
+            _inputKeys[index] = Guid.NewGuid();
+            StateHasChanged();
+            await Task.Delay(1);
+            await _inputRefs[index].FocusAsync();
+            return;
+        }
+
+        // Store digit and advance focus
+        _otpValues[index] = lastChar;
+
+        if (index < 5)
+            await _inputRefs[index + 1].FocusAsync();
+
+        // Auto-submit when all 6 digits are filled
+        if (!IsIncomplete && !_isBusy)
+            await VerifyCodeAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e, int index)
+    {
+        // Backspace on empty field moves focus back
+        if (e.Key == "Backspace" && string.IsNullOrEmpty(_otpValues[index]) && index > 0)
+            await _inputRefs[index - 1].FocusAsync();
+    }
+
+    // -------------------------------------------------------------------------
+    // Verify
+    // -------------------------------------------------------------------------
+
+    private async Task VerifyCodeAsync()
+    {
+        _isBusy        = true;
+        _verifyMessage = string.Empty;
+
+        try
+        {
+            var fullCode = string.Join("", _otpValues);
+            //var result = await validateOtpHandler.HandleAsync(fullCode);
+            await Task.Delay(8500); // Simulate API call delay
+            var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message"); // Simulate API call delay)
+            _verifyMessage = result.responseMessage;
+            _verifySuccess = result.successStatus;
+            Array.Clear(_otpValues);
+            if (!_verifySuccess)
+            {
+                _verifySuccess = false; _isBusy = false;
+                _verifyMessage = result.responseMessage;
+                Array.Clear(_otpValues);
+                _inputKeys[0] = Guid.NewGuid();
+                StateHasChanged();
+                await Task.Delay(1);
+                await _inputRefs[0].FocusAsync();
+                return;
+            }
+
+            // Success
+            _verifySuccess = true; _isBusy = false;
+            _verifyMessage = "Verified successfully. Redirecting...";
+            StateHasChanged();
+
+            // Brief pause so the user sees the success message
+            await Task.Delay(5000);
+
+            navigationManager.NavigateTo(_returnUrl);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Resend
+    // -------------------------------------------------------------------------
+
+    private async Task ResendCode()
+    {
+        _resendMessage  = string.Empty;
+        _verifyMessage  = string.Empty;
+        _resendDisabled = true;
+        _timer          = 75;
+
+        Array.Clear(_otpValues);
+        StateHasChanged();
+
+        if (OnResendOtp is not null)
+        {
+            var error = await OnResendOtp();
+
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                _resendSuccess = false;
+                _resendMessage = error;
+                _resendDisabled = false;
+                return;
+            }
+        }
+
+        _resendSuccess = true;
+        _resendMessage = "A new code has been sent to your email.";
+
+        await StartCountdownAsync();
+        await _inputRefs[0].FocusAsync();
+    }
+
+    // -------------------------------------------------------------------------
+    // Countdown — adapted from uploaded OtpInput.razor
+    // -------------------------------------------------------------------------
+
+    private async Task StartCountdownAsync()
+    {
+        _resendDisabled = true;
+        _timer          = 75;
+
+        while (_timer > 0)
+        {
+            await Task.Delay(1000);
+            _timer--;
+            StateHasChanged();
+        }
+
+        _resendDisabled = false;
+        StateHasChanged();
+    }
+}

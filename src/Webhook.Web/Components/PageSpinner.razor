@@ -1,0 +1,35 @@
+@*
+    PageSpinner — full page loading overlay
+
+    Covers the entire viewport with a semi-transparent backdrop
+    and a centred spinner. Used for page-level loading states
+    such as initial data fetch before content renders.
+
+    Parameters:
+    - Visible: controls visibility (default: true)
+    - Label:   accessible screen reader label (default: "Loading...")
+
+    Usage:
+        <PageSpinner Visible="@_isLoading" />
+        <PageSpinner Visible="@_isLoading" Label="Fetching subscriptions..." />
+*@
+
+@if (Visible)
+{
+    <div class="page-spinner-overlay" role="status" aria-label="@Label">
+        <div class="page-spinner-content">
+            <div class="app-loading-logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+            </div>
+            <Spinner Size="md" Label="@Label" />
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool   Visible { get; set; } = true;
+    [Parameter] public string Label   { get; set; } = "Loading...";
+}

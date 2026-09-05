@@ -18,7 +18,7 @@ public class LoginHandler
         _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameOpen);
     }
 
-    public async Task<ApiResponseDto> HandleAsync(LoginUserDto loginUser)
+    public async Task<ApiResponseDto> HandleAsync(LoginUserDto loginUser, bool rememberMe = false)
     {
         try
         {
@@ -35,6 +35,15 @@ public class LoginHandler
             if(genericResponse.IsSuccessful && genericResponse.ResponseData is not null)
             {
                 await _localStorageService.SetItemAsync<TokenDto>(ApplicationClientHelper.StorageKey, genericResponse.ResponseData);
+
+                if(rememberMe)
+                {
+                    await _localStorageService.SetItemAsync(ApplicationClientHelper.RememberMeKey, true);
+                }
+                else
+                {
+                    await _localStorageService.RemoveItemAsync(ApplicationClientHelper.RememberMeKey);
+                }
             }
 
             return new ApiResponseDto(genericResponse.IsSuccessful, genericResponse.ResponseMessage);

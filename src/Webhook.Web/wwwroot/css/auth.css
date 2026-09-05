@@ -177,3 +177,72 @@
     flex-shrink: 0;
     border-radius: var(--radius-sm);
 }
+
+/* Back link */
+.auth-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    color: var(--color-primary);
+    transition: color var(--transition-base);
+}
+
+.auth-back-link:hover {
+    color: var(--color-text-link-hover);
+}
+
+
+/* -----------------------------------------------------------------------------
+   OTP input group — adapted from uploaded OtpInput_razor.css
+   ----------------------------------------------------------------------------- */
+.otp-input-group {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    width: 100%;
+}
+
+.otp-input {
+    width: 52px;
+    height: 56px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    caret-color: var(--color-primary);
+    transition: border-color var(--transition-base), box-shadow var(--transition-base), background var(--transition-base);
+    /* Remove number input spinners */
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.otp-input::-webkit-outer-spin-button,
+.otp-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.otp-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-glow);
+    background: var(--color-surface-3);
+}
+
+.otp-input.filled {
+    border-color: var(--color-success);
+    background: var(--color-success-muted);
+    color: var(--color-success);
+}
+
+.otp-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+ 

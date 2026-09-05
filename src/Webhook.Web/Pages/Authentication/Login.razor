@@ -119,7 +119,7 @@
             </div>
             <!-- Forgot password section -->
             <div class="auth-forgot-row">
-                <a href="/forgot-password" class="auth-forgot-link">
+                <a href="/request-otp?purpose=ChangePassword&returnUrl=/change-password" class="auth-forgot-link">
                     Forgot password?
                 </a>
             </div>
@@ -247,7 +247,7 @@
         try
         {
             await Task.Delay(1000);
-            var loginResult = await loginHandler.HandleAsync(_model);
+            var loginResult = await loginHandler.HandleAsync(_model, rememberMe: _rememeberMe);
 
             _errorMessage = loginResult.successStatus ? string.Empty : loginResult.responseMessage;
 
@@ -263,14 +263,6 @@
                 await localStorageService.RemoveItemAsync(ApplicationClientHelper.RegisteredUserEmailKey);
             }
 
-            if (_rememeberMe)
-            {
-                await localStorageService.SetItemAsync(ApplicationClientHelper.RememberMeKey, _model.UserNameOrEmailAddress);
-            }
-            if (!_rememeberMe)
-            {
-                await localStorageService.RemoveItemAsync(ApplicationClientHelper.RememberMeKey);
-            }
             // Navigate to returnUrl or dashboard on success
             navigationManager.NavigateTo(GetReturnUrl());
         }
