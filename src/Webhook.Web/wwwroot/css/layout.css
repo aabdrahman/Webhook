@@ -690,3 +690,20 @@
     inset: 0;
     z-index: 499;
 }
+
+/* -----------------------------------------------------------------------------
+   PageHeader additions
+   ----------------------------------------------------------------------------- */
+.page-header-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-shrink: 0;
+}

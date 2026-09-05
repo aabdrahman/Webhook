@@ -1,0 +1,124 @@
+@*
+    PageHeader — consistent page title section
+
+    Parameters:
+    - Title:          page heading — rendered in Archivo Black (required)
+    - Description:    optional subtext below the title
+    - ActionText:     label for the optional primary action button
+    - OnAction:       callback for the action button click
+    - ActionVariant:  button variant — "primary" | "secondary" | "danger" (default: "primary")
+    - IsActionLoading: puts the action button in loading state (default: false)
+    - ActionLoadingText: loading label for the action button (default: "Please wait...")
+    - BadgeValue:     optional badge rendered next to the title — e.g. record count
+    - BadgeType:      badge type passed to Badge component (default: "custom")
+    - BadgeCssClass:  custom css class for the badge (default: "badge-inactive")
+    - AdditionalActions: slot for extra buttons rendered alongside the primary action
+
+    Usage:
+
+        Basic — title only:
+        <PageHeader Title="Subscriptions" />
+
+        With description:
+        <PageHeader Title="Event Catalog"
+                    Description="Manage the event types available for subscription." />
+
+        With action button:
+        <PageHeader Title="Service Clients"
+                    Description="Onboard and manage internal services."
+                    ActionText="Onboard Client"
+                    OnAction="OpenOnboardModal" />
+
+        With record count badge:
+        <PageHeader Title="Subscriptions"
+                    BadgeValue="@_subscriptions.Count.ToString()"
+                    BadgeCssClass="badge-inactive" />
+
+        With loading action:
+        <PageHeader Title="Dead Letters"
+                    ActionText="Retry All"
+                    IsActionLoading="@_isRetrying"
+                    ActionLoadingText="Retrying..."
+                    ActionVariant="danger"
+                    OnAction="HandleRetryAll" />
+
+        With extra actions slot:
+        <PageHeader Title="Deliveries"
+                    ActionText="Export"
+                    OnAction="HandleExport">
+            <AdditionalActions>
+                <button class="btn btn-secondary btn-sm" @onclick="HandleFilter">
+                    Filter
+                </button>
+            </AdditionalActions>
+        </PageHeader>
+*@
+
+<div class="page-header">
+
+    <!-- Left — title, optional badge, optional description -->
+    <div class="page-header-left">
+        <div class="page-header-title-row">
+            <h1 class="page-title">@Title</h1>
+            @if (!string.IsNullOrWhiteSpace(BadgeValue))
+            {
+                <Badge Value="@BadgeValue"
+                       Type="@BadgeType"
+                       CssClass="@BadgeCssClass"
+                       ShowDot="false"
+                       Label="@BadgeValue" />
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <p class="page-header-description">@Description</p>
+        }
+    </div>
+
+    <!-- Right — additional actions slot + primary action button -->
+    @if (AdditionalActions is not null || (!string.IsNullOrWhiteSpace(ActionText) && OnAction.HasDelegate))
+    {
+        <div class="page-header-actions">
+            @if (AdditionalActions is not null)
+            {
+                @AdditionalActions
+            }
+            @if (!string.IsNullOrWhiteSpace(ActionText) && OnAction.HasDelegate)
+            {
+                <LoadingButton Text="@ActionText"
+                               LoadingText="@ActionLoadingText"
+                               IsLoading="@IsActionLoading"
+                               Variant="@ActionVariant"
+                               OnClick="OnAction">
+                    <IconContent>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                             style="width:15px;height:15px;">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5"  y1="12" x2="19" y2="12" />
+                        </svg>
+                    </IconContent>
+                </LoadingButton>
+            }
+        </div>
+    }
+
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter] public string        Description       { get; set; } = string.Empty;
+    [Parameter] public string        ActionText        { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnAction          { get; set; }
+    [Parameter] public string        ActionVariant     { get; set; } = "primary";
+    [Parameter] public bool          IsActionLoading   { get; set; } = false;
+    [Parameter] public string        ActionLoadingText { get; set; } = "Please wait...";
+    [Parameter] public string        BadgeValue        { get; set; } = string.Empty;
+    [Parameter] public string        BadgeType         { get; set; } = "custom";
+    [Parameter] public string        BadgeCssClass     { get; set; } = "badge-inactive";
+
+    [Parameter] public RenderFragment? AdditionalActions { get; set; }
+}
