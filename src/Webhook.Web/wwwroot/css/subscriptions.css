@@ -54,3 +54,106 @@
     color:       var(--color-text-primary);
     word-break:  break-all;
 }
+
+
+/* =============================================================================
+   Create Subscription page
+   ============================================================================= */
+
+.create-subscription-form {
+    display: contents;
+}
+
+/* Two column layout — fields left, event picker right */
+.create-subscription-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.create-subscription-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+.create-subscription-events {
+    display: flex;
+    flex-direction: column;
+}
+
+.create-subscription-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+}
+
+/* Event picker list */
+.event-picker-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.event-picker-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    transition: background var(--transition-fast);
+}
+
+.event-picker-item:last-child {
+    border-bottom: none;
+}
+
+.event-picker-item:hover {
+    background: var(--color-surface-3);
+}
+
+.event-picker-item-selected {
+    background: var(--color-success-muted);
+}
+
+.event-picker-item-selected:hover {
+    background: var(--color-success-muted);
+    filter: brightness(1.1);
+}
+
+.event-picker-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    flex: 1;
+    overflow: hidden;
+}
+
+.event-picker-item-name {
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-picker-item-desc {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsive — stack on smaller screens */
+@media (max-width: 860px) {
+    .create-subscription-layout {
+        grid-template-columns: 1fr;
+    }
+}
+ 

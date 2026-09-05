@@ -1,0 +1,351 @@
+@page "/subscriptions/create"
+
+<PageTitle>New Subscription — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoadingCatalog" Label="Loading event catalog..." />
+
+@if (!_isLoadingCatalog && _allCatalogEvents is not null && _availableEvents is not null && _selectedEvents is not null)
+{
+    <PageHeader Title="New Subscription"
+                Description="Subscribe to webhook events and receive them at your callback URL." />
+
+    <Alert Message="@_errorMessage" />
+
+    <EditForm Model="_model"
+              OnValidSubmit="HandleCreate"
+              class="create-subscription-form">
+
+        <DataAnnotationsValidator />
+
+        <div class="create-subscription-layout">
+
+            <!-- Left — form fields -->
+            <div class="create-subscription-fields">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Subscription Details</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label form-label-required"
+                                   for="subscriberName">
+                                Subscriber name
+                            </label>
+                            <InputText id="subscriberName"
+                                       @bind-Value="_model.SubscriberName"
+                                       class="form-input"
+                                       placeholder="e.g. Order Management Service"
+                                       disabled="@_isSubmitting" />
+                            <ValidationMessage For="@(() => _model.SubscriberName)"
+                                               class="form-error" />
+                        </div>
+
+                        <div class="form-group" style="margin-top:var(--space-5);">
+                            <label class="form-label form-label-required"
+                                   for="callbackUrl">
+                                Callback URL
+                            </label>
+                            <div class="form-input-wrapper">
+                                <svg class="form-input-icon-left" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                                </svg>
+                                <InputText id="callbackUrl"
+                                           @bind-Value="_model.CallBackUrl"
+                                           class="form-input has-icon-left"
+                                           placeholder="https://your-service.com/webhook"
+                                           autocomplete="off"
+                                           disabled="@_isSubmitting" />
+                            </div>
+                            <ValidationMessage For="@(() => _model.CallBackUrl)"
+                                               class="form-error" />
+                            <span class="form-help">
+                                WebhookHub will POST events to this URL with an
+                                <code>X-Webhook-Signature</code> header for verification.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="create-subscription-actions">
+                    <button class="btn btn-ghost"
+                            type="button"
+                            @onclick="Cancel"
+                            disabled="@_isSubmitting">
+                        Cancel
+                    </button>
+                    <LoadingButton Text="Create Subscription"
+                                   LoadingText="Creating..."
+                                   IsLoading="@_isSubmitting"
+                                   Type="submit" />
+                </div>
+            </div>
+
+            <!-- Right — event picker -->
+            <div class="create-subscription-events">
+
+                <!-- Available events -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Available Events</h2>
+                        <span class="text-sm text-muted">
+                            @_availableEvents.Count available
+                        </span>
+                    </div>
+                    <div class="card-body" style="padding:0;">
+                        @if (!_availableEvents.Any() && !_selectedEvents.Any())
+                        {
+                            <EmptyState Title="No events available"
+                                        Description="No active event types found in the catalog."
+                                        Icon="catalog" />
+                        }
+                        else if (!_availableEvents.Any())
+                        {
+                            <div style="padding:var(--space-5);text-align:center;">
+                                <p class="text-sm text-muted">
+                                    All available events have been selected.
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            <ul class="event-picker-list">
+                                @foreach (var evt in _availableEvents)
+                                {
+                                    <li class="event-picker-item">
+                                        <div class="event-picker-item-info">
+                                            <span class="event-picker-item-name table-mono">
+                                                @evt.EventCatalogName
+                                            </span>
+                                            @if (!string.IsNullOrWhiteSpace(evt.Description))
+                                            {
+                                                <span class="event-picker-item-desc">
+                                                    @evt.Description
+                                                </span>
+                                            }
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-outline btn-sm"
+                                                @onclick="() => AddEvent(evt)">
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2.5"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:13px;height:13px;">
+                                                <line x1="12" y1="5" x2="12" y2="19" />
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            </svg>
+                                            Add
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+                <!-- Selected events -->
+                <div class="card" style="margin-top:var(--space-4);">
+                    <div class="card-header">
+                        <h2 class="card-title">Selected Events</h2>
+                        <span class="text-sm @(_model.SubscribedEvents.Any() ? "text-success" : "text-muted")">
+                            @_model.SubscribedEvents.Count selected
+                        </span>
+                    </div>
+                    <div class="card-body" style="padding:0;">
+                        @if (!_selectedEvents.Any())
+                        {
+                            <div style="padding:var(--space-5);text-align:center;">
+                                <p class="text-sm text-muted">
+                                    No events selected yet. Add events from the list above.
+                                </p>
+                            </div>
+                        }
+                        else
+                        {
+                            <ul class="event-picker-list">
+                                @foreach (var evt in _selectedEvents)
+                                {
+                                    <li class="event-picker-item event-picker-item-selected">
+                                        <div class="event-picker-item-info">
+                                            <span class="event-picker-item-name table-mono">
+                                                @evt.EventCatalogName
+                                            </span>
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-ghost btn-sm"
+                                                @onclick="() => RemoveEvent(evt)"
+                                                title="Remove">
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;
+                                                        color:var(--color-danger);">
+                                                <line x1="18" y1="6"  x2="6"  y2="18" />
+                                                <line x1="6"  y1="6"  x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+
+                <!-- Events validation error -->
+                @if (_eventsError)
+                {
+                    <span class="form-error" style="margin-top:var(--space-2);">
+                        Please select at least one event to subscribe to.
+                    </span>
+                }
+
+            </div>
+        </div>
+
+    </EditForm>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private readonly CreateWebhookSubscriptionDto _model = new();
+
+    private bool   _isLoadingCatalog = true;
+    private bool   _isSubmitting     = false;
+    private bool   _eventsError      = false;
+    private string _errorMessage     = string.Empty;
+
+    // Event catalog — all active entries
+    private List<EventCatalogItem> _allCatalogEvents  = [];
+
+    // Two-panel picker state
+    private List<EventCatalogItem> _availableEvents = [];
+    private List<EventCatalogItem> _selectedEvents  = [];
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+        => await LoadCatalogAsync();
+
+    private async Task LoadCatalogAsync()
+    {
+        _isLoadingCatalog = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.GetAllAsync();
+            // if (result.IsSuccessful)
+            //     _allCatalogEvents = result.ResponseData
+            //         .Select(e => new EventCatalogItem(e.EventCatalogName, e.Description))
+            //         .ToList();
+
+            await Task.Delay(600);
+
+            _allCatalogEvents =
+            [
+                new("OrderCreated",    "Raised when a new order is created."),
+                new("OrderCancelled",  "Raised when an order is cancelled."),
+                new("PaymentReceived", "Raised when a payment is received."),
+                new("UserRegistered",  "Raised when a new user registers."),
+                new("OrderShipped",    "Raised when an order is shipped."),
+            ];
+
+            _availableEvents = _allCatalogEvents.ToList();
+        }
+        finally
+        {
+            _isLoadingCatalog = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Event picker handlers
+    // -------------------------------------------------------------------------
+
+    private void AddEvent(EventCatalogItem evt)
+    {
+        _availableEvents.Remove(evt);
+        _selectedEvents.Add(evt);
+        _model.SubscribedEvents.Add(evt.EventCatalogName);
+        _eventsError = false;
+    }
+
+    private void RemoveEvent(EventCatalogItem evt)
+    {
+        _selectedEvents.Remove(evt);
+        _availableEvents.Add(evt);
+        _model.SubscribedEvents.Remove(evt.EventCatalogName);
+    }
+
+    // -------------------------------------------------------------------------
+    // Form handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleCreate()
+    {
+        // Manual validation — at least one event required
+        if (!_model.SubscribedEvents.Any())
+        {
+            _eventsError = true;
+            return;
+        }
+
+        _eventsError     = false;
+        _errorMessage    = string.Empty;
+        _isSubmitting    = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await SubscriptionService.CreateAsync(new CreateWebhookSubscriptionDto
+            // {
+            //     SubscriberName   = _model.SubscriberName,
+            //     CallBackUrl      = _model.CallBackUrl,
+            //     SubscribedEvents = _model.SubscribedEvents,
+            //     SubscribedFields = _model.SubscribedFields
+            // });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to create subscription. Please try again.";
+                return;
+            }
+
+            navigationManager.NavigateTo("/subscriptions");
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+        => navigationManager.NavigateTo("/subscriptions");
+
+    // -------------------------------------------------------------------------
+    // Local view model
+    // -------------------------------------------------------------------------
+
+    private sealed record EventCatalogItem(
+        string EventCatalogName,
+        string Description);
+}
