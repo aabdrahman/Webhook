@@ -29,10 +29,15 @@ public class ValidateOtpHandler
             }
             var httpResponse = await _httpClient.PostAsJsonAsync("api/OtpOperation/validate-otp", new OtpVerificationRequestDto { Otp = otp, EmailAddress = requestedUserEmail });
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
-            GenericResponse<string> responseBody = JsonSerializer.Deserialize<GenericResponse<string>>(responseContent, new JsonSerializerOptions
+            GenericResponse<OtpVerificationDto> responseBody = JsonSerializer.Deserialize<GenericResponse<OtpVerificationDto>>(responseContent, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new InvalidOperationException("Failed to deserialize the response body.");
+
+            if(responseBody.IsSuccessful && responseBody.ResponseData is not null)
+            {
+                await _localStorageService.SetItemAsync(ApplicationClientHelper.VerifiedOtpTokenKey, responseBody.ResponseData.SignedToken);
+            }
 
             return new ApiResponseDto(responseBody.IsSuccessful, responseBody.ResponseMessage);
         }
