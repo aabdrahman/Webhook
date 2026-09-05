@@ -1,4 +1,4 @@
-namespace WebhookHub.Client.Services;
+namespace Webhook.Web.Services;
 
 /// <summary>
 /// Defines the visual type of a toast notification.

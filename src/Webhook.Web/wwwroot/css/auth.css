@@ -93,3 +93,33 @@
 .password-strength-label.weak   { color: var(--color-danger);  }
 .password-strength-label.medium { color: var(--color-warning); }
 .password-strength-label.strong { color: var(--color-success); }
+
+
+/* -----------------------------------------------------------------------------
+   Auth form layout
+   ----------------------------------------------------------------------------- */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+}
+
+/* Label row — label + forgot password link side by side */
+.form-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.auth-forgot-link {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    transition: color var(--transition-base);
+}
+
+.auth-forgot-link:hover {
+    color: var(--color-primary);
+}
+ 

@@ -1,0 +1,19 @@
+@*
+    RedirectToLogin — immediately navigates to the login page.
+    Used in App.razor inside the <NotAuthorized> block when the
+    user is not authenticated and tries to access a protected route.
+    Preserves the originally requested URL as a returnUrl query parameter
+    so the login page can redirect back after a successful login.
+*@
+
+@code {
+
+    protected override void OnInitialized()
+    {
+        var currentUrl = navigationManager.Uri;
+        var returnUrl  = Uri.EscapeDataString(
+            new Uri(currentUrl).PathAndQuery);
+
+        navigationManager.NavigateTo($"/login?returnUrl={returnUrl}", replace: true);
+    }
+}

@@ -82,7 +82,7 @@
                         </button>
 
                         <LoadingButton Text="@ConfirmText"
-                                       LoadingText="@ConfirmText..."
+                                       LoadingText="@(string.Concat(ConfirmText, "......"))"
                                        IsLoading="@IsConfirming"
                                        Variant="@ConfirmVariant"
                                        Size="sm"

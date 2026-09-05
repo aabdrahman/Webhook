@@ -4,6 +4,7 @@ using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Authentication;
 using Webhook.Web.Helper;
+using Webhook.Web.Services;
 
 namespace Webhook.Web;
 
@@ -20,6 +21,7 @@ public static class ApplicationServiceExtensions
 
     internal static void AddApplicationAuthenticationStateProvider(this IServiceCollection services)
     {
+        services.AddAuthorizationCore();
         services.AddScoped<AuthenticationStateProvider, UserJwtAuthenticationStateProvider>();
     }
 

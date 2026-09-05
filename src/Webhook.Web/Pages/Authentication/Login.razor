@@ -1,0 +1,226 @@
+@page "/login"
+@layout AuthLayout
+
+
+<PageTitle>Sign In — WebhookHub</PageTitle>
+
+<div class="auth-card">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="auth-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="auth-logo-text">WebhookHub</span>
+    </div>
+
+    <!-- Heading -->
+    <h1 class="auth-heading">Welcome back</h1>
+    <p class="auth-subheading">Sign in to your account to continue.</p>
+
+    <!-- API error alert — shown above the form on service failure -->
+    <Alert Message="@_errorMessage" />
+
+    <!-- Form -->
+    <EditForm Model="_model"
+              OnValidSubmit="HandleLogin"
+              class="auth-form">
+
+        <DataAnnotationsValidator />
+
+        <!-- Email or username to sign in user -->
+
+        <div class="form-group">
+            <label class="form-label form-label-required" for="usernameoremail">
+                Email address or username
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <InputText id="usernameoremail"
+                           @bind-Value="_model.UserNameOrEmailAddress"
+                           class="form-input has-icon-left"
+                           placeholder="you@example.com or username"
+                           autocomplete="username"
+                           disabled="@_isLoading" />
+            </div>
+            <ValidationMessage For="@(() => _model.UserNameOrEmailAddress)"
+                               class="form-error" />
+        </div>
+        @*
+        <div class="form-group">
+            <label class="form-label form-label-required" for="email">
+                Email or username
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <InputText id="email"
+                           @bind-Value="_model.UserNameOrEmailAddress"
+                           class="form-input has-icon-left"
+                           placeholder="you@example.com"
+                           autocomplete="email"
+                           disabled="@_isLoading" />
+            </div>
+            <ValidationMessage For="@(() => _model.UserNameOrEmailAddress)" class="form-error" />
+        </div>
+        *@
+
+
+        <!-- Password -->
+        <div class="form-group">
+            <div class="form-label-row">
+                <label class="form-label form-label-required" for="password">
+                    Password
+                </label>
+                <a href="/forgot-password" class="auth-forgot-link">
+                    Forgot password?
+                </a>
+            </div>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <input id="password"
+                       type="@(_showPassword ? "text" : "password")"
+                       class="form-input has-icon-left has-icon-right"
+                       placeholder="••••••••••"
+                       @bind="_model.Password"
+                       @bind:event="oninput"
+                       autocomplete="current-password"
+                       disabled="@_isLoading" />
+                <button type="button"
+                        class="form-input-icon-right"
+                        @onclick="TogglePasswordVisibility"
+                        tabindex="-1"
+                        aria-label="@(_showPassword ? "Hide password" : "Show password")">
+                    @if (_showPassword)
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+                            a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+                            a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    }
+                </button>
+            </div>
+            <ValidationMessage For="@(() => _model.Password)" class="form-error" />
+        </div>
+
+        <!-- Submit -->
+        <LoadingButton Text="Sign In"
+                       LoadingText="Signing in..."
+                       IsLoading="@_isLoading"
+                       FullWidth="true"
+                       Type="submit" />
+
+    </EditForm>
+
+    <!-- Footer -->
+    <p class="auth-footer-text">
+        Don't have an account?
+        <a href="/register">Create one</a>
+    </p>
+
+</div>
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // Parameters — your side wires the service call via OnLogin
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called by EditForm OnValidSubmit after all validation passes.
+    /// Your side: call AuthService.LoginAsync and return the error message
+    /// on failure or an empty string on success.
+    /// </summary>
+    [Parameter]
+    public Func<string, string, Task<string>>? OnLogin { get; set; }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private readonly LoginUserDto _model = new();
+    private bool _isLoading = false;
+    private bool _showPassword = false;
+    private string _errorMessage = string.Empty;
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private void TogglePasswordVisibility()
+        => _showPassword = !_showPassword;
+
+    /// <summary>
+    /// Only called by EditForm when DataAnnotationsValidator passes.
+    /// Client-side validation is already complete at this point.
+    /// </summary>
+    private async Task HandleLogin()
+    {
+        _errorMessage = string.Empty;
+        _isLoading = true;
+
+        try
+        {
+            if (OnLogin is not null)
+            {
+                var error = await OnLogin(_model.UserNameOrEmailAddress, _model.Password);
+
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    _errorMessage = error;
+                    return;
+                }
+            }
+
+            // Navigate to returnUrl or dashboard on success
+            navigationManager.NavigateTo(GetReturnUrl());
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetReturnUrl()
+    {
+        var uri = new Uri(navigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("returnUrl", out var returnUrl)
+            && !string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return Uri.UnescapeDataString(returnUrl!);
+        }
+
+        return "/";
+    }
+}

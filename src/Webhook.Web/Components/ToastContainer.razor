@@ -1,14 +1,15 @@
+
 @*
     ToastContainer — renders all active toasts in the top-right corner.
     Placed once in MainLayout.razor.
     Subscribes to ToastService and re-renders when the queue changes.
 *@
 
-@inject ToastService ToastService
+
 @implements IDisposable
 
 <div class="toast-container" aria-label="Notifications" aria-live="polite">
-    @foreach (var toast in ToastService.Toasts)
+    @foreach (var toast in toastService.Toasts)
     {
         <Toast ToastMessage="@toast"
                OnDismiss="@HandleDismiss"
@@ -20,7 +21,7 @@
 
     protected override void OnInitialized()
     {
-        ToastService.OnToastsChanged += HandleToastsChanged;
+        toastService.OnToastsChanged += HandleToastsChanged;
     }
 
     private void HandleToastsChanged()
@@ -32,11 +33,11 @@
 
     private void HandleDismiss(Guid id)
     {
-        ToastService.Remove(id);
+        toastService.Remove(id);
     }
 
     public void Dispose()
     {
-        ToastService.OnToastsChanged -= HandleToastsChanged;
+        toastService.OnToastsChanged -= HandleToastsChanged;
     }
 }

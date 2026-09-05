@@ -9,11 +9,15 @@
 @using Microsoft.JSInterop
 @using Webhook.Web
 @using Webhook.Web.Layout
+@using Microsoft.AspNetCore.WebUtilities
 
 @* Application using imports *@
 @using Webhook.Web.Components
 @using Webhook.Web.ApplicationAuthenticationHandler
 @using Webhook.Web.Helper
+@using Webhook.Web.Services
+@using Webhook.Web.Pages
+
 @using WebHook.Core
 @using WebHook.Core.DataTransferObjects
 
@@ -22,3 +26,4 @@
 @inject NavigationManager navigationManager
 @inject AuthenticationStateProvider authenticationStateProvider
 @inject EnvironmentVariables environmentVariables
+@inject ToastService toastService

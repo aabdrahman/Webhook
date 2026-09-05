@@ -1,0 +1,48 @@
+@*
+    UnauthorizedPage — rendered by App.razor <NotAuthorized> block
+    when the user is authenticated but does not have the required role
+    to access the requested route (e.g. a USER accessing an Admin route).
+*@
+
+<PageTitle>Access Denied — WebhookHub</PageTitle>
+
+<div class="error-page">
+
+    <div class="error-page-code font-display">403</div>
+
+    <div class="error-page-content">
+        <h1 class="error-page-title">Access denied</h1>
+        <p class="error-page-description">
+            You do not have permission to view this page.
+            If you believe this is a mistake, contact your administrator.
+        </p>
+    </div>
+
+    <div class="error-page-actions">
+        <button class="btn btn-primary" @onclick="GoHome">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 style="width:16px;height:16px;">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Go to Dashboard
+        </button>
+        <button class="btn btn-ghost" @onclick="GoBack">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 style="width:16px;height:16px;">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Go Back
+        </button>
+    </div>
+
+</div>
+
+@code {
+
+    private void GoHome() => navigationManager.NavigateTo("/");
+
+    private void GoBack() => navigationManager.NavigateTo("javascript:history.back()");
+}
