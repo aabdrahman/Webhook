@@ -17,12 +17,14 @@
 @using Webhook.Web.Helper
 @using Webhook.Web.Services
 @using Webhook.Web.Pages
+@using Blazored.LocalStorage
 
 @using WebHook.Core
 @using WebHook.Core.DataTransferObjects
 
 
 @* Application global injects *@
+@inject ILocalStorageService localStorageService
 @inject NavigationManager navigationManager
 @inject AuthenticationStateProvider authenticationStateProvider
 @inject EnvironmentVariables environmentVariables

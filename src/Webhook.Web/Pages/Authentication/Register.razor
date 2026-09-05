@@ -1,0 +1,355 @@
+@page "/register"
+@layout AuthLayout
+
+<PageTitle>Create Account — WebhookHub</PageTitle>
+
+<div class="auth-card">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+        <div class="auth-logo-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+        </div>
+        <span class="auth-logo-text">WebhookHub</span>
+    </div>
+
+    <!-- Heading -->
+    <h1 class="auth-heading">Create an account</h1>
+    <p class="auth-subheading">Fill in your details to get started.</p>
+
+    <!-- API error alert -->
+    <Alert Message="@_errorMessage" />
+
+    <!-- Form -->
+    <EditForm Model="_model"
+              OnValidSubmit="HandleRegister"
+              class="auth-form">
+
+        <DataAnnotationsValidator />
+
+        <!-- First name + Last name — side by side -->
+        <div class="auth-name-row">
+            <div class="form-group">
+                <label class="form-label form-label-required" for="firstName">
+                    First name
+                </label>
+                <InputText id="firstName"
+                           @bind-Value="_model.FirstName"
+                           class="form-input"
+                           placeholder="John"
+                           autocomplete="given-name"
+                           disabled="@_isLoading" />
+                <ValidationMessage For="@(() => _model.FirstName)"
+                                   class="form-error" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label form-label-required" for="lastName">
+                    Last name
+                </label>
+                <InputText id="lastName"
+                           @bind-Value="_model.LastName"
+                           class="form-input"
+                           placeholder="Doe"
+                           autocomplete="family-name"
+                           disabled="@_isLoading" />
+                <ValidationMessage For="@(() => _model.LastName)"
+                                   class="form-error" />
+            </div>
+        </div>
+
+        <!-- Username -->
+        <div class="form-group">
+            <label class="form-label form-label-required" for="username">
+                Username
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                <InputText id="username"
+                           @bind-Value="_model.UserName"
+                           class="form-input has-icon-left"
+                           placeholder="johndoe112"
+                           autocomplete="username"
+                           disabled="@_isLoading" />
+            </div>
+            <ValidationMessage For="@(() => _model.UserName)"
+                               class="form-error" />
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+            <label class="form-label form-label-required" for="email">
+                Email address
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                </svg>
+                <InputText id="email"
+                           @bind-Value="_model.EmailAddress"
+                           class="form-input has-icon-left"
+                           placeholder="you@example.com"
+                           autocomplete="email"
+                           disabled="@_isLoading" />
+            </div>
+            <ValidationMessage For="@(() => _model.EmailAddress)"
+                               class="form-error" />
+        </div>
+
+        <!-- Password -->
+        <div class="form-group">
+            <label class="form-label form-label-required" for="password">
+                Password
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <input id="password"
+                       type="@(_showPassword ? "text" : "password")"
+                       class="form-input has-icon-left has-icon-right"
+                       placeholder="••••••••••"
+                       @bind="_model.Password"
+                       @bind:event="oninput" 
+                       @onblur="HidePasswordOnBlur"
+                       autocomplete="new-password"
+                       disabled="@_isLoading" />
+                <button type="button"
+                        class="form-input-icon-right"
+                        @onclick="TogglePasswordVisibility" 
+                        @onmousedown:preventDefault
+                        tabindex="-1"
+                        aria-label="@(_showPassword ? "Hide password" : "Show password")">
+                    @if (_showPassword)
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+                                     a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+                                     a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    }
+                </button>
+            </div>
+            <ValidationMessage For="@(() => _model.Password)"
+                               class="form-error" />
+
+            <!-- Password strength indicator -->
+            @if (!string.IsNullOrWhiteSpace(_model.Password))
+            {
+                <div class="password-strength">
+                    <div class="password-strength-bars">
+                        <div class="password-strength-bar @(_strength >= 1 ? StrengthClass : "")"></div>
+                        <div class="password-strength-bar @(_strength >= 2 ? StrengthClass : "")"></div>
+                        <div class="password-strength-bar @(_strength >= 3 ? StrengthClass : "")"></div>
+                    </div>
+                    <span class="password-strength-label @StrengthClass">
+                        @StrengthLabel
+                    </span>
+                </div>
+            }
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="form-group">
+            <label class="form-label form-label-required" for="confirmPassword">
+                Confirm password
+            </label>
+            <div class="form-input-wrapper">
+                <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <input id="confirmPassword"
+                       type="@(_showConfirmPassword ? "text" : "password")"
+                       class="form-input has-icon-left has-icon-right"
+                       placeholder="••••••••••"
+                       @bind="_model.ConfirmPassword" 
+                       @onblur="HideConfirmPasswordOnBlur"
+                       @bind:event="oninput"
+                       autocomplete="new-password"
+                       disabled="@_isLoading" />
+                <button type="button"
+                        class="form-input-icon-right"
+                        @onclick="ToggleConfirmPasswordVisibility" 
+                        @onmousedown:preventDefault
+                        tabindex="-1"
+                        aria-label="@(_showConfirmPassword ? "Hide password" : "Show password")">
+                    @if (_showConfirmPassword)
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
+                                     a18.45 18.45 0 0 1 5.06-5.94" />
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8
+                                     a18.5 18.5 0 0 1-2.16 3.19" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    }
+                </button>
+            </div>
+            <ValidationMessage For="@(() => _model.ConfirmPassword)"
+                               class="form-error" />
+        </div>
+
+        <!-- Submit -->
+        <LoadingButton Text="Create Account"
+                       LoadingText="Creating account..."
+                       IsLoading="@_isLoading"
+                       FullWidth="true"
+                       Type="submit" />
+
+    </EditForm>
+
+    <!-- Footer -->
+    <p class="auth-footer-text">
+        Already have an account?
+        <a href="/login">Sign in</a>
+    </p>
+
+</div>
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // Parameters
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called by EditForm OnValidSubmit after all validation passes.
+    /// Your side: call AuthService.RegisterAsync and return the error
+    /// message on failure or empty string on success.
+    /// </summary>
+    //[Parameter]
+    //public Func<CreateUserDto, Task<string>>? OnRegister { get; set; }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private readonly CreateUserDto _model = new();
+    private bool _isLoading           = false;
+    private bool _showPassword        = false;
+    private bool _showConfirmPassword = false;
+    private string _errorMessage        = string.Empty;
+
+    // -------------------------------------------------------------------------
+    // Password strength
+    // -------------------------------------------------------------------------
+
+    private int _strength => ComputeStrength(_model.Password);
+
+    private string StrengthClass => _strength switch
+    {
+        1 => "weak",
+        2 => "medium",
+        3 => "strong",
+        _ => ""
+    };
+
+    private string StrengthLabel => _strength switch
+    {
+        1 => "Weak",
+        2 => "Medium",
+        3 => "Strong",
+        _ => ""
+    };
+
+    private static int ComputeStrength(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password)) return 0;
+
+        int score = 0;
+
+        if (password.Length >= 10) score++;
+        if (password.Any(char.IsUpper) && password.Any(char.IsLower)) score++;
+        if (password.Any(char.IsDigit) || password.Any(c =>
+            !char.IsLetterOrDigit(c))) score++;
+
+        return score;
+    }
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private void TogglePasswordVisibility()
+        => _showPassword = !_showPassword;
+
+    private void ToggleConfirmPasswordVisibility()
+        => _showConfirmPassword = !_showConfirmPassword;
+
+    private async Task HandleRegister()
+    {
+        _errorMessage = string.Empty;
+        _isLoading    = true;
+
+        try
+        {
+            var registerResult = await registerUserHandler.HandleAsync(_model);
+            _errorMessage = registerResult.successStatus ? string.Empty : registerResult.responseMessage;
+
+            if (!registerResult.successStatus && !string.IsNullOrEmpty(_errorMessage))
+            {
+                return;
+            }
+
+
+            await localStorageService.SetItemAsync<string>(ApplicationClientHelper.RegisteredUserEmailKey, _model.EmailAddress);
+            // Navigate to login on success with a success hint
+            navigationManager.NavigateTo("/login?registered=true");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HidePasswordOnBlur()
+    {
+        // Small delay allows the toggle button onclick to fire first
+        // if the user clicked the eye icon rather than tabbing away
+        await Task.Delay(150);
+        _showPassword = false;
+    }
+
+    private async Task HideConfirmPasswordOnBlur()
+    {
+        await Task.Delay(150);
+        _showConfirmPassword = false;
+    }
+}

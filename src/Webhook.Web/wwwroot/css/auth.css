@@ -140,3 +140,40 @@
     justify-content: flex-end;
     margin-top: calc(var(--space-2) * -1); /* ensures it is closer to the password field */
 }
+
+/* First name + Last name side by side */
+.auth-name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+/* Remember me */
+.auth-remember-row {
+    display: flex;
+    align-items: center;
+}
+
+.auth-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    user-select: none;
+}
+
+.auth-checkbox-label:hover {
+    color: var(--color-text-primary);
+}
+
+.auth-checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+}

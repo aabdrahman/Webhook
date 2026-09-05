@@ -14,6 +14,7 @@ public static class ApplicationServiceExtensions
     {
         services.AddScoped<RefreshTokenHandler>();
         services.AddScoped<LoginHandler>();
+        services.AddScoped<RegisterUserHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
