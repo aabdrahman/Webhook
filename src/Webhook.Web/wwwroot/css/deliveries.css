@@ -31,3 +31,111 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* =============================================================================
+   Delivery Attempts page
+   ============================================================================= */
+
+.attempts-header {
+    margin-bottom: var(--space-4);
+}
+
+/* Summary grid */
+.attempts-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-5);
+}
+
+/* Attempts list */
+.attempts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+/* Attempt card header layout */
+.attempts-card .card-header {
+    cursor: default;
+}
+
+.attempts-card-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.attempts-card-number {
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    color: var(--color-text-primary);
+    min-width: 32px;
+}
+
+.attempts-card-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* HTTP status code pill */
+.attempts-status-code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-sm);
+}
+
+.attempts-status-success {
+    background: var(--color-success-muted);
+    color: var(--color-success);
+}
+
+.attempts-status-error {
+    background: var(--color-danger-muted);
+    color: var(--color-danger);
+}
+
+.attempts-card-time {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-left: auto;
+}
+
+/* Response body */
+.attempts-response-body {
+    border-top: 1px solid var(--color-border-subtle);
+}
+
+.attempts-response-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.attempts-response-pre {
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Responsive */
+@media (max-width: 760px) {
+    .attempts-summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+ 
