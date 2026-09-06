@@ -35,7 +35,7 @@ public class AuthenticationTokenHandler : DelegatingHandler
 
         var result = await base.SendAsync(request, cancellationToken);
 
-        if(result.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        if(result.StatusCode == HttpStatusCode.Unauthorized)
         {
             var newAccessToken = await _refreshTokenHandler.RefreshTokenAsync(accessToken);
             if (string.IsNullOrEmpty(newAccessToken))
