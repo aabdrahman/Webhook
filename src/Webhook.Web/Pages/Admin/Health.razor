@@ -1,0 +1,337 @@
+@page "/admin/health"
+@attribute [Authorize(Roles = "Admin,ADMIN")]
+@implements IAsyncDisposable
+
+<PageTitle>System Health — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading health checks..." />
+
+@if (!_isLoading)
+{
+    <div class="dashboard-greeting">
+        <div>
+            <div style="display:flex;align-items:center;gap:var(--space-3);">
+                <h1 class="page-title">System Health</h1>
+                <Badge Value="@_overallStatus"
+                       Variant="custom"
+                       Text="@_overallStatus"
+                       ShowDot="true" />
+            </div>
+            <p class="page-header-description">
+                Last checked: @_lastChecked.ToString("HH:mm:ss") —
+                Auto-refreshes every 30 seconds
+            </p>
+        </div>
+        <div class="dashboard-greeting-actions">
+            <LoadingButton Text="Refresh Now"
+                           LoadingText="Refreshing..."
+                           IsLoading="@_isRefreshing"
+                           Variant="secondary"
+                           Size="sm"
+                           OnClick="RefreshAsync" />
+        </div>
+    </div>
+
+    <Alert Message="@_errorMessage" />
+
+    @if (!_checks.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <EmptyState Title="No health checks found"
+                    Description="No health checks are registered."
+                    Icon="health" />
+    }
+    else
+    {
+        <!-- Overall status card -->
+        <div class="card" style="margin-bottom:var(--space-6);">
+            <div class="card-body">
+                <div class="health-overall-grid">
+                    <div class="health-overall-item">
+                        <span class="metric-card-label">Overall Status</span>
+                        <div style="display:flex;align-items:center;
+                                    gap:var(--space-2);margin-top:var(--space-1);">
+                            <StatusDot Status="@_overallStatus" Size="lg"
+                                       Pulse="@(_overallStatus == "Healthy")" />
+                            <span class="metric-card-value"
+                                  style="color:@OverallStatusColor;">
+                                @_overallStatus
+                            </span>
+                        </div>
+                    </div>
+                    <div class="health-overall-item">
+                        <span class="metric-card-label">Healthy</span>
+                        <span class="metric-card-value"
+                              style="color:var(--color-success);">
+                            @_checks.Count(c => c.Status == "Healthy")
+                        </span>
+                    </div>
+                    <div class="health-overall-item">
+                        <span class="metric-card-label">Degraded</span>
+                        <span class="metric-card-value"
+                              style="color:var(--color-warning);">
+                            @_checks.Count(c => c.Status == "Degraded")
+                        </span>
+                    </div>
+                    <div class="health-overall-item">
+                        <span class="metric-card-label">Unhealthy</span>
+                        <span class="metric-card-value"
+                              style="color:var(--color-danger);">
+                            @_checks.Count(c => c.Status == "Unhealthy")
+                        </span>
+                    </div>
+                    <div class="health-overall-item">
+                        <span class="metric-card-label">Total Duration</span>
+                        <span class="metric-card-value text-sm">
+                            @_totalDurationMs ms
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Individual checks -->
+        <div class="health-checks-grid">
+            @foreach (var check in _checks.OrderBy(c => c.Status == "Healthy" ? 2 : c.Status == "Degraded" ? 1 : 0))
+            {
+                <div class="card health-check-card
+                    @(check.Status == "Unhealthy"
+                        ? "health-check-card-unhealthy"
+                        : check.Status == "Degraded"
+                            ? "health-check-card-degraded"
+                            : "health-check-card-healthy")">
+                    <div class="card-body">
+                        <div class="health-check-header">
+                            <StatusDot Status="@check.Status"
+                                       Pulse="@(check.Status == "Healthy")" />
+                            <span class="health-check-name table-mono">
+                                @check.Name
+                            </span>
+                            <Badge Value="@check.Status"
+                                   Variant="custom"
+                                   Text="@check.Status"
+                                   ShowDot="false" />
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(check.Description))
+                        {
+                            <p class="health-check-description">
+                                @check.Description
+                            </p>
+                        }
+
+                        <div class="health-check-meta">
+                            <span class="text-xs text-muted">
+                                Duration: <strong>@check.DurationMs ms</strong>
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(check.Exception))
+                            {
+                                <details class="health-check-exception">
+                                    <summary class="text-xs"
+                                             style="color:var(--color-danger);
+                                                    cursor:pointer;">
+                                        View exception
+                                    </summary>
+                                    <pre class="attempts-response-pre"
+                                         style="margin-top:var(--space-2);">@check.Exception</pre>
+                                </details>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading   = true;
+    private bool   _isRefreshing = false;
+    private string _errorMessage = string.Empty;
+
+    private List<HealthCheckItem> _checks         = [];
+    private string                _overallStatus  = "Unknown";
+    private DateTimeOffset        _lastChecked    = DateTimeOffset.UtcNow;
+    private double                _totalDurationMs = 0;
+
+    // Auto-refresh timer
+    private Timer? _refreshTimer;
+
+    // -------------------------------------------------------------------------
+    // Computed
+    // -------------------------------------------------------------------------
+
+    private string OverallStatusColor => _overallStatus switch
+    {
+        "Healthy"   => "var(--color-success)",
+        "Degraded"  => "var(--color-warning)",
+        "Unhealthy" => "var(--color-danger)",
+        _           => "var(--color-text-muted)"
+    };
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHealthAsync();
+
+        // Start auto-refresh timer — fires every 30 seconds
+        _refreshTimer = new Timer(
+            async _ => await AutoRefreshAsync(),
+            null,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(30));
+    }
+
+    private async Task AutoRefreshAsync()
+    {
+        await LoadHealthAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshAsync()
+    {
+        _isRefreshing = true;
+
+        try
+        {
+            await LoadHealthAsync();
+            // Reset the timer so the next auto-refresh is 30 seconds from now, not from the last tick
+            _refreshTimer?.Change(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private async Task LoadHealthAsync()
+    {
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await HealthService.GetHealthAsync();
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _overallStatus   = result.ResponseData.Status;
+            // _checks          = result.ResponseData.Checks.ToList();
+            // _totalDurationMs = result.ResponseData.TotalDurationMs;
+
+            await Task.Delay(600);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load health checks. Please try again.";
+                return;
+            }
+
+            _checks =
+            [
+                new HealthCheckItem("postgresql",
+                    "Healthy", 12.3,
+                    "PostgreSQL database connection is healthy.",
+                    null),
+
+                new HealthCheckItem("email-queue",
+                    "Healthy", 0.1,
+                    "Email processing queue is within capacity.",
+                    null),
+
+                new HealthCheckItem("dead-letter-queue",
+                    "Degraded", 1.8,
+                    "Dead letter queue depth is above warning threshold.",
+                    null),
+
+                new HealthCheckItem("pending-deliveries",
+                    "Healthy", 2.1,
+                    "Pending delivery count is within acceptable range.",
+                    null),
+
+                new HealthCheckItem("stale-processing",
+                    "Healthy", 0.9,
+                    "No stale claimed deliveries detected.",
+                    null),
+
+                new HealthCheckItem("EventRaisedWorker",
+                    "Healthy", 0.2,
+                    "Worker is running and processing events.",
+                    null),
+
+                new HealthCheckItem("PendingRaisedEventWorker",
+                    "Healthy", 0.1,
+                    "Worker is running.",
+                    null),
+
+                new HealthCheckItem("DeliveryWorker",
+                    "Healthy", 0.3,
+                    "Worker is running and delivering events.",
+                    null),
+
+                new HealthCheckItem("RetryWorker",
+                    "Degraded", 5.2,
+                    "Worker is running but experiencing elevated retry times.",
+                    null),
+
+                new HealthCheckItem("StaleClaimedDeliveryReleaseWorker",
+                    "Healthy", 0.1,
+                    "Worker is running.",
+                    null),
+
+                new HealthCheckItem("EmailProcessorWorker",
+                    "Healthy", 0.2,
+                    "Worker is running and processing emails.",
+                    null),
+            ];
+
+            _overallStatus = _checks.Any(c => c.Status == "Unhealthy")
+                ? "Unhealthy"
+                : _checks.Any(c => c.Status == "Degraded")
+                    ? "Degraded"
+                    : "Healthy";
+
+            _totalDurationMs = _checks.Sum(c => c.DurationMs);
+            _lastChecked     = DateTimeOffset.UtcNow;
+        }
+        finally
+        {
+            if (_isLoading) _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Dispose — cancel timer when navigating away
+    // -------------------------------------------------------------------------
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_refreshTimer is not null)
+        {
+            await _refreshTimer.DisposeAsync();
+            _refreshTimer = null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local view model
+    // -------------------------------------------------------------------------
+
+    private sealed record HealthCheckItem(
+        string  Name,
+        string  Status,
+        double  DurationMs,
+        string? Description,
+        string? Exception);
+}

@@ -159,3 +159,92 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* =============================================================================
+   Health page
+   ============================================================================= */
+
+/* Overall status summary grid */
+.health-overall-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+}
+
+.health-overall-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+/* Individual checks grid */
+.health-checks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-4);
+}
+
+/* Check card */
+.health-check-card {
+    border-left: 3px solid var(--color-border);
+    transition: border-color var(--transition-base);
+}
+
+.health-check-card-degraded {
+    border-left-color: var(--color-warning);
+}
+
+.health-check-card-unhealthy {
+    border-left-color: var(--color-danger);
+}
+
+.health-check-card-healthy {
+    border-left-color: var(--color-success);
+}
+
+.health-check-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.health-check-name {
+    flex: 1;
+    font-size: var(--text-sm);
+    color: var(--color-text-primary);
+}
+
+.health-check-description {
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+    line-height: var(--leading-relaxed);
+}
+
+.health-check-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.health-check-exception summary {
+    font-family: var(--font-body);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .health-overall-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .health-overall-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+ 
