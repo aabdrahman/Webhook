@@ -204,7 +204,7 @@
             var query = QueryHelpers.ParseQuery(uri.Query);
             if (query.TryGetValue("registered", out var newRegistration) && newRegistration == "true")
             {
-                
+
                 string? registeredUserEmail = await localStorageService.GetItemAsync<string>(ApplicationClientHelper.RegisteredUserEmailKey);
                 if (!string.IsNullOrEmpty(registeredUserEmail))
                 {
@@ -235,6 +235,7 @@
         }
         finally
         {
+            await localStorageService.RemoveItemAsync(ApplicationClientHelper.StorageKey);
             _isInitialized = true;
         }
 

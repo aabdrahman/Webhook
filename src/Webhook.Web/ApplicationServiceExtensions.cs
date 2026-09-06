@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Authentication;
+using Webhook.Web.Handlers.User;
 using Webhook.Web.Helper;
 using Webhook.Web.Services;
 
@@ -18,6 +19,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<RequestOtpHandler>();
         services.AddScoped<ValidateOtpHandler>();
         services.AddScoped<ResetPasswordHandler>();
+        services.AddScoped<ChangePasswordHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 

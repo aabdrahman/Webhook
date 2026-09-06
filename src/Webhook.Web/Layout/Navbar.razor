@@ -62,8 +62,7 @@
                     @_userInitials
                 </div>
                 <div class="navbar-user-info">
-                    <span class="navbar-user-email">@_userEmail</span>
-                    <span class="navbar-user-role">@_userRole</span>
+                    <span class="navbar-user-email">@_fullName.Split(" ")[0]</span>
                 </div>
                 <svg class="navbar-chevron @(_dropdownOpen ? "navbar-chevron-open" : "")"
                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -76,7 +75,7 @@
             {
                 <div class="navbar-dropdown" @onclick:stopPropagation="true">
                     <div class="navbar-dropdown-header">
-                        <span class="navbar-dropdown-email">@_userEmail</span>
+                        <span class="navbar-dropdown-email">@_fullName</span>
                         <Badge Value="@_userRole" Variant="role" ShowDot="false" />
                     </div>
 
@@ -138,6 +137,7 @@
     private string _userEmail    = string.Empty;
     private string _userInitials = "U";
     private string _userRole     = "User";
+    private string _fullName = "john doe";
 
     private List<BreadcrumbItem> _breadcrumbs = [];
 
@@ -159,9 +159,13 @@
                      ?? user.FindFirst("given_name")?.Value
                      ?? string.Empty;
 
-            _userEmail    = email;
-            _userInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "anonymous";
-            _userRole     = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
+            var firstName = user.FindFirstValue(ClaimTypes.GivenName) ?? user.FindFirstValue("given_name") ?? "john";
+            var lastName = user.FindFirstValue(ClaimTypes.Surname) ?? user.FindFirstValue("family_name") ?? "doe";
+
+            _userEmail = email;
+            _fullName = $"{firstName} {lastName}";
+            _userInitials = $"{firstName[0].ToString().ToUpper()}{lastName[0].ToString().ToUpper()}";
+            _userRole = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
         }
     }
 

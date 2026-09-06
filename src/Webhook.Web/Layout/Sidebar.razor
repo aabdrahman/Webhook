@@ -154,8 +154,11 @@
                      ?? user.FindFirst("email")?.Value
                      ?? "User";
 
-            UserName     = email;
-            UserInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "U";
+            var firstName = user.FindFirstValue(ClaimTypes.GivenName) ?? user.FindFirstValue("given_name") ?? "john";
+            var lastname = user.FindFirstValue(ClaimTypes.Surname) ?? user.FindFirstValue("family_name") ?? "doe";
+
+            UserName     = string.Concat(firstName, " ", lastname);
+            UserInitials = $"{firstName[0].ToString().ToUpper()}{lastname[0].ToString().ToUpper()}";
             UserRole     = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
         }
     }
