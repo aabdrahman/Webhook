@@ -1,5 +1,5 @@
 @page "/subscriptions"
-@inject NavigationManager Navigation
+@attribute [Authorize]
 
 <PageTitle>Subscriptions — WebhookHub</PageTitle>
 
@@ -25,7 +25,7 @@
     <!-- Error alert -->
     <Alert Message="@_errorMessage" />
 
-    @if (_subscriptions.Count == 0 && string.IsNullOrWhiteSpace(_errorMessage))
+    @if (!_subscriptions.Any() && string.IsNullOrWhiteSpace(_errorMessage))
     {
         <EmptyState Title="No subscriptions yet"
                     Description="Create your first subscription to start receiving webhook events."
@@ -226,9 +226,9 @@
     private List<WebhookSubscriptionDto> _subscriptions = [];
 
     // Toggle modal
-    private bool                   _showToggleModal    = false;
-    private bool                   _isToggling         = false;
-    private string                 _toggleErrorMessage = string.Empty;
+    private bool _showToggleModal = false;
+    private bool  _isToggling = false;
+    private string  _toggleErrorMessage = string.Empty;
     private WebhookSubscriptionDto? _selectedSubscription;
 
     // Delete modal
@@ -241,7 +241,9 @@
     // -------------------------------------------------------------------------
 
     protected override async Task OnInitializedAsync()
-        => await LoadSubscriptionsAsync();
+    {
+        await LoadSubscriptionsAsync();
+    }
 
     private async Task LoadSubscriptionsAsync()
     {
@@ -250,46 +252,44 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await SubscriptionService.GetUserSubscriptionsAsync();
-            // if (!result.IsSuccessful)
-            // {
-            //     _errorMessage = result.ResponseMessage;
-            //     return;
-            // }
-            // _subscriptions = result.ResponseData?.ToList() ?? [];
 
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
 
-            if (!success)
+            bool isAdmin = authState.User.IsInRole("Admin") || authState.User.IsInRole("ADMIN");
+            var result = await getSubscriptionsHandler.HandleAsync(isAdmin);
+
+            if (!result.response.successStatus)
             {
-                _errorMessage = "Failed to load subscriptions. Please try again.";
+                _errorMessage = $"Failed to load subscriptions. {result.response.responseMessage}";
                 return;
             }
 
-            _subscriptions =
-            [
-                new WebhookSubscriptionDto
-                {
-                    Id               = Guid.NewGuid(),
-                    Name             = "Order Service Sub",
-                    CallBackUrl      = "https://orders.internal/webhook",
-                    IsActive         = true,
-                    SubscribedEvents = ["OrderCreated", "OrderCancelled"],
-                    CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
-                },
-                new WebhookSubscriptionDto
-                {
-                    Id               = Guid.NewGuid(),
-                    Name             = "CRM Sub",
-                    CallBackUrl      = "https://crm.internal/hooks",
-                    IsActive         = false,
-                    SubscribedEvents = ["UserRegistered"],
-                    CreatedDate      = DateTimeOffset.UtcNow.AddDays(-5)
-                }
-            ];
+            _subscriptions = result.subscriptions.ToList();
+
+            // _subscriptions =
+            // [
+            //     new WebhookSubscriptionDto
+            //     {
+            //         Id               = Guid.NewGuid(),
+            //         Name             = "Order Service Sub",
+            //         CallBackUrl      = "https:orders.internal/webhook",
+            //         IsActive         = true,
+            //         SubscribedEvents = ["OrderCreated", "OrderCancelled"],
+            //         CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
+            //     },
+            //     new WebhookSubscriptionDto
+            //     {
+            //         Id               = Guid.NewGuid(),
+            //         Name             = "CRM Sub",
+            //         CallBackUrl      = "https:crm.internal/hooks",
+            //         IsActive         = false,
+            //         SubscribedEvents = ["UserRegistered"],
+            //         CreatedDate      = DateTimeOffset.UtcNow.AddDays(-5)
+            //     }
+            // ];
         }
         finally
         {
@@ -302,10 +302,10 @@
     // -------------------------------------------------------------------------
 
     private void NavigateToCreate()
-        => Navigation.NavigateTo("/subscriptions/create");
+        => navigationManager.NavigateTo("/subscriptions/create");
 
     private void NavigateToDetail(Guid id)
-        => Navigation.NavigateTo($"/subscriptions/{id}");
+        => navigationManager.NavigateTo($"/subscriptions/{id}");
 
     // -------------------------------------------------------------------------
     // Modal handlers
@@ -314,8 +314,8 @@
     private void OpenToggleModal(WebhookSubscriptionDto sub)
     {
         _selectedSubscription = sub;
-        _toggleErrorMessage   = string.Empty;
-        _showToggleModal      = true;
+        _toggleErrorMessage = string.Empty;
+        _showToggleModal = true;
     }
 
     private void OpenDeleteModal(WebhookSubscriptionDto sub)
