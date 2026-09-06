@@ -46,7 +46,7 @@ public static class EventCatalogMapper
             Id = webHookEventCatalog.Id,
             AvailableFields = webHookEventCatalog.AvailableFields,
             Description = webHookEventCatalog.Description,
-            EventCatalogName = webHookEventCatalog.EventName,
+            EventCatalogName = webHookEventCatalog.NormalizedEventName,
             IsActive = webHookEventCatalog.IsActive
         };
     }
@@ -65,7 +65,7 @@ public static class EventCatalogMapper
             Id = webHookEventCatalog.Id,
             AvailableFields = webHookEventCatalog.AvailableFields,
             Description = webHookEventCatalog.Description,
-            EventCatalogName = webHookEventCatalog.EventName,
+            EventCatalogName = webHookEventCatalog.NormalizedEventName,
             IsActive = webHookEventCatalog.IsActive
         };
     }

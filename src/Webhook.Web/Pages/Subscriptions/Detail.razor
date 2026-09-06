@@ -1,6 +1,5 @@
 @page "/subscriptions/{Id:guid}"
-@inject NavigationManager Navigation
-@inject ToastService Toast
+@attribute [Authorize]
 
 <PageTitle>Subscription Detail — WebhookHub</PageTitle>
 
@@ -354,7 +353,7 @@
     }
 </Modal>
 
-@code {
+    @code {
 
     [Parameter] public Guid Id { get; set; }
 
@@ -402,6 +401,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _isLoading = true;
+        await Task.Delay(100);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
         await LoadSubscriptionAsync();
         await LoadRecentDeliveriesAsync();
     }
@@ -423,17 +428,25 @@
             // _subscription = result.ResponseData;
 
             await Task.Delay(600);
-
-            _subscription = new WebhookSubscriptionDto
+            var result = await getSubscriptionDetailsHandler.HandleAsync(Id);
+            if (!result.response.successStatus && result.subscription is not null)
             {
-                Id               = Id,
-                Name             = "Order Service Sub",
-                CallBackUrl      = "https://orders.internal/webhook",
-                IsActive         = true,
-                SubscribedEvents = new List<string> { "OrderCreated", "OrderCancelled" },
-                SecretKey        = "sk_live_abc123xyz456def789",
-                CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
-            };
+                _errorMessage = result.response.responseMessage;
+                return;
+            }
+
+            _subscription = result.subscription;
+
+            // _subscription = new WebhookSubscriptionDto
+            // {
+            //     Id               = Id,
+            //     Name             = "Order Service Sub",
+            //     CallBackUrl      = "https:orders.internal/webhook",
+            //     IsActive         = true,
+            //     SubscribedEvents = new List<string> { "OrderCreated", "OrderCancelled" },
+            //     SecretKey        = "sk_live_abc123xyz456def789",
+            //     CreatedDate      = DateTimeOffset.UtcNow.AddDays(-10)
+            // };
         }
         finally
         {
@@ -458,7 +471,7 @@
                 new("OrderCreated",   "Delivered", 142,  DateTimeOffset.UtcNow.AddMinutes(-2)),
                 new("OrderCancelled", "Failed",    3012, DateTimeOffset.UtcNow.AddMinutes(-8)),
                 new("OrderCreated",   "Delivered", 201,  DateTimeOffset.UtcNow.AddMinutes(-15)),
-            ];
+    ];
         }
         finally
         {
@@ -480,13 +493,15 @@
             //     .ToList();
 
             await Task.Delay(400);
+            var result = await getEventCatalogsHandler.HandleAsync();
+            var all = result.catalogs.Any() ? result.catalogs.Select(x => x.EventCatalogName).ToList() : [];
 
-            var all = new List<string>
-                { "OrderCreated", "OrderCancelled", "PaymentReceived",
-                  "UserRegistered", "OrderShipped" };
-
+            // var all = new List<string>
+            //     { "OrderCreated", "OrderCancelled", "PaymentReceived",
+            //       "UserRegistered", "OrderShipped" };
+            var currSubscribed = _subscription?.SubscribedEvents.Select(x => x.ToUpper()).ToList() ?? [];
             _availableCatalogEvents = all
-                .Where(e => !(_subscription?.SubscribedEvents.Contains(e) ?? false))
+                .Where(x => !currSubscribed.Contains(x))
                 .ToList();
         }
         finally
@@ -506,7 +521,7 @@
     // -------------------------------------------------------------------------
 
     private void NavigateBack()
-        => Navigation.NavigateTo("/subscriptions");
+        => navigationManager.NavigateTo("/subscriptions");
 
     // -------------------------------------------------------------------------
     // Modal openers
@@ -571,7 +586,7 @@
             }
 
             _subscription!.IsActive = !_subscription.IsActive;
-            Toast.ShowSuccess(
+            toastService.ShowSuccess(
                 _subscription.IsActive
                     ? "Subscription activated successfully."
                     : "Subscription deactivated successfully.");
@@ -601,8 +616,8 @@
                 return;
             }
 
-            Toast.ShowSuccess("Subscription deleted successfully.");
-            Navigation.NavigateTo("/subscriptions");
+            toastService.ShowSuccess("Subscription deleted successfully.");
+            navigationManager.NavigateTo("/subscriptions");
         }
         finally
         {
@@ -628,7 +643,7 @@
             }
 
             _subscription!.SubscribedEvents.ToList().Remove(_selectedEvent);
-            Toast.ShowSuccess($"{_selectedEvent} removed from subscription.");
+            toastService.ShowSuccess($"{_selectedEvent} removed from subscription.");
             CloseModals();
         }
         finally
@@ -650,13 +665,13 @@
 
             if (!success)
             {
-                Toast.ShowError($"Failed to add {eventName}. Please try again.");
+                toastService.ShowError($"Failed to add {eventName}. Please try again.");
                 return;
             }
 
             _subscription!.SubscribedEvents.ToList().Add(eventName);
             _availableCatalogEvents.Remove(eventName);
-            Toast.ShowSuccess($"{eventName} added to subscription.");
+            toastService.ShowSuccess($"{eventName} added to subscription.");
         }
         finally
         {

@@ -1,10 +1,11 @@
 @page "/subscriptions/create"
+@attribute [Authorize(Roles = "User,USER")]
 
 <PageTitle>New Subscription — WebhookHub</PageTitle>
 
 <PageSpinner Visible="@_isLoadingCatalog" Label="Loading event catalog..." />
 
-@if (!_isLoadingCatalog && _allCatalogEvents is not null && _availableEvents is not null && _selectedEvents is not null)
+@if (!_isLoadingCatalog)
 {
     <PageHeader Title="New Subscription"
                 Description="Subscribe to webhook events and receive them at your callback URL." />
@@ -160,6 +161,7 @@
                             <div style="padding:var(--space-5);text-align:center;">
                                 <p class="text-sm text-muted">
                                     No events selected yet. Add events from the list above.
+                                    @_fetchCatalogsResponseMNessage
                                 </p>
                             </div>
                         }
@@ -214,7 +216,7 @@
     // State
     // -------------------------------------------------------------------------
 
-    private readonly CreateWebhookSubscriptionDto _model = new();
+    private CreateWebhookSubscriptionDto _model = new();
 
     private bool   _isLoadingCatalog = true;
     private bool   _isSubmitting     = false;
@@ -223,6 +225,7 @@
 
     // Event catalog — all active entries
     private List<EventCatalogItem> _allCatalogEvents  = [];
+    private string _fetchCatalogsResponseMNessage = string.Empty;
 
     // Two-panel picker state
     private List<EventCatalogItem> _availableEvents = [];
@@ -241,23 +244,18 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await EventCatalogService.GetAllAsync();
-            // if (result.IsSuccessful)
-            //     _allCatalogEvents = result.ResponseData
-            //         .Select(e => new EventCatalogItem(e.EventCatalogName, e.Description))
-            //         .ToList();
-
             await Task.Delay(600);
-
-            _allCatalogEvents =
-            [
-                new("OrderCreated",    "Raised when a new order is created."),
-                new("OrderCancelled",  "Raised when an order is cancelled."),
-                new("PaymentReceived", "Raised when a payment is received."),
-                new("UserRegistered",  "Raised when a new user registers."),
-                new("OrderShipped",    "Raised when an order is shipped."),
-            ];
+            var result = await getEventCatalogsHandler.HandleAsync();
+            _allCatalogEvents = result.catalogs.Select(x => new EventCatalogItem(EventCatalogName: x.EventCatalogName, Description: x.Description)).ToList();
+            _fetchCatalogsResponseMNessage = result.response.responseMessage;
+            // _allCatalogEvents =
+            // [
+            //     new("OrderCreated",    "Raised when a new order is created."),
+            //     new("OrderCancelled",  "Raised when an order is cancelled."),
+            //     new("PaymentReceived", "Raised when a payment is received."),
+            //     new("UserRegistered",  "Raised when a new user registers."),
+            //     new("OrderShipped",    "Raised when an order is shipped."),
+            // ];
 
             _availableEvents = _allCatalogEvents.ToList();
         }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Authentication;
+using Webhook.Web.Handlers.EventCatalog;
 using Webhook.Web.Handlers.Subscription;
 using Webhook.Web.Handlers.User;
 using Webhook.Web.Helper;
@@ -24,6 +25,10 @@ public static class ApplicationServiceExtensions
 
         //Subscriptions
         services.AddScoped<GetSubscriptionsHandler>();
+        services.AddScoped<GetSubscriptionDetailsHandler>();
+
+        //Event Catalogs
+        services.AddScoped<GetEventCatalogsHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
