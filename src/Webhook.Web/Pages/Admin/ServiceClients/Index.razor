@@ -1,0 +1,704 @@
+@page "/admin/service-clients"
+@attribute [Authorize(Roles = "Admin,ADMIN")]
+
+<PageTitle>Service Clients — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading service clients..." />
+
+@if (!_isLoading)
+{
+    <PageHeader Title="Service Clients"
+                Description="Manage internal services that publish webhook events."
+                BadgeValue="@_clients.Count.ToString()"
+                BadgeType="custom"
+                BadgeCssClass="badge-inactive"
+                ActionText="Onboard Client"
+                OnAction="OpenOnboardModal" />
+
+    <Alert Message="@_errorMessage" />
+
+    @if (!_clients.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <EmptyState Title="No service clients yet"
+                    Description="Onboard your first internal service to start publishing events."
+                    ActionText="Onboard Client"
+                    OnAction="OpenOnboardModal"
+                    Icon="client" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Service Name</th>
+                                <th>Client ID</th>
+                                <th>Catalogs</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var client in _clients)
+                            {
+                                <tr class="table-row-clickable"
+                                    @onclick="() => NavigateToDetail(client.Id)">
+                                    <td>
+                                        <span class="subscription-name">
+                                            @client.ServiceClientName
+                                        </span>
+                                    </td>
+                                    <td class="table-mono text-sm">
+                                        @client.ClientId
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @client.SubscribedCatalogs.Count
+                                        catalog@(client.SubscribedCatalogs.Count != 1 ? "s" : "")
+                                    </td>
+                                    <td>
+                                        <Badge Value="@(client.ActiveStatus ? "Active" : "Inactive")"
+                                               Variant="subscription" />
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @client.CreatedAt.ToString("MMM dd, yyyy")
+                                    </td>
+                                    <td @onclick:stopPropagation="true">
+                                        <div class="table-actions">
+
+                                            <!-- Rotate key -->
+                                            <button class="btn btn-ghost btn-sm"
+                                                    @onclick="() => OpenRotateKeyModal(client)"
+                                                    title="Rotate client key">
+                                                <svg viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor" stroke-width="2"
+                                                     stroke-linecap="round" stroke-linejoin="round"
+                                                     style="width:15px;height:15px;
+                                                            color:var(--color-info);">
+                                                    <polyline points="23 4 23 10 17 10" />
+                                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                                </svg>
+                                            </button>
+
+                                            <!-- Activate / Deactivate -->
+                                            <button class="btn btn-ghost btn-sm"
+                                                    @onclick="() => OpenToggleModal(client)"
+                                                    title="@(client.ActiveStatus ? "Deactivate" : "Activate")">
+                                                @if (client.ActiveStatus)
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;
+                                                                color:var(--color-warning);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="8" y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                                else
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;
+                                                                color:var(--color-success);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="12" y1="8" x2="12" y2="16" />
+                                                        <line x1="8"  y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                            </button>
+
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Onboard modal -->
+<Modal @bind-IsOpen="_showOnboardModal"
+       Title="Onboard Service Client"
+       ShowFooter="false"
+       OnClose="CloseModals"
+       Size="lg">
+
+    <EditForm Model="_onboardModel" OnValidSubmit="HandleOnboard">
+        <DataAnnotationsValidator />
+
+        <div style="display:flex;flex-direction:column;gap:var(--space-5);">
+
+            <!-- Service name -->
+            <div class="form-group">
+                <label class="form-label form-label-required" for="serviceName">
+                    Service name
+                </label>
+                <InputText id="serviceName"
+                           @bind-Value="_onboardModel.ServiceName"
+                           class="form-input"
+                           placeholder="e.g. Order Management Service"
+                           disabled="@_isOnboarding" />
+                <ValidationMessage For="@(() => _onboardModel.ServiceName)"
+                                   class="form-error" />
+            </div>
+
+            <!-- Client ID -->
+            <div class="form-group">
+                <label class="form-label form-label-required" for="clientId">
+                    Client ID
+                </label>
+                <InputText id="clientId"
+                           @bind-Value="_onboardModel.ClientId"
+                           class="form-input"
+                           placeholder="e.g. order-service-prod"
+                           disabled="@_isOnboarding" />
+                <ValidationMessage For="@(() => _onboardModel.ClientId)"
+                                   class="form-error" />
+                <span class="form-help">
+                    Lowercase alphanumeric with hyphens only. Cannot be changed after creation.
+                </span>
+            </div>
+
+            <!-- Contact email -->
+            <div class="form-group">
+                <label class="form-label form-label-required" for="contactEmail">
+                    Contact email
+                </label>
+                <div class="form-input-wrapper">
+                    <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2
+                                 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <InputText id="contactEmail"
+                               @bind-Value="_onboardModel.ContactEmail"
+                               class="form-input has-icon-left"
+                               placeholder="team@service.com"
+                               autocomplete="off"
+                               disabled="@_isOnboarding" />
+                </div>
+                <ValidationMessage For="@(() => _onboardModel.ContactEmail)"
+                                   class="form-error" />
+            </div>
+
+            <!-- Allowed event types -->
+            <div class="form-group">
+                <label class="form-label form-label-required">
+                    Allowed event types
+                </label>
+                <span class="form-help" style="margin-bottom:var(--space-3);">
+                    Select the event types this service is allowed to publish.
+                </span>
+
+                @if (_isLoadingCatalog)
+                {
+                    <Spinner Size="sm" />
+                }
+                else if (!_catalogOptions.Any())
+                {
+                    <p class="text-sm text-muted">
+                        No active event types found. Create event types first.
+                    </p>
+                }
+                else
+                {
+                    <div class="catalog-fields-list">
+                        @foreach (var catalog in _catalogOptions)
+                        {
+                            <label class="auth-checkbox-label catalog-field-item"
+                                   style="cursor:pointer;">
+                                <input type="checkbox"
+                                       class="auth-checkbox"
+                                       checked="@_onboardModel.AllowedEventTypes.Contains(catalog)"
+                                       @onchange="(e) => ToggleCatalog(catalog, (bool)e.Value!)"
+                                       disabled="@_isOnboarding" />
+                                <span class="table-mono text-sm">@catalog</span>
+                            </label>
+                        }
+                    </div>
+                }
+
+                @if (_allowedEventsError)
+                {
+                    <span class="form-error">
+                        At least one event type must be assigned.
+                    </span>
+                }
+            </div>
+
+            <Alert Message="@_onboardErrorMessage" />
+
+            <!-- Footer -->
+            <div class="modal-footer"
+                 style="margin:0 calc(var(--space-6) * -1)
+                        calc(var(--space-6) * -1);border-radius:0;">
+                <button type="button"
+                        class="btn btn-ghost btn-sm"
+                        @onclick="CloseModals"
+                        disabled="@_isOnboarding">
+                    Cancel
+                </button>
+                <LoadingButton Text="Onboard Client"
+                               LoadingText="Onboarding..."
+                               IsLoading="@_isOnboarding"
+                               Type="submit" />
+            </div>
+
+        </div>
+    </EditForm>
+
+</Modal>
+
+<!-- Toggle modal -->
+@if (_selectedClient is not null)
+{
+    <Modal @bind-IsOpen="_showToggleModal"
+           Title="@(_selectedClient.ActiveStatus ? "Deactivate Client" : "Activate Client")"
+           ConfirmText="@(_selectedClient.ActiveStatus ? "Deactivate" : "Activate")"
+           ConfirmVariant="@(_selectedClient.ActiveStatus ? "danger" : "primary")"
+           IsConfirming="@_isToggling"
+           OnConfirm="HandleToggle"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Service</span>
+                <span class="subscription-modal-value">
+                    @_selectedClient.ServiceClientName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client ID</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_selectedClient.ClientId
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_selectedClient.ActiveStatus ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="@(_selectedClient.ActiveStatus
+                   ? "Deactivating this client will prevent it from publishing any events."
+                   : "Activating this client will allow it to resume publishing events.")" />
+
+        <Alert Message="@_toggleErrorMessage" />
+
+    </Modal>
+}
+
+<!-- Rotate key modal -->
+@if (_selectedClient is not null)
+{
+    <Modal @bind-IsOpen="_showRotateKeyModal"
+           Title="Rotate Client Key"
+           ConfirmText="Rotate Key"
+           ConfirmVariant="danger"
+           IsConfirming="@_isRotatingKey"
+           OnConfirm="HandleRotateKey"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Service</span>
+                <span class="subscription-modal-value">
+                    @_selectedClient.ServiceClientName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client ID</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_selectedClient.ClientId
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="Rotating the key will immediately invalidate the current key. The service must be updated with the new key before it can publish events again." />
+
+        <Alert Message="@_rotateKeyErrorMessage" />
+
+    </Modal>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading    = true;
+    private string _errorMessage = string.Empty;
+
+    private List<WebhookServiceClientDto> _clients = [];
+
+    // Onboard modal
+    private bool          _showOnboardModal    = false;
+    private bool          _isOnboarding        = false;
+    private bool          _isLoadingCatalog    = false;
+    private bool          _allowedEventsError  = false;
+    private string        _onboardErrorMessage = string.Empty;
+    private OnboardModel  _onboardModel        = new();
+    private List<string>  _catalogOptions      = [];
+
+    // Toggle modal
+    private bool                   _showToggleModal    = false;
+    private bool                   _isToggling         = false;
+    private string                 _toggleErrorMessage = string.Empty;
+    private WebhookServiceClientDto? _selectedClient;
+
+    // Rotate key modal
+    private bool   _showRotateKeyModal    = false;
+    private bool   _isRotatingKey         = false;
+    private string _rotateKeyErrorMessage = string.Empty;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+        => await LoadClientsAsync();
+
+    private async Task LoadClientsAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.GetAllAsync();
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _clients = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(700);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load service clients. Please try again.";
+                return;
+            }
+
+            _clients =
+            [
+                new WebhookServiceClientDto
+                {
+                    Id                = Guid.NewGuid(),
+                    ServiceClientName = "Order Management Service",
+                    ClientId          = "order-service-prod",
+                    ActiveStatus      = true,
+                    SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
+                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
+                },
+                new WebhookServiceClientDto
+                {
+                    Id                = Guid.NewGuid(),
+                    ServiceClientName = "Payment Gateway",
+                    ClientId          = "payment-gateway-prod",
+                    ActiveStatus      = true,
+                    SubscribedCatalogs = ["PaymentReceived"],
+                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-20)
+                },
+                new WebhookServiceClientDto
+                {
+                    Id                = Guid.NewGuid(),
+                    ServiceClientName = "Notification Service",
+                    ClientId          = "notification-prod",
+                    ActiveStatus      = false,
+                    SubscribedCatalogs = ["UserRegistered"],
+                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-10)
+                }
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadCatalogOptionsAsync()
+    {
+        _isLoadingCatalog = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.GetAllActiveAsync();
+            // _catalogOptions = result.ResponseData?
+            //     .Select(c => c.EventCatalogName).ToList() ?? [];
+
+            await Task.Delay(400);
+
+            _catalogOptions =
+            [
+                "OrderCreated", "OrderCancelled", "PaymentReceived",
+                "UserRegistered", "OrderShipped"
+            ];
+        }
+        finally
+        {
+            _isLoadingCatalog = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
+    private void NavigateToDetail(Guid id)
+        => navigationManager.NavigateTo($"/admin/service-clients/{id}");
+
+    // -------------------------------------------------------------------------
+    // Modal openers
+    // -------------------------------------------------------------------------
+
+    private async Task OpenOnboardModal()
+    {
+        _onboardModel       = new();
+        _allowedEventsError = false;
+        _onboardErrorMessage = string.Empty;
+        _showOnboardModal   = true;
+        await LoadCatalogOptionsAsync();
+    }
+
+    private void OpenToggleModal(WebhookServiceClientDto client)
+    {
+        _selectedClient     = client;
+        _toggleErrorMessage = string.Empty;
+        _showToggleModal    = true;
+    }
+
+    private void OpenRotateKeyModal(WebhookServiceClientDto client)
+    {
+        _selectedClient        = client;
+        _rotateKeyErrorMessage = string.Empty;
+        _showRotateKeyModal    = true;
+    }
+
+    private void CloseModals()
+    {
+        _showOnboardModal   = false;
+        _showToggleModal    = false;
+        _showRotateKeyModal = false;
+        _selectedClient     = null;
+        _toggleErrorMessage    = string.Empty;
+        _rotateKeyErrorMessage = string.Empty;
+        _onboardErrorMessage   = string.Empty;
+        _allowedEventsError    = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Catalog checkbox
+    // -------------------------------------------------------------------------
+
+    private void ToggleCatalog(string catalog, bool isChecked)
+    {
+        if (isChecked)
+            _onboardModel.AllowedEventTypes.Add(catalog);
+        else
+            _onboardModel.AllowedEventTypes.Remove(catalog);
+
+        _allowedEventsError = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleOnboard()
+    {
+        if (!_onboardModel.AllowedEventTypes.Any())
+        {
+            _allowedEventsError = true;
+            return;
+        }
+
+        _allowedEventsError  = false;
+        _onboardErrorMessage = string.Empty;
+        _isOnboarding        = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.OnboardAsync(
+            //     new CreateServiceClientDto
+            //     {
+            //         ServiceName       = _onboardModel.ServiceName,
+            //         ClientId          = _onboardModel.ClientId,
+            //         ContactEmail      = _onboardModel.ContactEmail,
+            //         AllowedEventTypes = _onboardModel.AllowedEventTypes
+            //     });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _onboardErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _onboardErrorMessage = "Failed to onboard client. Please try again.";
+                return;
+            }
+
+            _clients.Add(new WebhookServiceClientDto
+            {
+                Id                = Guid.NewGuid(),
+                ServiceClientName = _onboardModel.ServiceName,
+                ClientId          = _onboardModel.ClientId,
+                ActiveStatus      = true,
+                SubscribedCatalogs = _onboardModel.AllowedEventTypes.ToList(),
+                CreatedAt         = DateTimeOffset.UtcNow
+            });
+
+            toastService.ShowSuccess($"{_onboardModel.ServiceName} onboarded successfully.");
+            CloseModals();
+        }
+        finally
+        {
+            _isOnboarding = false;
+        }
+    }
+
+    private async Task HandleToggle()
+    {
+        if (_selectedClient is null) return;
+
+        _toggleErrorMessage = string.Empty;
+        _isToggling         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = _selectedClient.ActiveStatus
+            //     ? await ServiceClientService.DeactivateAsync(_selectedClient.Id)
+            //     : await ServiceClientService.ReactivateAsync(_selectedClient.Id);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _toggleErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _toggleErrorMessage = "Operation failed. Please try again.";
+                return;
+            }
+
+            var index = _clients.IndexOf(_selectedClient);
+            if (index >= 0)
+            {
+                _clients[index] = _selectedClient with
+                {
+                    ActiveStatus = !_selectedClient.ActiveStatus
+                };
+            }
+
+            toastService.ShowSuccess(
+                _selectedClient.ActiveStatus
+                    ? $"{_selectedClient.ServiceClientName} deactivated."
+                    : $"{_selectedClient.ServiceClientName} activated.");
+
+            CloseModals();
+        }
+        finally
+        {
+            _isToggling = false;
+        }
+    }
+
+    private async Task HandleRotateKey()
+    {
+        if (_selectedClient is null) return;
+
+        _rotateKeyErrorMessage = string.Empty;
+        _isRotatingKey         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.RotateKeyAsync(
+            //     new RequestNewClientKeyDto
+            //     {
+            //         ServiceName = _selectedClient.ServiceClientName,
+            //         ClientId    = _selectedClient.ClientId
+            //     });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _rotateKeyErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _rotateKeyErrorMessage = "Failed to rotate key. Please try again.";
+                return;
+            }
+
+            toastService.ShowSuccess(
+                $"Key rotated for {_selectedClient.ServiceClientName}. " +
+                "Ensure the service is updated with the new key.");
+
+            CloseModals();
+        }
+        finally
+        {
+            _isRotatingKey = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local onboard model
+    // -------------------------------------------------------------------------
+
+    private sealed class OnboardModel
+    {
+        [Required(ErrorMessage = "Service name is required.")]
+        [MaxLength(50, ErrorMessage = "Service name cannot exceed 50 characters.")]
+        public string ServiceName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Client ID is required.")]
+        [MaxLength(50, ErrorMessage = "Client ID cannot exceed 50 characters.")]
+        [RegularExpression(@"^[a-z0-9]+(-[a-z0-9]+)*$",
+            ErrorMessage = "Lowercase alphanumeric with hyphens only. e.g. order-service-prod")]
+        public string ClientId { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Contact email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string ContactEmail { get; set; } = string.Empty;
+
+        public List<string> AllowedEventTypes { get; set; } = [];
+    }
+}

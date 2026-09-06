@@ -1,0 +1,720 @@
+@page "/admin/service-clients/{Id:guid}"
+@attribute [Authorize(Roles = "Admin,ADMIN")]
+
+<PageTitle>Service Client Detail — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading service client..." />
+
+@if (!_isLoading && _client is not null)
+{
+    <div class="attempts-header">
+        <button class="btn btn-ghost btn-sm"
+                @onclick="@(() => navigationManager.NavigateTo("/admin/service-clients"))">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 style="width:14px;height:14px;">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Back to Service Clients
+        </button>
+    </div>
+
+    <PageHeader Title="@_client.ServiceClientName"
+                Description="@_client.ClientId"
+                ActionText="@(_client.ActiveStatus ? "Deactivate" : "Activate")"
+                ActionVariant="@(_client.ActiveStatus ? "danger" : "primary")"
+                OnAction="OpenToggleModal">
+        <AdditionalActions>
+            <button class="btn btn-ghost btn-sm"
+                    style="color:var(--color-info);"
+                    @onclick="OpenRotateKeyModal">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                Rotate Key
+            </button>
+        </AdditionalActions>
+    </PageHeader>
+
+    <Alert Message="@_errorMessage" />
+
+    <div class="detail-layout">
+
+        <!-- Left — client details -->
+        <div class="detail-left">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Details</h2>
+                    <Badge Value="@(_client.ActiveStatus ? "Active" : "Inactive")"
+                           Variant="subscription" />
+                </div>
+                <div class="card-body">
+                    <div class="detail-fields">
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Service Name</span>
+                            <span class="detail-field-value">
+                                @_client.ServiceClientName
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Client ID</span>
+                            <span class="detail-field-value table-mono text-sm">
+                                @_client.ClientId
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Created</span>
+                            <span class="detail-field-value text-sm">
+                                @_client.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Client Key</span>
+                            <div class="detail-field-value">
+                                <div class="detail-secret-row">
+                                    <CopyButton Value="@_clientKey"
+                                                DisplayText="@(_showClientKey
+                                                    ? _clientKey
+                                                    : "••••••••••••••••")" />
+                                    <button class="btn btn-ghost btn-sm"
+                                            @onclick="ToggleClientKey"
+                                            title="@(_showClientKey
+                                                ? "Hide key"
+                                                : "Reveal key")">
+                                        @if (_showClientKey)
+                                        {
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;">
+                                                <path d="M17.94 17.94A10.07 10.07 0 0 1
+                                                         12 20c-7 0-11-8-11-8a18.45 18.45
+                                                         0 0 1 5.06-5.94" />
+                                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12
+                                                         4c7 0 11 8 11 8a18.5 18.5 0 0
+                                                         1-2.16 3.19" />
+                                                <line x1="1" y1="1" x2="23" y2="23" />
+                                            </svg>
+                                            <p>Hide</p>
+                                        }
+                                        else
+                                        {
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;">
+                                                <path d="M1 12s4-8 11-8 11 8 11
+                                                         8-4 8-11 8-11-8-11-8z" />
+                                                <circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                            <p>Reveal</p>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right — catalog assignments -->
+        <div class="detail-right">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Assigned Catalogs</h2>
+                    <button class="btn btn-outline btn-sm"
+                            @onclick="OpenAddCatalogModal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.5" stroke-linecap="round"
+                             stroke-linejoin="round"
+                             style="width:13px;height:13px;">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5"  y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add
+                    </button>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    @if (_isLoadingCatalogs)
+                    {
+                        <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
+                    }
+                    else if (!_assignedCatalogs.Any())
+                    {
+                        <EmptyState Title="No catalogs assigned"
+                                    Description="Assign event types this service can publish."
+                                    Icon="catalog" />
+                    }
+                    else
+                    {
+                        <ul class="event-picker-list">
+                            @foreach (var catalog in _assignedCatalogs)
+                            {
+                                <li class="event-picker-item">
+                                    <div class="event-picker-item-info">
+                                        <span class="event-picker-item-name table-mono">
+                                            @catalog.CatalogName
+                                        </span>
+                                    </div>
+                                    <div style="display:flex;align-items:center;
+                                                gap:var(--space-2);">
+                                        <Badge Value="@(catalog.IsActive
+                                                       ? "Active" : "Inactive")"
+                                               Variant="subscription" />
+                                        <button type="button"
+                                                class="btn btn-ghost btn-sm"
+                                                @onclick="() => OpenRemoveCatalogModal(catalog)"
+                                                title="Remove catalog">
+                                            <svg viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2"
+                                                 stroke-linecap="round" stroke-linejoin="round"
+                                                 style="width:14px;height:14px;
+                                                        color:var(--color-danger);">
+                                                <line x1="18" y1="6"  x2="6"  y2="18" />
+                                                <line x1="6"  y1="6"  x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@if (!_isLoading && _client is null &&
+     string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <EmptyState Title="Client not found"
+                Description="The service client you are looking for does not exist."
+                ActionText="Back to Service Clients"
+                OnAction="@(() => navigationManager.NavigateTo("/admin/service-clients"))"
+                Icon="client" />
+}
+
+<!-- Toggle modal -->
+<Modal @bind-IsOpen="_showToggleModal"
+       Title="@(_client?.ActiveStatus == true
+               ? "Deactivate Client"
+               : "Activate Client")"
+       ConfirmText="@(_client?.ActiveStatus == true ? "Deactivate" : "Activate")"
+       ConfirmVariant="@(_client?.ActiveStatus == true ? "danger" : "primary")"
+       IsConfirming="@_isToggling"
+       OnConfirm="HandleToggle"
+       OnClose="CloseModals">
+
+    @if (_client is not null)
+    {
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Service</span>
+                <span class="subscription-modal-value">
+                    @_client.ServiceClientName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client ID</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_client.ClientId
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_client.ActiveStatus ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="@(_client.ActiveStatus
+                   ? "Deactivating will prevent this service from publishing any events."
+                   : "Activating will allow this service to resume publishing events.")" />
+
+        <Alert Message="@_toggleErrorMessage" />
+    }
+</Modal>
+
+<!-- Rotate key modal -->
+<Modal @bind-IsOpen="_showRotateKeyModal"
+       Title="Rotate Client Key"
+       ConfirmText="Rotate Key"
+       ConfirmVariant="danger"
+       IsConfirming="@_isRotatingKey"
+       OnConfirm="HandleRotateKey"
+       OnClose="CloseModals">
+
+    @if (_client is not null)
+    {
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Service</span>
+                <span class="subscription-modal-value">
+                    @_client.ServiceClientName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client ID</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_client.ClientId
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="The current key will be immediately invalidated. Update the service with the new key before it can publish events again." />
+
+        <Alert Message="@_rotateKeyErrorMessage" />
+    }
+</Modal>
+
+<!-- Remove catalog modal -->
+@if (_selectedCatalog is not null)
+{
+    <Modal @bind-IsOpen="_showRemoveCatalogModal"
+           Title="Remove Catalog Assignment"
+           ConfirmText="Remove"
+           ConfirmVariant="danger"
+           IsConfirming="@_isRemovingCatalog"
+           OnConfirm="HandleRemoveCatalog"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Catalog</span>
+                <span class="subscription-modal-value table-mono">
+                    @_selectedCatalog.CatalogName
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="Removing this catalog will prevent this service from publishing events of this type." />
+
+        <Alert Message="@_removeCatalogErrorMessage" />
+
+    </Modal>
+}
+
+<!-- Add catalog modal -->
+<Modal @bind-IsOpen="_showAddCatalogModal"
+       Title="Add Catalog Assignment"
+       ShowFooter="false"
+       OnClose="CloseModals"
+       Size="sm">
+
+    @if (_isLoadingAvailableCatalogs)
+    {
+        <Spinner Centered="true" />
+    }
+    else if (!_availableCatalogs.Any())
+    {
+        <p class="text-sm text-muted"
+           style="text-align:center;padding:var(--space-4) 0;">
+            All available catalogs are already assigned.
+        </p>
+    }
+    else
+    {
+        <ul class="event-picker-list"
+            style="max-height:320px;overflow-y:auto;">
+            @foreach (var catalog in _availableCatalogs)
+            {
+                <li class="event-picker-item">
+                    <span class="event-picker-item-name table-mono">
+                        @catalog
+                    </span>
+                    <LoadingButton Text="Add"
+                                   LoadingText="Adding..."
+                                   IsLoading="@(_isAddingCatalog &&
+                                               _addingCatalogName == catalog)"
+                                   Variant="outline"
+                                   Size="sm"
+                                   OnClick="() => HandleAddCatalog(catalog)" />
+                </li>
+            }
+        </ul>
+    }
+</Modal>
+
+@code {
+
+    [Parameter] public Guid Id { get; set; }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool                    _isLoading        = true;
+    private bool                    _isLoadingCatalogs = true;
+    private string                  _errorMessage     = string.Empty;
+    private bool                    _showClientKey    = false;
+    private string                  _clientKey        = "ck_live_placeholder_key";
+    private WebhookServiceClientDto? _client;
+
+    // Assigned catalogs
+    private List<WebhookServiceClientCatalogDto> _assignedCatalogs = [];
+
+    // Toggle modal
+    private bool   _showToggleModal    = false;
+    private bool   _isToggling         = false;
+    private string _toggleErrorMessage = string.Empty;
+
+    // Rotate key modal
+    private bool   _showRotateKeyModal    = false;
+    private bool   _isRotatingKey         = false;
+    private string _rotateKeyErrorMessage = string.Empty;
+
+    // Remove catalog modal
+    private bool                           _showRemoveCatalogModal    = false;
+    private bool                           _isRemovingCatalog         = false;
+    private string                         _removeCatalogErrorMessage = string.Empty;
+    private WebhookServiceClientCatalogDto? _selectedCatalog;
+
+    // Add catalog modal
+    private bool         _showAddCatalogModal        = false;
+    private bool         _isLoadingAvailableCatalogs = false;
+    private bool         _isAddingCatalog            = false;
+    private string       _addingCatalogName          = string.Empty;
+    private List<string> _availableCatalogs          = [];
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClientAsync();
+        await LoadAssignedCatalogsAsync();
+    }
+
+    private async Task LoadClientAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.GetByIdAsync(Id);
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _client = result.ResponseData;
+
+            await Task.Delay(600);
+
+            _client = new WebhookServiceClientDto
+            {
+                Id                = Id,
+                ServiceClientName = "Order Management Service",
+                ClientId          = "order-service-prod",
+                ActiveStatus      = true,
+                SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
+                CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
+            };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadAssignedCatalogsAsync()
+    {
+        _isLoadingCatalogs = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService
+            //     .GetAssignedCatalogsAsync(Id);
+            // _assignedCatalogs = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(400);
+
+            _assignedCatalogs =
+            [
+                new WebhookServiceClientCatalogDto
+                {
+                    Id             = Guid.NewGuid(),
+                    ServiceClientId = Id,
+                    CatalogName    = "OrderCreated",
+                    IsActive       = true
+                },
+                new WebhookServiceClientCatalogDto
+                {
+                    Id             = Guid.NewGuid(),
+                    ServiceClientId = Id,
+                    CatalogName    = "OrderCancelled",
+                    IsActive       = true
+                }
+            ];
+        }
+        finally
+        {
+            _isLoadingCatalogs = false;
+        }
+    }
+
+    private async Task LoadAvailableCatalogsAsync()
+    {
+        _isLoadingAvailableCatalogs = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var all    = await EventCatalogService.GetAllActiveAsync();
+            // var assigned = _assignedCatalogs.Select(c => c.CatalogName);
+            // _availableCatalogs = all.ResponseData
+            //     .Select(c => c.EventCatalogName)
+            //     .Where(n => !assigned.Contains(n))
+            //     .ToList();
+
+            await Task.Delay(400);
+
+            var assigned = _assignedCatalogs.Select(c => c.CatalogName).ToHashSet();
+
+            _availableCatalogs = new List<string>
+                { "OrderCreated", "OrderCancelled", "PaymentReceived",
+                  "UserRegistered", "OrderShipped" }
+                .Where(c => !assigned.Contains(c))
+                .ToList();
+        }
+        finally
+        {
+            _isLoadingAvailableCatalogs = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Client key toggle
+    // -------------------------------------------------------------------------
+
+    private void ToggleClientKey() => _showClientKey = !_showClientKey;
+
+    // -------------------------------------------------------------------------
+    // Modal openers
+    // -------------------------------------------------------------------------
+
+    private void OpenToggleModal()
+    {
+        _toggleErrorMessage = string.Empty;
+        _showToggleModal    = true;
+    }
+
+    private void OpenRotateKeyModal()
+    {
+        _rotateKeyErrorMessage = string.Empty;
+        _showRotateKeyModal    = true;
+    }
+
+    private void OpenRemoveCatalogModal(WebhookServiceClientCatalogDto catalog)
+    {
+        _selectedCatalog           = catalog;
+        _removeCatalogErrorMessage = string.Empty;
+        _showRemoveCatalogModal    = true;
+    }
+
+    private async Task OpenAddCatalogModal()
+    {
+        _showAddCatalogModal = true;
+        await LoadAvailableCatalogsAsync();
+    }
+
+    private void CloseModals()
+    {
+        _showToggleModal        = false;
+        _showRotateKeyModal     = false;
+        _showRemoveCatalogModal = false;
+        _showAddCatalogModal    = false;
+        _selectedCatalog           = null;
+        _toggleErrorMessage        = string.Empty;
+        _rotateKeyErrorMessage     = string.Empty;
+        _removeCatalogErrorMessage = string.Empty;
+    }
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleToggle()
+    {
+        if (_client is null) return;
+
+        _toggleErrorMessage = string.Empty;
+        _isToggling         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _toggleErrorMessage = "Operation failed. Please try again.";
+                return;
+            }
+
+            _client = _client with { ActiveStatus = !_client.ActiveStatus };
+
+            toastService.ShowSuccess(
+                _client.ActiveStatus
+                    ? $"{_client.ServiceClientName} activated."
+                    : $"{_client.ServiceClientName} deactivated.");
+
+            CloseModals();
+        }
+        finally
+        {
+            _isToggling = false;
+        }
+    }
+
+    private async Task HandleRotateKey()
+    {
+        if (_client is null) return;
+
+        _rotateKeyErrorMessage = string.Empty;
+        _isRotatingKey         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.RotateKeyAsync(
+            //     new RequestNewClientKeyDto
+            //     {
+            //         ServiceName = _client.ServiceClientName,
+            //         ClientId    = _client.ClientId
+            //     });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _rotateKeyErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _clientKey = result.ResponseData.NewKey;
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _rotateKeyErrorMessage = "Failed to rotate key. Please try again.";
+                return;
+            }
+
+            _clientKey     = $"ck_live_{Guid.NewGuid():N}";
+            _showClientKey = true; // reveal new key automatically
+
+            toastService.ShowSuccess("Key rotated successfully. Copy the new key now.");
+            CloseModals();
+        }
+        finally
+        {
+            _isRotatingKey = false;
+        }
+    }
+
+    private async Task HandleRemoveCatalog()
+    {
+        if (_selectedCatalog is null) return;
+
+        _removeCatalogErrorMessage = string.Empty;
+        _isRemovingCatalog         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService
+            //     .RemoveCatalogAsync(_selectedCatalog.Id);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _removeCatalogErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(600);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _removeCatalogErrorMessage = "Failed to remove catalog. Please try again.";
+                return;
+            }
+
+            _assignedCatalogs.Remove(_selectedCatalog);
+            toastService.ShowSuccess(
+                $"{_selectedCatalog.CatalogName} removed from this client.");
+            CloseModals();
+        }
+        finally
+        {
+            _isRemovingCatalog = false;
+        }
+    }
+
+    private async Task HandleAddCatalog(string catalogName)
+    {
+        _addingCatalogName = catalogName;
+        _isAddingCatalog   = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await ServiceClientService.AssignCatalogAsync(
+            //     Id, catalogName);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     toastService.ShowError($"Failed to add {catalogName}.");
+            //     return;
+            // }
+
+            await Task.Delay(600);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                toastService.ShowError($"Failed to add {catalogName}. Please try again.");
+                return;
+            }
+
+            _assignedCatalogs.Add(new WebhookServiceClientCatalogDto
+            {
+                Id              = Guid.NewGuid(),
+                ServiceClientId = Id,
+                CatalogName     = catalogName,
+                IsActive        = true
+            });
+
+            _availableCatalogs.Remove(catalogName);
+            toastService.ShowSuccess($"{catalogName} assigned to this client.");
+        }
+        finally
+        {
+            _isAddingCatalog   = false;
+            _addingCatalogName = string.Empty;
+        }
+    }
+}
