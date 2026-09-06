@@ -1,0 +1,269 @@
+@page "/profile"
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Profile — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading profile..." />
+
+@if (!_isLoading)
+{
+    <PageHeader Title="My Profile"
+                Description="View and update your account details." />
+
+    <Alert Message="@_errorMessage" />
+    <Alert Type="success"
+           Message="@_successMessage"
+           Visible="@(!string.IsNullOrWhiteSpace(_successMessage))" />
+
+    <div class="detail-layout">
+
+        <!-- Left — editable fields -->
+        <div class="detail-left">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Personal Details</h2>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="_model"
+                              OnValidSubmit="HandleSave">
+
+                        <DataAnnotationsValidator />
+
+                        <div style="display:flex;flex-direction:column;
+                                    gap:var(--space-5);">
+
+                            <!-- Name row -->
+                            <div class="auth-name-row">
+                                <div class="form-group">
+                                    <label class="form-label form-label-required"
+                                           for="firstName">
+                                        First name
+                                    </label>
+                                    <InputText id="firstName"
+                                               @bind-Value="_model.FirstName"
+                                               class="form-input"
+                                               disabled="@_isSaving" />
+                                    <ValidationMessage For="@(() => _model.FirstName)"
+                                                       class="form-error" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label form-label-required"
+                                           for="lastName">
+                                        Last name
+                                    </label>
+                                    <InputText id="lastName"
+                                               @bind-Value="_model.LastName"
+                                               class="form-input"
+                                               disabled="@_isSaving" />
+                                    <ValidationMessage For="@(() => _model.LastName)"
+                                                       class="form-error" />
+                                </div>
+                            </div>
+
+                            <!-- Username -->
+                            <div class="form-group">
+                                <label class="form-label form-label-required"
+                                       for="username">
+                                    Username
+                                </label>
+                                <InputText id="username"
+                                           @bind-Value="_model.UserName"
+                                           class="form-input"
+                                           disabled="@_isSaving" />
+                                <ValidationMessage For="@(() => _model.UserName)"
+                                                   class="form-error" />
+                            </div>
+
+                            <LoadingButton Text="Save Changes"
+                                           LoadingText="Saving..."
+                                           IsLoading="@_isSaving"
+                                           Type="submit" />
+
+                        </div>
+
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right — read-only account info -->
+        <div class="detail-right">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Account Info</h2>
+                    <Badge Value="@_role" Variant="role" ShowDot="false" />
+                </div>
+                <div class="card-body">
+                    <div class="detail-fields">
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Email</span>
+                            <span class="detail-field-value text-sm">
+                                @_email
+                            </span>
+                            <span class="form-help">
+                                Email cannot be changed directly.
+                                Contact an administrator.
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Role</span>
+                            <Badge Value="@_role" Variant="role" ShowDot="false" />
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Member since</span>
+                            <span class="detail-field-value text-sm">
+                                @_createdAt.ToString("MMM dd, yyyy")
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">Last login</span>
+                            <span class="detail-field-value text-sm">
+                                @(_lastLogin.HasValue
+                                    ? _lastLogin.Value.ToString("MMM dd, yyyy HH:mm")
+                                    : "Never")
+                            </span>
+                        </div>
+
+                        <div class="detail-field" style="margin-top:var(--space-4);">
+                            <a href="/request-otp?purpose=ChangePassword&returnUrl=/change-password"
+                               class="btn btn-outline btn-sm">
+                                Change Password
+                            </a>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading     = true;
+    private bool   _isSaving      = false;
+    private string _errorMessage  = string.Empty;
+    private string _successMessage = string.Empty;
+
+    // Read-only fields from auth state
+    private string          _email     = string.Empty;
+    private string          _role      = string.Empty;
+    private DateTimeOffset  _createdAt = DateTimeOffset.UtcNow;
+    private DateTimeOffset? _lastLogin;
+
+    private readonly ProfileModel _model = new();
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // Load claims from auth state
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user      = authState.User;
+
+            _email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)
+                        ?.Value ?? string.Empty;
+            _role  = user.IsInRole("Admin") || user.IsInRole("ADMIN")
+                        ? "Admin"
+                        : "User";
+
+            // TODO: replace with real service call
+            // var result = await UserService.GetProfileAsync();
+            // _model.FirstName = result.ResponseData.FirstName;
+            // _model.LastName  = result.ResponseData.LastName;
+            // _model.UserName  = result.ResponseData.UserName;
+            // _createdAt       = result.ResponseData.CreatedAt;
+            // _lastLogin       = result.ResponseData.LastLoginDate;
+
+            await Task.Delay(600);
+
+            _model.FirstName = "Abdrahman";
+            _model.LastName  = "Ibrahim";
+            _model.UserName  = "abdrahman";
+            _createdAt       = DateTimeOffset.UtcNow.AddDays(-60);
+            _lastLogin       = DateTimeOffset.UtcNow.AddHours(-2);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleSave()
+    {
+        _errorMessage  = string.Empty;
+        _successMessage = string.Empty;
+        _isSaving      = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await UserService.UpdateProfileAsync(new UpdateProfileDto
+            // {
+            //     FirstName = _model.FirstName,
+            //     LastName  = _model.LastName,
+            //     UserName  = _model.UserName
+            // });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to update profile. Please try again.";
+                return;
+            }
+
+            _successMessage = "Profile updated successfully.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Local model
+    // -------------------------------------------------------------------------
+
+    private sealed class ProfileModel
+    {
+        [Required(ErrorMessage = "First name is required.")]
+        [MaxLength(50, ErrorMessage = "First name cannot exceed 50 characters.")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Last name is required.")]
+        [MaxLength(50, ErrorMessage = "Last name cannot exceed 50 characters.")]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Username is required.")]
+        [MaxLength(50, ErrorMessage = "Username cannot exceed 50 characters.")]
+        public string UserName { get; set; } = string.Empty;
+    }
+}

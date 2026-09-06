@@ -77,14 +77,12 @@
                 <div class="navbar-dropdown" @onclick:stopPropagation="true">
                     <div class="navbar-dropdown-header">
                         <span class="navbar-dropdown-email">@_userEmail</span>
-                        @* <Badge Value="@_userRole" Type="role" ShowDot="false" /> *@
                         <Badge Value="@_userRole" Variant="role" ShowDot="false" />
                     </div>
 
                     <div class="navbar-dropdown-divider"></div>
 
-                    <button class="navbar-dropdown-item"
-                            @onclick="NavigateToProfile">
+                    <button type="button" class="navbar-dropdown-item" @onclick="NavigateToProfile">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -93,8 +91,7 @@
                         Profile
                     </button>
 
-                    <button class="navbar-dropdown-item"
-                            @onclick="NavigateToChangePassword">
+                    <button type="button" class="navbar-dropdown-item" @onclick="NavigateToChangePassword">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -105,7 +102,7 @@
 
                     <div class="navbar-dropdown-divider"></div>
 
-                    <button class="navbar-dropdown-item navbar-dropdown-item-danger"
+                    <button type="button" class="navbar-dropdown-item navbar-dropdown-item-danger"
                             @onclick="HandleLogout">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -120,14 +117,14 @@
         </div>
 
     </div>
+    <!-- Backdrop to close dropdown when clicking outside -->
+    @if (_dropdownOpen)
+    {
+        <div class="navbar-backdrop" @onclick="CloseDropdown"></div>
+    }
 
 </header>
 
-<!-- Backdrop to close dropdown when clicking outside -->
-@if (_dropdownOpen)
-{
-    <div class="navbar-backdrop" @onclick="CloseDropdown"></div>
-}
 
 @code {
 
@@ -158,8 +155,8 @@
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-                     ?? user.FindFirst("email")?.Value
+            var email = user.FindFirst(ClaimTypes.GivenName)?.Value
+                     ?? user.FindFirst("given_name")?.Value
                      ?? string.Empty;
 
             _userEmail    = email;

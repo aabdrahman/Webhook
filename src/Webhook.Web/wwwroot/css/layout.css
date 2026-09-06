@@ -114,6 +114,7 @@
     cursor: pointer;
     position: relative;
     white-space: nowrap;
+    z-index: 600;
 }
 
 .nav-item:hover {
@@ -538,9 +539,9 @@
     user-select: none;
 }
 
-    .navbar-user-trigger:hover {
-        background: var(--color-surface-3);
-    }
+.navbar-user-trigger:hover {
+    background: var(--color-surface-3);
+}
 
 .navbar-user-avatar {
     width: 32px;
@@ -602,8 +603,9 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    z-index: 500;
-    overflow: hidden;
+    z-index: 600;
+    pointer-events: all;
+    /*    overflow: hidden;*/
     animation: dropdownIn 0.15s var(--transition-spring) both;
 }
 
@@ -630,7 +632,7 @@
 .navbar-dropdown-email {
     font-family: var(--font-body);
     font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -688,7 +690,7 @@
 .navbar-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 499;
+    z-index: 599;
 }
 
 /* -----------------------------------------------------------------------------
