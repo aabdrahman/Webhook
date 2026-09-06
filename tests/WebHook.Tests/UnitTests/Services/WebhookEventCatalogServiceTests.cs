@@ -56,7 +56,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
 
         //Act
         var result = await operationParameters.svc.CreateNewEventCatalogAsync(createEventDto);
-        Console.WriteLine(result);
+        //Console.WriteLine(result);
 
         //Assert
         Assert.NotNull(result);

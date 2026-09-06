@@ -15,7 +15,7 @@ public class ValidateOtpHandler
     public ValidateOtpHandler(ILocalStorageService localStorageService, IHttpClientFactory httpClientFactory)
     {
         _localStorageService = localStorageService;
-        _httpClient = httpClientFactory.CreateClient();
+        _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameOpen);
     }
 
     public async Task<ApiResponseDto> HandleAsync(string otp)

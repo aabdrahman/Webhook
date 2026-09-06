@@ -12,4 +12,5 @@ public static class ApplicationClientHelper
     public static string RememberMeKey = "BrowserLoggedInKey";
     public static string OtpRequestedUser = "OtpRequestedUserEmail";
     public static string VerifiedOtpTokenKey = "Signed-Operation-Token";
+    public static string OperationTokenHeaderKey = "X-Operation-Token";
 }

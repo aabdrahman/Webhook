@@ -25,7 +25,7 @@
 
         <!-- Registration success -->
         <Alert Type="success"
-               Message="Account created successfully. Sign in to continue."
+               Message="@(string.Concat(_descriptionMessage, " Sign in to continue..."))"
                Visible="@_isNewRegistration" />
 
         <!-- API error alert — shown above the form on service failure -->
@@ -191,7 +191,7 @@
     private bool _isLoading = false; private bool _isInitialized = false;
     private bool _showPassword = false;
     private string _errorMessage = string.Empty;
-    private bool _isNewRegistration = false;
+    private bool _isNewRegistration = false; private string _descriptionMessage = "";
     private bool _rememeberMe = false;
 
     protected override async Task OnInitializedAsync()
@@ -204,11 +204,23 @@
             var query = QueryHelpers.ParseQuery(uri.Query);
             if (query.TryGetValue("registered", out var newRegistration) && newRegistration == "true")
             {
-                _isNewRegistration = true;
+                
                 string? registeredUserEmail = await localStorageService.GetItemAsync<string>(ApplicationClientHelper.RegisteredUserEmailKey);
                 if (!string.IsNullOrEmpty(registeredUserEmail))
                 {
                     _model.UserNameOrEmailAddress = registeredUserEmail;
+                    _isNewRegistration = true; _descriptionMessage = "Account created successfully.";
+                    return;
+                }
+            }
+
+            if (query.TryGetValue("passwordReset", out var resetUser) && resetUser == "true")
+            {
+                string? passwordResetUser = await localStorageService.GetItemAsync<string>(ApplicationClientHelper.OtpRequestedUser);
+                if (!string.IsNullOrEmpty(passwordResetUser))
+                {
+                    _model.UserNameOrEmailAddress = passwordResetUser;
+                    _isNewRegistration = true; _descriptionMessage = "Account reset successsfully.";
                     return;
                 }
             }

@@ -26,22 +26,22 @@ public class UserJwtAuthenticationStateProvider : AuthenticationStateProvider
     {
         //Get access token from local storage
         var accessToken = await _localStorageService.GetItemAsync<TokenDto>(ApplicationClientHelper.StorageKey);
-        Console.WriteLine($"Token fetched from store successfully - {accessToken?.accessToken}");
+        //Console.WriteLine($"Token fetched from store successfully - {accessToken?.accessToken}");
         //check if access token is null, if null return anonymous user
         if (accessToken is null)
         {
-            Console.WriteLine("Token is empty from store.");
+            //Console.WriteLine("Token is empty from store.");
             NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
             return _anonymous;
         }
 
         //Extract claims from access token and check if the token is expired, if expired return anonymous user
         var userClaims = JwtParser.ParseClaimsFromJwt(accessToken.accessToken);
-        Console.WriteLine($"Claims fetched from token successfully - {JsonSerializer.Serialize(userClaims)}");
+        //Console.WriteLine($"Claims fetched from token successfully - {JsonSerializer.Serialize(userClaims)}");
         var expiry = userClaims.FirstOrDefault(x => x.Type.Equals("exp", StringComparison.OrdinalIgnoreCase))?.Value ?? "";
         if(string.IsNullOrEmpty(expiry) || !long.TryParse(expiry, out long expiryTime))
         {
-            Console.WriteLine($"Token exp value could not be parsed from claims - {expiry}");
+            //Console.WriteLine($"Token exp value could not be parsed from claims - {expiry}");
             await _localStorageService.RemoveItemAsync(ApplicationClientHelper.StorageKey);
             NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
             return _anonymous;
@@ -52,7 +52,7 @@ public class UserJwtAuthenticationStateProvider : AuthenticationStateProvider
 
         if (DateTimeOffset.UtcNow >= expTime)
         {
-            Console.WriteLine($"Token already expired at - {expTime}");
+            //Console.WriteLine($"Token already expired at - {expTime}");
             //The expiry time has exceeded. Token already expired. Remove expired token and set anonymous
             await _localStorageService.RemoveItemAsync(ApplicationClientHelper.StorageKey);
             NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
@@ -64,12 +64,12 @@ public class UserJwtAuthenticationStateProvider : AuthenticationStateProvider
         {
             try
             {
-                Console.WriteLine("Begin refresh operation -");
+                //Console.WriteLine("Begin refresh operation -");
                 string? refreshTokenResult = await _refreshTokenHandler.RefreshTokenAsync(accessToken);
 
                 if (string.IsNullOrEmpty(refreshTokenResult))
                 {
-                    Console.WriteLine("Refresh token failed....");
+                    //Console.WriteLine("Refresh token failed....");
                     //The token could not be refreshed successfully, so we remove any possible stale ones and return accordingly
                     await _localStorageService.RemoveItemAsync(ApplicationClientHelper.StorageKey);
                     NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
@@ -79,7 +79,7 @@ public class UserJwtAuthenticationStateProvider : AuthenticationStateProvider
                 userClaims = JwtParser.ParseClaimsFromJwt(refreshTokenResult);
                 if(userClaims is null)
                 {
-                    Console.WriteLine($"New token parsed successfully - {JsonSerializer.Serialize(userClaims)}");
+                    //Console.WriteLine($"New token parsed successfully - {JsonSerializer.Serialize(userClaims)}");
                    //User claims is null, hence, we could not refresh successfuly.
                     await _localStorageService.RemoveItemAsync(ApplicationClientHelper.StorageKey);
                     NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
@@ -95,7 +95,7 @@ public class UserJwtAuthenticationStateProvider : AuthenticationStateProvider
             }
         }
 
-        Console.WriteLine("User session validated successfully....");
+        //Console.WriteLine("User session validated successfully....");
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims: userClaims, "jwtAuthType", nameType: ClaimTypes.Name, roleType: ClaimTypes.Role)));
     }
 

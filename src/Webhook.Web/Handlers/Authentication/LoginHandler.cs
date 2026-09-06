@@ -25,7 +25,7 @@ public class LoginHandler
             var httpResponse = await _httpClient.PostAsJsonAsync("api/Authentication/login", loginUser);
 
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
-            Console.WriteLine($" Status Code: {httpResponse.StatusCode}. Response Content: {responseContent}.");
+            //Console.WriteLine($" Status Code: {httpResponse.StatusCode}. Response Content: {responseContent}.");
 
             GenericResponse<TokenDto> genericResponse = JsonSerializer.Deserialize<GenericResponse<TokenDto>>(responseContent, new JsonSerializerOptions
             {
@@ -35,7 +35,7 @@ public class LoginHandler
             if(genericResponse.IsSuccessful && genericResponse.ResponseData is not null)
             {
                 await _localStorageService.SetItemAsync<TokenDto>(ApplicationClientHelper.StorageKey, genericResponse.ResponseData);
-
+                await _localStorageService.RemoveItemAsync(ApplicationClientHelper.OtpRequestedUser);
                 if(rememberMe)
                 {
                     await _localStorageService.SetItemAsync(ApplicationClientHelper.RememberMeKey, true);

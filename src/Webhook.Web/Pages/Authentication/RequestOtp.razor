@@ -194,9 +194,9 @@
 
         try
         {
-            //var result = await requestOtpHandler.HandleAsync(_model);
-            await Task.Delay(10000); // Simulate API call delay
-            var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message");
+            var result = await requestOtpHandler.HandleAsync(_model);
+            // await Task.Delay(10000); Simulate API call delay
+            // var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message");
             _errorMessage = result.successStatus ? string.Empty : result.responseMessage;
             if (!result.successStatus && !string.IsNullOrEmpty(_errorMessage))
             {

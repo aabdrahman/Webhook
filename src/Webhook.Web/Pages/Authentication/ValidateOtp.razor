@@ -128,7 +128,7 @@
     /// store the operation token, clear the email from localStorage.
     /// Returns error message on failure or empty string on success.
     /// </summary>
-   // [Parameter]
+    // [Parameter]
     //public Func<string, Task<string>>? OnValidateOtp { get; set; }
 
     /// <summary>
@@ -256,9 +256,10 @@
         try
         {
             var fullCode = string.Join("", _otpValues);
-            //var result = await validateOtpHandler.HandleAsync(fullCode);
-            await Task.Delay(8500); // Simulate API call delay
-            var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message"); // Simulate API call delay)
+            await Task.Delay(500);
+            var result = await validateOtpHandler.HandleAsync(fullCode);
+            // await Task.Delay(8500); Simulate API call delay
+            // var result = new ApiResponseDto(DateTime.Now.Second % 2 == 0, "Simulated API response message"); Simulate API call delay)
             _verifyMessage = result.responseMessage;
             _verifySuccess = result.successStatus;
             Array.Clear(_otpValues);
@@ -280,7 +281,7 @@
             StateHasChanged();
 
             // Brief pause so the user sees the success message
-            await Task.Delay(5000);
+            await Task.Delay(2500);
 
             navigationManager.NavigateTo(_returnUrl);
         }

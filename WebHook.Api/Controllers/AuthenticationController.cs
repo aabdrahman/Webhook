@@ -328,4 +328,52 @@ public class AuthenticationController : ControllerBase
                 }));
         }
     }
+
+    /// <summary>
+    /// This endpoint is used by unauthorized users to reset the password and unlock their profile.
+    /// </summary>
+    /// <param name="resetUserPasswordequest">
+    /// Contains the request details of the new password and confirm password which are to be the same.
+    /// </param>
+    /// <param name="ct">
+    /// A cancellation token that can be used to cancel the operation before it completes.
+    /// </param>
+    /// <returns>
+    /// <response code="400">
+    /// This specifes that the operation failed due to some validation(s).
+    /// </response>
+    /// <response code="500">
+    /// This specifes that an unexpected error occurred during the operation.
+    /// </response>
+    /// <response code="200">
+    /// This specifes that the request was successfully completed.
+    /// </response>
+    /// </returns>
+    [HttpPost("reset-user-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(type: typeof(GenericResponse<string>), statusCode: StatusCodes.Status400BadRequest, Description = "One of the validation failed.")]
+    [ProducesResponseType(type: typeof(GenericResponse<string>), statusCode: StatusCodes.Status200OK, Description = "User password was successfully reste.")]
+    [ProducesResponseType(type: typeof(GenericResponse<string>), statusCode: StatusCodes.Status400BadRequest, Description = "An unex[ected error occurred while calling the api.")]
+    public async Task<IActionResult> ResetUserPassword([FromBody] ResetUserPasswordequestDto resetUserPasswordequest, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(ResetUserPassword));
+        try
+        {
+            var result = await _authenticationService.ResetUserPasswordAsync(resetUserPasswordequest, ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
 }
