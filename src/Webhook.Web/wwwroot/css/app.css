@@ -125,7 +125,7 @@
     --sidebar-collapsed: 64px;
     --navbar-height: 60px;
     --content-max-width: 1200px;
-    --content-padding: var(--space-6);
+    --content-padding: var(--space-4);
 }
 
 /* -----------------------------------------------------------------------------

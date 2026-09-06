@@ -637,6 +637,7 @@
     font-family: var(--font-body);
     font-size: var(--text-sm);
     line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-2);
 }
 
 .alert-icon {

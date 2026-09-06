@@ -1,0 +1,616 @@
+@page "/admin/event-catalog"
+@attribute [Authorize(Roles = "Admin,ADMIN")]
+
+<PageTitle>Event Catalog — WebhookHub</PageTitle>
+
+<PageSpinner Visible="@_isLoading" Label="Loading event catalog..." />
+
+@if (!_isLoading)
+{
+    <PageHeader Title="Event Catalog"
+                Description="Manage event types available for subscription."
+                BadgeValue="@_catalogs.Count.ToString()"
+                BadgeType="custom"
+                BadgeCssClass="badge-inactive"
+                ActionText="New Event Type"
+                OnAction="OpenCreateModal" />
+
+    <Alert Message="@_errorMessage" />
+
+    @if (!_catalogs.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <EmptyState Title="No event types yet"
+                    Description="Create your first event type to allow subscriptions."
+                    ActionText="New Event Type"
+                    OnAction="OpenCreateModal"
+                    Icon="catalog" />
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Event Name</th>
+                                <th>Description</th>
+                                <th>Fields</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var catalog in _catalogs)
+                            {
+                                <tr>
+                                    <td class="table-mono text-sm">
+                                        @catalog.EventCatalogName
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        @(string.IsNullOrWhiteSpace(catalog.Description)
+                                            ? "—"
+                                            : catalog.Description)
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-ghost btn-sm"
+                                                @onclick="() => OpenFieldsModal(catalog)">
+                                            @catalog.AvailableFields.Count
+                                            field@(catalog.AvailableFields.Count != 1 ? "s" : "")
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <Badge Value="@(catalog.IsActive ? "Active" : "Inactive")"
+                                               Variant="subscription" />
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn btn-ghost btn-sm"
+                                                    @onclick="() => OpenToggleModal(catalog)"
+                                                    title="@(catalog.IsActive ? "Deactivate" : "Activate")">
+                                                @if (catalog.IsActive)
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;
+                                                                color:var(--color-warning);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="8" y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                                else
+                                                {
+                                                    <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;
+                                                                color:var(--color-success);">
+                                                        <circle cx="12" cy="12" r="10" />
+                                                        <line x1="12" y1="8" x2="12" y2="16" />
+                                                        <line x1="8" y1="12" x2="16" y2="12" />
+                                                    </svg>
+                                                }
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<!-- Create modal -->
+<Modal @bind-IsOpen="_showCreateModal"
+       Title="New Event Type"
+       ShowFooter="false"
+       OnClose="CloseModals"
+       Size="lg">
+
+    <EditForm Model="_createModel"
+              OnValidSubmit="HandleCreate">
+
+        <DataAnnotationsValidator />
+
+        <div style="display:flex;flex-direction:column;gap:var(--space-5);">
+
+            <!-- Event name -->
+            <div class="form-group">
+                <label class="form-label form-label-required" for="eventName">
+                    Event name
+                </label>
+                <InputText id="eventName"
+                           @bind-Value="_createModel.EventCatalogName"
+                           class="form-input"
+                           placeholder="e.g. OrderCreated"
+                           disabled="@_isCreating" />
+                <ValidationMessage For="@(() => _createModel.EventCatalogName)"
+                                   class="form-error" />
+                <span class="form-help">
+                    Use PascalCase — e.g. OrderCreated, PaymentReceived.
+                </span>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+                <label class="form-label" for="description">
+                    Description
+                    <span class="text-muted text-xs">(optional)</span>
+                </label>
+                <InputText id="description"
+                           @bind-Value="_createModel.Description"
+                           class="form-input"
+                           placeholder="Brief description of when this event is raised."
+                           disabled="@_isCreating" />
+            </div>
+
+            <!-- Available fields -->
+            <div class="form-group">
+                <label class="form-label form-label-required">
+                    Available fields
+                </label>
+                <span class="form-help" style="margin-bottom:var(--space-3);">
+                    Define the fields this event exposes. Key = field name,
+                    Value = field description.
+                </span>
+
+                <!-- Field input row -->
+                <!-- Field input row -->
+                <div class="catalog-field-input-row">
+                    <input type="text"
+                           class="form-input"
+                           placeholder="Property name e.g. orderId"
+                           @bind="_newFieldKey"
+                           disabled="@_isCreating" />
+
+                    <select class="form-select"
+                            @bind="_newFieldValue"
+                            disabled="@_isCreating">
+                        <option value="">Select data type</option>
+                        <option value="string">string</option>
+                        <option value="int">int</option>
+                        <option value="decimal">decimal</option>
+                        <option value="double">double</option>
+                        <option value="bool">bool</option>
+                        <option value="Guid">Guid</option>
+                        <option value="DateTime">DateTime</option>
+                        <option value="DateTimeOffset">DateTimeOffset</option>
+                    </select>
+
+                    <button type="button"
+                            class="btn btn-outline btn-sm"
+                            @onclick="AddField"
+                            disabled="@(string.IsNullOrWhiteSpace(_newFieldKey)
+                                                || string.IsNullOrWhiteSpace(_newFieldValue)
+                                                || _isCreating)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                             style="width:13px;height:13px;">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add
+                    </button>
+                </div>
+
+                <!-- Fields list -->
+                @if (_createModel.AvailableFields.Any())
+                {
+                    <div class="catalog-fields-list">
+                        @foreach (var field in _createModel.AvailableFields)
+                        {
+                            <div class="catalog-field-item">
+                                <span class="catalog-field-key table-mono text-sm">
+                                    @field.Key
+                                </span>
+                                <span class="catalog-field-value text-sm text-muted">
+                                    @field.Value
+                                </span>
+                                <button type="button"
+                                        class="btn btn-ghost btn-sm"
+                                        @onclick="() => RemoveField(field.Key)">
+                                    <svg viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2"
+                                         stroke-linecap="round" stroke-linejoin="round"
+                                         style="width:13px;height:13px;
+                                                color:var(--color-danger);">
+                                        <line x1="18" y1="6" x2="6"  y2="18" />
+                                        <line x1="6"  y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (_fieldsError)
+                {
+                    <span class="form-error">
+                        At least one available field is required.
+                    </span>
+                }
+            </div>
+
+            <Alert Message="@_createErrorMessage" />
+
+            <!-- Footer -->
+            <div class="modal-footer" style="margin:0 calc(var(--space-6) * -1)
+                         calc(var(--space-6) * -1);border-radius:0;">
+                <button type="button"
+                        class="btn btn-ghost btn-sm"
+                        @onclick="CloseModals"
+                        disabled="@_isCreating">
+                    Cancel
+                </button>
+                <LoadingButton Text="Create Event Type"
+                               LoadingText="Creating..."
+                               IsLoading="@_isCreating"
+                               Type="submit" />
+            </div>
+
+        </div>
+
+    </EditForm>
+
+</Modal>
+
+<!-- Toggle modal -->
+@if (_selectedCatalog is not null)
+{
+    <Modal @bind-IsOpen="_showToggleModal"
+           Title="@(_selectedCatalog.IsActive ? "Deactivate Event Type" : "Activate Event Type")"
+           ConfirmText="@(_selectedCatalog.IsActive ? "Deactivate" : "Activate")"
+           ConfirmVariant="@(_selectedCatalog.IsActive ? "danger" : "primary")"
+           IsConfirming="@_isToggling"
+           OnConfirm="HandleToggle"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Event Name</span>
+                <span class="subscription-modal-value table-mono">
+                    @_selectedCatalog.EventCatalogName
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_selectedCatalog.IsActive ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+        </div>
+
+        <Alert Type="warning"
+               Message="@(_selectedCatalog.IsActive
+                   ? "Deactivating this event type will prevent new subscriptions to it. Existing subscriptions will stop receiving deliveries."
+                   : "Activating this event type will allow new subscriptions and resume deliveries.")" />
+
+        <Alert Message="@_toggleErrorMessage" />
+
+    </Modal>
+}
+
+<!-- Fields view modal -->
+@if (_selectedCatalog is not null)
+{
+    <Modal @bind-IsOpen="_showFieldsModal"
+           Title="@($"{_selectedCatalog.EventCatalogName} — Available Fields")"
+           ShowFooter="false"
+           OnClose="CloseModals"
+           Size="sm">
+
+        @if (!_selectedCatalog.AvailableFields.Any())
+        {
+            <p class="text-sm text-muted" style="text-align:center;
+               padding:var(--space-4) 0;">
+                No fields defined for this event type.
+            </p>
+        }
+        else
+        {
+            <div class="catalog-fields-list">
+                @foreach (var field in _selectedCatalog.AvailableFields)
+                {
+                    <div class="catalog-field-item">
+                        <span class="catalog-field-key table-mono text-sm">@field.Key</span>
+                        <span class="text-xs text-muted">→</span>
+                        <span class="catalog-field-value table-mono text-sm"
+                              style="color:var(--color-info);">
+                            @field.Value
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+
+    </Modal>
+}
+
+@code {
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
+    private bool   _isLoading    = true;
+    private string _errorMessage = string.Empty;
+
+    private List<EventCatalogDto> _catalogs = [];
+
+    // Create modal
+    private bool _showCreateModal = false;
+    private bool  _isCreating = false;
+    private bool _fieldsError = false;
+    private string  _createErrorMessage = string.Empty;
+    private CreateEventCatalogDto _createModel = new() { AvailableFields = new Dictionary<string, string>() };
+    private string  _newFieldKey = string.Empty;
+    private string _newFieldValue = string.Empty;
+
+    // Toggle modal
+    private bool            _showToggleModal  = false;
+    private bool            _isToggling       = false;
+    private string          _toggleErrorMessage = string.Empty;
+    private EventCatalogDto? _selectedCatalog;
+
+    // Fields view modal
+    private bool _showFieldsModal = false;
+
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
+    protected override async Task OnInitializedAsync()
+    {
+        _createModel = new CreateEventCatalogDto
+        {
+            AvailableFields = new Dictionary<string, string>()
+        };
+        await LoadCatalogsAsync();
+    }
+
+    private async Task LoadCatalogsAsync()
+    {
+        _isLoading    = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.GetAllAsync();
+            // if (!result.IsSuccessful)
+            // {
+            //     _errorMessage = result.ResponseMessage;
+            //     return;
+            // }
+            // _catalogs = result.ResponseData?.ToList() ?? [];
+
+            await Task.Delay(700);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _errorMessage = "Failed to load event catalog. Please try again.";
+                return;
+            }
+
+            _catalogs =
+            [
+                new EventCatalogDto
+                {
+                    Id                = Guid.NewGuid(),
+                    EventCatalogName  = "OrderCreated",
+                    Description       = "Raised when a new order is created.",
+                    IsActive          = true,
+                    AvailableFields   = new Dictionary<string, string>
+                    {
+                        ["orderId"]    = "The unique order identifier",
+                        ["customerId"] = "The customer identifier",
+                        ["amount"]     = "The order total amount"
+                    }
+                },
+                new EventCatalogDto
+                {
+                    Id                = Guid.NewGuid(),
+                    EventCatalogName  = "PaymentReceived",
+                    Description       = "Raised when a payment is received.",
+                    IsActive          = true,
+                    AvailableFields   = new Dictionary<string, string>
+                    {
+                        ["paymentId"] = "The payment identifier",
+                        ["amount"]    = "The payment amount"
+                    }
+                },
+                new EventCatalogDto
+                {
+                    Id               = Guid.NewGuid(),
+                    EventCatalogName = "UserRegistered",
+                    Description      = "Raised when a new user registers.",
+                    IsActive         = false,
+                    AvailableFields  = new Dictionary<string, string>
+                    {
+                        ["userId"] = "The new user identifier",
+                        ["email"]  = "The user email address"
+                    }
+                }
+            ];
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Modal openers
+    // -------------------------------------------------------------------------
+
+    private void OpenCreateModal()
+    {
+        _createModel        = new();
+        _newFieldKey        = string.Empty;
+        _newFieldValue      = string.Empty;
+        _fieldsError        = false;
+        _createErrorMessage = string.Empty;
+        _showCreateModal    = true;
+    }
+
+    private void OpenToggleModal(EventCatalogDto catalog)
+    {
+        _selectedCatalog    = catalog;
+        _toggleErrorMessage = string.Empty;
+        _showToggleModal    = true;
+    }
+
+    private void OpenFieldsModal(EventCatalogDto catalog)
+    {
+        _selectedCatalog = catalog;
+        _showFieldsModal = true;
+    }
+
+    private void CloseModals()
+    {
+        _showCreateModal = false;
+        _showToggleModal = false;
+        _showFieldsModal = false;
+        _selectedCatalog = null;
+        _toggleErrorMessage  = string.Empty;
+        _createErrorMessage  = string.Empty;
+    }
+
+    // -------------------------------------------------------------------------
+    // Field management
+    // -------------------------------------------------------------------------
+
+    private void AddField()
+    {
+        if (string.IsNullOrWhiteSpace(_newFieldKey)) return;
+
+        _createModel.AvailableFields[_newFieldKey.Trim()] =
+            _newFieldValue.Trim();
+
+        _newFieldKey   = string.Empty;
+        _newFieldValue = string.Empty;
+        _fieldsError   = false;
+    }
+
+    private void RemoveField(string key)
+        => _createModel.AvailableFields.Remove(key);
+
+    // -------------------------------------------------------------------------
+    // Handlers
+    // -------------------------------------------------------------------------
+
+    private async Task HandleCreate()
+    {
+        if (!_createModel.AvailableFields.Any())
+        {
+            _fieldsError = true;
+            return;
+        }
+
+        _fieldsError        = false;
+        _createErrorMessage = string.Empty;
+        _isCreating         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.CreateAsync(new CreateEventCatalogDto
+            // {
+            //     EventCatalogName = _createModel.EventCatalogName,
+            //     Description      = _createModel.Description,
+            //     AvailableFields  = _createModel.AvailableFields
+            // });
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _createErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _createErrorMessage = "Failed to create event type. Please try again.";
+                return;
+            }
+
+            // Add to local list
+            _catalogs.Add(new EventCatalogDto
+            {
+                Id               = Guid.NewGuid(),
+                EventCatalogName = _createModel.EventCatalogName,
+                Description      = _createModel.Description ?? string.Empty,
+                AvailableFields  = new Dictionary<string, string>(
+                    _createModel.AvailableFields),
+                IsActive         = true
+            });
+
+            toastService.ShowSuccess($"{_createModel.EventCatalogName} created successfully.");
+            CloseModals();
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task HandleToggle()
+    {
+        if (_selectedCatalog is null) return;
+
+        _toggleErrorMessage = string.Empty;
+        _isToggling         = true;
+
+        try
+        {
+            // TODO: replace with real service call
+            // var result = await EventCatalogService.ToggleAsync(
+            //     _selectedCatalog.Id,
+            //     isDeactivate: _selectedCatalog.IsActive);
+            //
+            // if (!result.IsSuccessful)
+            // {
+            //     _toggleErrorMessage = result.ResponseMessage;
+            //     return;
+            // }
+
+            await Task.Delay(800);
+
+            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if (!success)
+            {
+                _toggleErrorMessage = "Operation failed. Please try again.";
+                return;
+            }
+
+            var index = _catalogs.IndexOf(_selectedCatalog);
+            if (index >= 0)
+            {
+                _catalogs[index] = _selectedCatalog with
+                {
+                    IsActive = !_selectedCatalog.IsActive
+                };
+            }
+
+            toastService.ShowSuccess(
+                _selectedCatalog.IsActive
+                    ? $"{_selectedCatalog.EventCatalogName} deactivated."
+                    : $"{_selectedCatalog.EventCatalogName} activated.");
+
+            CloseModals();
+        }
+        finally
+        {
+            _isToggling = false;
+        }
+    }
+}

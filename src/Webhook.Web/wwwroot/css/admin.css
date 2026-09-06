@@ -95,3 +95,47 @@
         grid-template-columns: 1fr;
     }
 }
+
+
+/* =============================================================================
+   Event Catalog — field builder
+   ============================================================================= */
+
+.catalog-field-input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-3);
+}
+
+.catalog-fields-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+}
+
+.catalog-field-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+}
+
+.catalog-field-key {
+    min-width: 120px;
+    flex-shrink: 0;
+    color: var(--color-primary);
+}
+
+.catalog-field-value {
+    flex: 1;
+}
+ 
