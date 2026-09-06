@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@implements IAsyncDisposable
 
 @* MainLayout.razor *@
 <div class="app-shell">
@@ -14,9 +15,39 @@
 <ToastContainer />   @* ← this must be outside the app-shell grid *@
 
 @code {
+
+    private Timer? _timer;
+
     private async Task HandleLogout()
     {
         await ((UserJwtAuthenticationStateProvider)authenticationStateProvider).NotifyUserLogout();
         navigationManager.NavigateTo("/login");
     }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new Timer(async _ =>
+        {
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+
+            var isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+
+            if (!isAuthenticated)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if(_timer is not null)
+        {
+            await _timer.DisposeAsync();
+            _timer = null;
+        }
+    }
+
 }

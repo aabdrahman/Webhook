@@ -212,7 +212,7 @@
                     return;
                 }
             }
-            
+
             var rememberedUserEmail = await localStorageService.GetItemAsync<string>(ApplicationClientHelper.RememberMeKey);
             if (!string.IsNullOrEmpty(rememberedUserEmail))
             {
@@ -263,6 +263,7 @@
                 await localStorageService.RemoveItemAsync(ApplicationClientHelper.RegisteredUserEmailKey);
             }
 
+            await ((UserJwtAuthenticationStateProvider)authenticationStateProvider).NotifyUserLogin();
             // Navigate to returnUrl or dashboard on success
             navigationManager.NavigateTo(GetReturnUrl());
         }

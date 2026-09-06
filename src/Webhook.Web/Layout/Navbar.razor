@@ -160,7 +160,7 @@
                      ?? string.Empty;
 
             _userEmail    = email;
-            _userInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "U";
+            _userInitials = email.Length > 0 ? email[0].ToString().ToUpper() : "anonymous";
             _userRole     = user.IsInRole("Admin") || user.IsInRole("ADMIN") ? "Admin" : "User";
         }
     }

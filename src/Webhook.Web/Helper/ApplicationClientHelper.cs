@@ -3,6 +3,7 @@
 public static class ApplicationClientHelper
 {
     public static string StorageKey = "tokenDetails";
+    public static int SessionRefreshWindow = 5;
     public static string OperationTokenKey = "operationToken";
     public static string ApplicationHttpClientNameSecure = "Webhook.Web.ServerAPI.Secure";
     public static string ApplicationHttpClientNameOpen = "Webhook.Web.ServerAPI.Open";
