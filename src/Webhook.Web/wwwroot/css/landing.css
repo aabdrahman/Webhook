@@ -1,0 +1,371 @@
+/* =============================================================================
+   Landing page styles
+   ============================================================================= */
+
+.landing-wrapper {
+    min-height:       100vh;
+    background:       var(--color-bg);
+    color:            var(--color-text-primary);
+    display:          flex;
+    flex-direction:   column;
+}
+
+/* Container — centred content width */
+.landing-container {
+    max-width:      1100px;
+    margin:         0 auto;
+    padding:        0 var(--space-6);
+    width:          100%;
+}
+
+/* =============================================================================
+   Navbar
+   ============================================================================= */
+.landing-nav {
+    position:         sticky;
+    top:              0;
+    z-index:          100;
+    background:       rgba(15, 17, 23, 0.85);
+    backdrop-filter:  blur(12px);
+    border-bottom:    1px solid var(--color-border-subtle);
+}
+
+.landing-nav-inner {
+    max-width:       1100px;
+    margin:          0 auto;
+    padding:         var(--space-4) var(--space-6);
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+}
+
+.landing-nav-logo {
+    display:     flex;
+    align-items: center;
+    gap:         var(--space-2);
+}
+
+.landing-nav-brand {
+    font-size:   var(--text-lg);
+    color:       var(--color-text-primary);
+    letter-spacing: var(--tracking-tight);
+}
+
+.landing-nav-actions {
+    display:     flex;
+    align-items: center;
+    gap:         var(--space-3);
+}
+
+/* =============================================================================
+   Hero
+   ============================================================================= */
+.landing-hero {
+    padding:    calc(var(--space-12) * 2) 0 var(--space-12);
+    text-align: center;
+}
+
+.landing-hero-badge {
+    display:          inline-flex;
+    align-items:      center;
+    gap:              var(--space-2);
+    font-family:      var(--font-body);
+    font-size:        var(--text-xs);
+    font-weight:      var(--weight-semibold);
+    color:            var(--color-primary);
+    background:       var(--color-primary-muted);
+    border:           1px solid var(--color-primary);
+    border-radius:    var(--radius-full);
+    padding:          var(--space-1) var(--space-3);
+    margin-bottom:    var(--space-6);
+    letter-spacing:   var(--tracking-wider);
+    text-transform:   uppercase;
+}
+
+.landing-hero-title {
+    font-size:      clamp(2.5rem, 6vw, 4rem);
+    line-height:    1.1;
+    letter-spacing: var(--tracking-tight);
+    color:          var(--color-text-primary);
+    margin-bottom:  var(--space-6);
+    max-width:      760px;
+    margin-left:    auto;
+    margin-right:   auto;
+}
+
+.landing-hero-description {
+    font-family:   var(--font-body);
+    font-size:     var(--text-lg);
+    color:         var(--color-text-muted);
+    line-height:   var(--leading-relaxed);
+    max-width:     580px;
+    margin:        0 auto var(--space-8);
+}
+
+.landing-hero-actions {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             var(--space-4);
+    flex-wrap:       wrap;
+}
+
+/* =============================================================================
+   Features
+   ============================================================================= */
+.landing-features {
+    padding:       var(--space-12) 0;
+    border-top:    1px solid var(--color-border-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.landing-features-grid {
+    display:               grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:                   var(--space-6);
+}
+
+.landing-feature-card {
+    display:        flex;
+    flex-direction: column;
+    gap:            var(--space-3);
+}
+
+.landing-feature-icon {
+    width:            40px;
+    height:           40px;
+    border-radius:    var(--radius-md);
+    background:       var(--color-primary-muted);
+    border:           1px solid var(--color-primary);
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+    color:            var(--color-primary);
+    flex-shrink:      0;
+}
+
+.landing-feature-icon svg {
+    width:  18px;
+    height: 18px;
+}
+
+.landing-feature-title {
+    font-family: var(--font-heading);
+    font-size:   var(--text-base);
+    color:       var(--color-text-primary);
+}
+
+.landing-feature-description {
+    font-family:  var(--font-body);
+    font-size:    var(--text-sm);
+    color:        var(--color-text-muted);
+    line-height:  var(--leading-relaxed);
+}
+
+/* =============================================================================
+   How it works
+   ============================================================================= */
+.landing-how {
+    padding:    var(--space-12) 0;
+    text-align: center;
+}
+
+.landing-section-title {
+    font-size:     var(--text-3xl);
+    color:         var(--color-text-primary);
+    margin-bottom: var(--space-3);
+    letter-spacing: var(--tracking-tight);
+}
+
+.landing-section-description {
+    font-family:   var(--font-body);
+    font-size:     var(--text-base);
+    color:         var(--color-text-muted);
+    margin-bottom: var(--space-10);
+}
+
+.landing-steps {
+    display:               grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:                   var(--space-6);
+    position:              relative;
+}
+
+.landing-step {
+    display:        flex;
+    flex-direction: column;
+    align-items:    center;
+    gap:            var(--space-3);
+    position:       relative;
+}
+
+.landing-step-number {
+    font-family:      var(--font-display);
+    font-size:        var(--text-xs);
+    font-weight:      var(--weight-bold);
+    color:            var(--color-primary);
+    background:       var(--color-primary-muted);
+    border:           1px solid var(--color-primary);
+    border-radius:    var(--radius-full);
+    width:            24px;
+    height:           24px;
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+    flex-shrink:      0;
+}
+
+.landing-step-connector {
+    position:   absolute;
+    top:        12px;
+    left:       calc(50% + 20px);
+    right:      calc(-50% + 20px);
+    height:     1px;
+    background: var(--color-border);
+}
+
+.landing-step-connector-last {
+    display: none;
+}
+
+.landing-step-icon {
+    width:            52px;
+    height:           52px;
+    border-radius:    var(--radius-lg);
+    background:       var(--color-surface-2);
+    border:           1px solid var(--color-border);
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+    color:            var(--color-text-secondary);
+}
+
+.landing-step-icon svg {
+    width:  22px;
+    height: 22px;
+}
+
+.landing-step-title {
+    font-family: var(--font-heading);
+    font-size:   var(--text-base);
+    color:       var(--color-text-primary);
+}
+
+.landing-step-description {
+    font-family:  var(--font-body);
+    font-size:    var(--text-sm);
+    color:        var(--color-text-muted);
+    line-height:  var(--leading-relaxed);
+    text-align:   center;
+}
+
+/* =============================================================================
+   CTA
+   ============================================================================= */
+.landing-cta {
+    padding: var(--space-12) 0;
+}
+
+.landing-cta-card {
+    background:    var(--color-surface-1);
+    border:        1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding:       var(--space-12) var(--space-8);
+    text-align:    center;
+    display:       flex;
+    flex-direction: column;
+    align-items:   center;
+    gap:           var(--space-4);
+    position:      relative;
+    overflow:      hidden;
+}
+
+/* Subtle radial glow behind CTA */
+.landing-cta-card::before {
+    content:    "";
+    position:   absolute;
+    inset:      0;
+    background: radial-gradient(
+        ellipse at center,
+        var(--color-primary-muted) 0%,
+        transparent 70%
+    );
+    pointer-events: none;
+}
+
+.landing-cta-title {
+    font-size:      var(--text-3xl);
+    color:          var(--color-text-primary);
+    letter-spacing: var(--tracking-tight);
+    position:       relative;
+}
+
+.landing-cta-description {
+    font-family: var(--font-body);
+    font-size:   var(--text-base);
+    color:       var(--color-text-muted);
+    max-width:   420px;
+    line-height: var(--leading-relaxed);
+    position:    relative;
+}
+
+/* =============================================================================
+   Footer
+   ============================================================================= */
+.landing-footer {
+    margin-top:    auto;
+    border-top:    1px solid var(--color-border-subtle);
+    padding:       var(--space-6) 0;
+}
+
+.landing-footer-inner {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             var(--space-4);
+}
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+@media (max-width: 860px) {
+    .landing-features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .landing-steps {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .landing-step-connector {
+        display: none;
+    }
+}
+
+@media (max-width: 540px) {
+    .landing-features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .landing-steps {
+        grid-template-columns: 1fr;
+    }
+
+    .landing-hero-title {
+        font-size: 2rem;
+    }
+}
+
+.landing-footer-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-body);
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    transition: color var(--transition-base);
+}
+
+.landing-footer-link:hover {
+    color: var(--color-text-primary);
+}

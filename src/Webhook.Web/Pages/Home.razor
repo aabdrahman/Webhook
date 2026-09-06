@@ -1,25 +1,272 @@
-﻿@page "/"
-@layout AuthLayout
+@page "/"
+@layout LandingLayout
 
-<PageTitle>Home</PageTitle>
+<PageTitle>WebhookHub — Reliable Webhook Delivery</PageTitle>
 
-<h1>Hello, world!</h1>
+<!-- Public navbar -->
+<nav class="landing-nav">
+    <div class="landing-nav-inner">
+        <div class="landing-nav-logo">
+            <div class="auth-logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+            </div>
+            <span class="landing-nav-brand font-display">WebhookHub</span>
+        </div>
+        <div class="landing-nav-actions">
+            <a href="/login" class="btn btn-ghost btn-sm">Sign In</a>
+            <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
+        </div>
+    </div>
+</nav>
 
-Welcome to your new app.
+<!-- Hero -->
+<section class="landing-hero">
+    <div class="landing-container">
+        <div class="landing-hero-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                 style="width:14px;height:14px;">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            Built on .NET 10
+        </div>
 
+        <h1 class="landing-hero-title font-display">
+            Reliable webhook delivery<br />
+            for your internal services
+        </h1>
 
-@code {
+        <p class="landing-hero-description">
+            Route events from your internal services to subscribers with
+            guaranteed delivery, automatic retries, dead letter support,
+            and full observability — all in one platform.
+        </p>
 
-    private string? _configValue;
-    private int _timeout = 0;
-    private bool _isLoading = true;
+        <div class="landing-hero-actions">
+            <a href="/register" class="btn btn-primary" style="display:flex;align-items:center;gap:var(--space-2);">
+                <span>Get Started</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:16px;height:16px;">
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </a>
+            <a href="/login" class="btn btn-outline">Sign In</a>
+        </div>
+    </div>
+</section>
 
-    protected override async Task OnInitializedAsync()
-    {
-        await Task.Delay(10000);
-        _isLoading = false;
-    }
+<!-- Feature strip -->
+<section class="landing-features">
+    <div class="landing-container">
+        <div class="landing-features-grid">
 
+            <div class="landing-feature-card">
+                <div class="landing-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                </div>
+                <h3 class="landing-feature-title">Reliable Delivery</h3>
+                <p class="landing-feature-description">
+                    Every event is persisted before delivery. Failed deliveries
+                    move to a dead letter queue for manual retry — nothing is ever lost.
+                </p>
+            </div>
 
+            <div class="landing-feature-card">
+                <div class="landing-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                    </svg>
+                </div>
+                <h3 class="landing-feature-title">Automatic Retries</h3>
+                <p class="landing-feature-description">
+                    Failed deliveries are retried automatically with configurable
+                    backoff. Transient errors are handled without manual intervention.
+                </p>
+            </div>
 
-}
+            <div class="landing-feature-card">
+                <div class="landing-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                </div>
+                <h3 class="landing-feature-title">Secure by Default</h3>
+                <p class="landing-feature-description">
+                    Every delivery includes an HMAC signature header so your
+                    endpoints can verify the payload came from WebhookHub.
+                </p>
+            </div>
+
+            <div class="landing-feature-card">
+                <div class="landing-feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                </div>
+                <h3 class="landing-feature-title">Full Observability</h3>
+                <p class="landing-feature-description">
+                    Track every delivery attempt, response code, and duration.
+                    Identify failing subscriptions instantly from your dashboard.
+                </p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- How it works -->
+<section class="landing-how">
+    <div class="landing-container">
+        <h2 class="landing-section-title font-display">How it works</h2>
+        <p class="landing-section-description">
+            From event publication to delivery in four steps.
+        </p>
+
+        <div class="landing-steps">
+
+            <div class="landing-step">
+                <div class="landing-step-number">1</div>
+                <div class="landing-step-connector"></div>
+                <div class="landing-step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                </div>
+                <h4 class="landing-step-title">Publish</h4>
+                <p class="landing-step-description">
+                    An internal service posts an event to the WebhookHub API
+                    using its assigned Client ID and key.
+                </p>
+            </div>
+
+            <div class="landing-step">
+                <div class="landing-step-number">2</div>
+                <div class="landing-step-connector"></div>
+                <div class="landing-step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2"  y1="12" x2="22" y2="12" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3
+                                 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3
+                                 15.3 0 0 1 4-10z" />
+                    </svg>
+                </div>
+                <h4 class="landing-step-title">Route</h4>
+                <p class="landing-step-description">
+                    WebhookHub matches the event type to all active subscribers
+                    and queues a delivery for each one.
+                </p>
+            </div>
+
+            <div class="landing-step">
+                <div class="landing-step-number">3</div>
+                <div class="landing-step-connector"></div>
+                <div class="landing-step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                </div>
+                <h4 class="landing-step-title">Deliver</h4>
+                <p class="landing-step-description">
+                    The delivery worker POSTs the event payload to each
+                    subscriber's callback URL with an HMAC signature.
+                </p>
+            </div>
+
+            <div class="landing-step">
+                <div class="landing-step-number">4</div>
+                <div class="landing-step-connector landing-step-connector-last"></div>
+                <div class="landing-step-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                    </svg>
+                </div>
+                <h4 class="landing-step-title">Retry</h4>
+                <p class="landing-step-description">
+                    Failed deliveries are retried automatically. After all
+                    retries are exhausted the event moves to the dead letter queue.
+                </p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="landing-cta">
+    <div class="landing-container">
+        <div class="landing-cta-card">
+            <h2 class="landing-cta-title font-display">
+                Ready to get started?
+            </h2>
+            <p class="landing-cta-description">
+                Set up your first subscription in minutes.
+                No configuration files, no infrastructure to manage.
+            </p>
+            <a href="/register" class="btn btn-primary">
+                Create an Account
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:16px;height:16px;">
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="landing-footer">
+    <div class="landing-container">
+        <div class="landing-footer-inner">
+            <div class="landing-nav-logo">
+                <div class="auth-logo-mark" style="width:20px;height:20px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                </div>
+                <span class="text-sm text-muted">WebhookHub</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-5);">
+                <a href="https://github.com/aabdrahman/Webhook"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="landing-footer-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         style="width:16px;height:16px;">
+                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0
+                        0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0
+                        0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38
+                        13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0
+                        5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44
+                        7A3.37 3.37 0 0 0 9 18.13V22" />
+                    </svg>
+                    View on GitHub
+                </a>
+                <span class="text-xs text-secondary">
+                    © @DateTime.Now.Year WebhookHub · Built with Blazor & .NET 10
+                </span>
+            </div>
+        </div>
+    </div>
+</footer>
