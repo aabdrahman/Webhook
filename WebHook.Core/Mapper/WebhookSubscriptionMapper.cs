@@ -15,7 +15,7 @@ public static class WebhookSubscriptionMapper
             Name = wbSubscription.Name,
             SecretKey = wbSubscription.SecretKey,
             SubscribedFields = wbSubscription.SubscribedFields,
-            SubscribedEvents = wbSubscription.WebhookEvents.Select(x => x.webHookEventCatalog.NormalizedEventName).ToList(),
+            SubscribedEvents = wbSubscription.WebhookEvents.Where(x => x.IsActive).Select(x => x.webHookEventCatalog.NormalizedEventName).ToList(),
             CallBackUrl = wbSubscription.CallbackUrl,
             IsActive = wbSubscription.IsActive
         };

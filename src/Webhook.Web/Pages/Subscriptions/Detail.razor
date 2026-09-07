@@ -61,7 +61,8 @@
                         <div class="detail-field">
                             <span class="detail-field-label">Created</span>
                             <span class="detail-field-value text-sm">
-                                @_subscription.CreatedDate.ToString("MMM dd, yyyy HH:mm")
+                                @_subscription.CreatedDate.ToString("R")
+                                @* .ToString("MMM dd, yyyy HH:mm") *@
                             </span>
                         </div>
 
@@ -330,7 +331,7 @@
     }
     else if (!_availableCatalogEvents.Any())
     {
-        <p class="text-sm text-muted" style="text-align:center;padding:var(--space-4) 0;">
+        <p class="text-sm text-secondary" style="text-align:center;padding:var(--space-4) 0;">
             All available events are already subscribed.
         </p>
     }
@@ -575,27 +576,32 @@
 
         try
         {
-            // TODO: replace with real service call
             await Task.Delay(800);
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            var result = _subscription!.IsActive ? await deleteSubscriptionHandler.HandleAsync(_subscription.Id) :
+                        await reactivateSubscriptionHandler.HandleAsync(_subscription.Id);
+
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _toggleErrorMessage = "Operation failed. Please try again.";
+                _toggleErrorMessage = $"Operation failed. {result.responseMessage}";
                 return;
             }
 
             _subscription!.IsActive = !_subscription.IsActive;
             toastService.ShowSuccess(
                 _subscription.IsActive
-                    ? "Subscription activated successfully."
-                    : "Subscription deactivated successfully.");
+                    ? $"Subscription activated successfully. {result.responseMessage}"
+                    : $"Subscription deactivated successfully. {result.responseMessage}");
 
             CloseModals();
         }
         finally
         {
             _isToggling = false;
+            await GetNewFormState();
         }
     }
 
@@ -606,22 +612,24 @@
 
         try
         {
-            // TODO: replace with real service call
             await Task.Delay(800);
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
+            var result = await deleteSubscriptionHandler.HandleAsync(_subscription!.Id);
+            bool success = result.successStatus;
             if (!success)
             {
-                _deleteErrorMessage = "Failed to delete subscription. Please try again.";
+                _deleteErrorMessage = $"Failed to delete subscription. {result.responseMessage}";
                 return;
             }
 
-            toastService.ShowSuccess("Subscription deleted successfully.");
+            toastService.ShowSuccess($"Subscription deleted successfully. {result.responseMessage}");
             navigationManager.NavigateTo("/subscriptions");
         }
         finally
         {
             _isDeleting = false;
+            await GetNewFormState();
         }
     }
 
@@ -632,23 +640,28 @@
 
         try
         {
-            // TODO: replace with real service call
             await Task.Delay(600);
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            var result = await unsubscribeFromEvenetHandler.HandleAsync(_subscription!.Id, _selectedEvent);
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _removeEventErrorMessage = "Failed to remove event. Please try again.";
+                _removeEventErrorMessage = $"Failed to remove event. {result.responseMessage}";
                 return;
             }
-
-            _subscription!.SubscribedEvents.ToList().Remove(_selectedEvent);
-            toastService.ShowSuccess($"{_selectedEvent} removed from subscription.");
+            var currentEvents = _subscription.SubscribedEvents.ToList();
+            currentEvents.Remove(_selectedEvent);
+            _subscription.SubscribedEvents.ToList().Clear();
+            _subscription!.SubscribedEvents = currentEvents.ToList();
+            toastService.ShowSuccess($"{_selectedEvent} removed from subscription. {result.responseMessage}");
             CloseModals();
         }
         finally
         {
             _isRemovingEvent = false;
+            await GetNewFormState();
         }
     }
 
@@ -661,23 +674,37 @@
         {
             // TODO: replace with real service call
             await Task.Delay(600);
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
+            var result = await addEventToSubscriptionHandler.HandleAsync(_subscription!.Id, _addingEventName);
+            bool success = result.successStatus;
             if (!success)
             {
-                toastService.ShowError($"Failed to add {eventName}. Please try again.");
+                toastService.ShowError($"Failed to add {eventName}. {result.responseMessage}");
                 return;
             }
 
-            _subscription!.SubscribedEvents.ToList().Add(eventName);
-            _availableCatalogEvents.Remove(eventName);
-            toastService.ShowSuccess($"{eventName} added to subscription.");
+            var currentEvents = _subscription.SubscribedEvents.ToList();
+            currentEvents.Add(eventName);
+            _subscription!.SubscribedEvents.ToList().Clear();
+            _subscription.SubscribedEvents = currentEvents.ToList();
+            toastService.ShowSuccess($"{eventName} added to subscription. {result.responseMessage}");
+            CloseModals();
         }
         finally
         {
             _isAddingEvent   = false;
             _addingEventName = string.Empty;
+            await GetNewFormState();
         }
+    }
+
+    private async Task GetNewFormState()
+    {
+        await Task.Delay(1000);
+        await InvokeAsync(StateHasChanged);
+        // await LoadSubscriptionAsync();
+        // await LoadRecentDeliveriesAsync();
     }
 
     // -------------------------------------------------------------------------

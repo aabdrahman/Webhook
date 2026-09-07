@@ -30,6 +30,10 @@ public static class ApplicationServiceExtensions
         services.AddScoped<CreateSubscriptionHandler>();
         services.AddScoped<ReactivateSubscriptionHandler>();
 
+        //Subscription Events
+        services.AddScoped<AddEventToSubscriptionHandler>();
+        services.AddScoped<UnsubscribeFromEventHandler>();
+
         //Event Catalogs
         services.AddScoped<GetEventCatalogsHandler>();
 

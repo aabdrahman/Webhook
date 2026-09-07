@@ -237,7 +237,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             WebhookSubscription subscriptionToInsert = createWebhookSubscription.ToEntity();
             subscriptionToInsert.SecretKey = GenerateAndEncryptSignatureService();
 
-            List<WebhookSubscriptionEvent> submittedEventsToMap = subscribedEventsInDatabase.Select(x => new WebhookSubscriptionEvent() { WebhookEventCatalogId = x.Id }).ToList();
+            List<WebhookSubscriptionEvent> submittedEventsToMap = subscribedEventsInDatabase.Select(x => new WebhookSubscriptionEvent() { WebhookEventCatalogId = x.Id, CreatedAt = subscriptionToInsert.CreatedAt }).ToList();
 
             subscriptionToInsert.WebhookEvents = submittedEventsToMap;
             subscriptionToInsert.CreatedByUserId = userId;
@@ -438,7 +438,11 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                 return GenericResponse<WebhookSubscriptionDto>.Failure(null, "Details could not be fetched.", HttpStatusCode.Forbidden);
             }
 
-            var getSubscriptionQuery = _repositoryContext.WebhookSubscriptions.AsNoTracking().Where(x => x.Id == webhookSubscriptionId);
+            var getSubscriptionQuery = _repositoryContext.WebhookSubscriptions.IgnoreQueryFilters()
+                                                .AsNoTracking()
+                                                //.Include(x => x.WebhookEvents.Where(y => y.IsActive))
+                                                .Where(x => x.Id == webhookSubscriptionId);
+                                               
             if(!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
             {
                 getSubscriptionQuery = getSubscriptionQuery.Where(x => x.CreatedByUserId == userId);
