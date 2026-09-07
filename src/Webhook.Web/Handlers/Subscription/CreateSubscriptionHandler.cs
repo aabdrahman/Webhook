@@ -18,7 +18,7 @@ public class CreateSubscriptionHandler
     {
         try
         {
-            var httpResponse = await _httpClient.PostAsJsonAsync("", createWebhookSubscription);
+            var httpResponse = await _httpClient.PostAsJsonAsync("api/WebhookSubscription", createWebhookSubscription);
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<string> responseBody = JsonSerializer.Deserialize<GenericResponse<string>>(responseContent,

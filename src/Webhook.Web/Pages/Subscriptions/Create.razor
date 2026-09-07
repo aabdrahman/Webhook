@@ -12,6 +12,10 @@
 
     <Alert Message="@_errorMessage" />
 
+    <Alert Type="success"
+           Message="@(_successMessage)"
+           Visible="@(!string.IsNullOrEmpty(_successMessage))" />
+
     <EditForm Model="_model"
               OnValidSubmit="HandleCreate"
               class="create-subscription-form">
@@ -36,7 +40,7 @@
                                        @bind-Value="_model.SubscriberName"
                                        class="form-input"
                                        placeholder="e.g. Order Management Service"
-                                       disabled="@_isSubmitting" />
+                                       disabled="@_isSubmitting" autocomplete="off" />
                             <ValidationMessage For="@(() => _model.SubscriberName)"
                                                class="form-error" />
                         </div>
@@ -67,6 +71,20 @@
                                 <code>X-Webhook-Signature</code> header for verification.
                             </span>
                         </div>
+
+                        <div class="form-group" style="margin-top:var(--space-5);">
+                            <label class="form-label"
+                                   for="subcontactemail">
+                                Contact Email
+                            </label>
+                            <InputText id="subcontactemail"
+                                       @bind-Value="_model.ContactEmail"
+                                       class="form-input"
+                                       placeholder="e.g. user@mail.com"
+                                       disabled="@_isSubmitting" autocomplete="off" />
+                            <ValidationMessage For="@(() => _model.ContactEmail)"
+                                               class="form-error" />
+                        </div>
                     </div>
                 </div>
 
@@ -75,13 +93,13 @@
                     <button class="btn btn-ghost"
                             type="button"
                             @onclick="Cancel"
-                            disabled="@_isSubmitting">
+                            disabled="@(_isSubmitting || !string.IsNullOrEmpty(_successMessage))">
                         Cancel
                     </button>
                     <LoadingButton Text="Create Subscription"
                                    LoadingText="Creating..."
                                    IsLoading="@_isSubmitting"
-                                   Type="submit" />
+                                   Type="submit" Disabled="@(!string.IsNullOrEmpty(_successMessage))" />
                 </div>
             </div>
 
@@ -217,11 +235,13 @@
     // -------------------------------------------------------------------------
 
     private CreateWebhookSubscriptionDto _model = new();
+    private string _authUserEmail = string.Empty;
 
     private bool   _isLoadingCatalog = true;
     private bool   _isSubmitting     = false;
     private bool   _eventsError      = false;
     private string _errorMessage     = string.Empty;
+    private string _successMessage = string.Empty;
 
     // Event catalog — all active entries
     private List<EventCatalogItem> _allCatalogEvents  = [];
@@ -261,6 +281,16 @@
         }
         finally
         {
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+            var authUserEmail = authState.User.FindFirstValue(ClaimTypes.Email) ?? null;
+            if (!string.IsNullOrEmpty(authUserEmail))
+            {
+                _model = new CreateWebhookSubscriptionDto()
+                {
+                    ContactEmail = authUserEmail.ToLower()
+                };
+                _authUserEmail = authUserEmail;
+            }
             _isLoadingCatalog = false;
         }
     }
@@ -275,6 +305,8 @@
         _selectedEvents.Add(evt);
         _model.SubscribedEvents.Add(evt.EventCatalogName);
         _eventsError = false;
+        Console.WriteLine($"Current model - {System.Text.Json.JsonSerializer.Serialize(_model)}");
+        StateHasChanged();
     }
 
     private void RemoveEvent(EventCatalogItem evt)
@@ -282,6 +314,8 @@
         _selectedEvents.Remove(evt);
         _availableEvents.Add(evt);
         _model.SubscribedEvents.Remove(evt.EventCatalogName);
+        Console.WriteLine($"Current model - {System.Text.Json.JsonSerializer.Serialize(_model)}");
+        StateHasChanged();
     }
 
     // -------------------------------------------------------------------------
@@ -290,9 +324,11 @@
 
     private async Task HandleCreate()
     {
+        Console.WriteLine($"Model pushed: {System.Text.Json.JsonSerializer.Serialize(_model)}");
         // Manual validation — at least one event required
         if (!_model.SubscribedEvents.Any())
         {
+            Console.WriteLine("No event subscribed...");
             _eventsError = true;
             return;
         }
@@ -303,30 +339,26 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await SubscriptionService.CreateAsync(new CreateWebhookSubscriptionDto
-            // {
-            //     SubscriberName   = _model.SubscriberName,
-            //     CallBackUrl      = _model.CallBackUrl,
-            //     SubscribedEvents = _model.SubscribedEvents,
-            //     SubscribedFields = _model.SubscribedFields
-            // });
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _errorMessage = result.ResponseMessage;
-            //     return;
-            // }
+            // await Task.Delay(8000);
 
-            await Task.Delay(800);
+            // bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
-
+            var result = await createSubscriptionHandler.HandleAsync(_model);
+            bool success = result.successStatus;
             if (!success)
             {
                 _errorMessage = "Failed to create subscription. Please try again.";
+                _isSubmitting = false;
                 return;
             }
+            _successMessage = $"Subscription created successfully. {result.responseMessage}";_isSubmitting = false;
+            _model = new CreateWebhookSubscriptionDto()
+            {
+                ContactEmail = string.IsNullOrEmpty(_authUserEmail) ? null : _authUserEmail
+            };
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(2500);
 
             navigationManager.NavigateTo("/subscriptions");
         }

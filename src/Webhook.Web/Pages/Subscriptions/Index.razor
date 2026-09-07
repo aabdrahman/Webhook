@@ -29,7 +29,7 @@
     <!-- Error alert -->
     <Alert Message="@_errorMessage" />
 
-    @if (!_subscriptions.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    @if (!_subscriptions.Any())
     {
         <EmptyState Title="No subscriptions yet"
                     Description="Create your first subscription to start receiving webhook events."

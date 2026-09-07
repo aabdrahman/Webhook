@@ -144,7 +144,7 @@
                            @bind-Value="_onboardModel.ServiceName"
                            class="form-input"
                            placeholder="e.g. Order Management Service"
-                           disabled="@_isOnboarding" />
+                           disabled="@_isOnboarding" autocomplete="off" />
                 <ValidationMessage For="@(() => _onboardModel.ServiceName)"
                                    class="form-error" />
             </div>
@@ -158,7 +158,7 @@
                            @bind-Value="_onboardModel.ClientId"
                            class="form-input"
                            placeholder="e.g. order-service-prod"
-                           disabled="@_isOnboarding" />
+                           disabled="@_isOnboarding" autocomplete="off" />
                 <ValidationMessage For="@(() => _onboardModel.ClientId)"
                                    class="form-error" />
                 <span class="form-help">
