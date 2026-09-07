@@ -25,6 +25,23 @@
         </Authorized>
     </AuthorizeView>
     
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body">
+            <div style="display:flex;align-items:center;
+                justify-content:space-between;">
+                <span class="text-sm text-muted">
+                    @(_showInactive
+                        ? "Showing all subscriptions including inactive"
+                        : "Showing active subscriptions only")
+                </span>
+                <button type="button"
+                        class="toggle-btn @(_showInactive ? "toggle-btn-on" : "")"
+                        @onclick="HandleToggleInactive">
+                    <span class="toggle-btn-thumb"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Error alert -->
     <Alert Message="@_errorMessage" />
@@ -226,6 +243,7 @@
 
     private bool   _isLoading    = true;
     private string _errorMessage = string.Empty;
+    private bool _showInactive = false;
 
     private List<WebhookSubscriptionDto> _subscriptions = [];
 
@@ -347,31 +365,24 @@
 
         try
         {
-            // TODO: replace with real service call
-            // GenericResponse<string> result;
-            // if (_selectedSubscription.IsActive)
-            //     result = await SubscriptionService.DeactivateAsync(_selectedSubscription.Id);
-            // else
-            //     result = await SubscriptionService.ActivateAsync(_selectedSubscription.Id);
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _toggleErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
+            //await Task.Delay(8000);
+
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             await Task.Delay(800);
-
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = _selectedSubscription.IsActive ? await deleteSubscriptionHandler.HandleAsync(_selectedSubscription.Id) : await reactivateSubscriptionHandler.HandleAsync(_selectedSubscription.Id);
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _toggleErrorMessage = "Operation failed. Please try again.";
+                _toggleErrorMessage = $"Operation failed. {result.responseMessage}";
+                toastService.ShowError(_toggleErrorMessage, _selectedSubscription.IsActive ? "Subscription Deactivation Failed." : "Subscription Reactivattion Failed.");
                 return;
             }
 
-            // Update local state
-            _selectedSubscription.IsActive = !_selectedSubscription.IsActive;
+            await LoadSubscriptionsAsync();
+            _subscriptions.Clear();
+            toastService.ShowSuccess($"Operation Successful. {result.responseMessage}", _selectedSubscription.IsActive ? "Subscription Deactivation Successful." : "Subscription Reactivattion Successful.");
             CloseModals();
         }
         finally
@@ -397,17 +408,24 @@
             //     return;
             // }
 
-            await Task.Delay(800);
+            await Task.Delay(8000);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            await Task.Delay(800);
+            var result = await deleteSubscriptionHandler.HandleAsync(_selectedSubscription.Id);
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _deleteErrorMessage = "Failed to delete subscription. Please try again.";
+                _deleteErrorMessage = $"Failed to delete subscription. {result.responseMessage}";
+                toastService.ShowError(_deleteErrorMessage, "Subscription Deletion Operation Failed.");
                 return;
             }
 
-            _subscriptions.Remove(_selectedSubscription);
+            // _subscriptions.Remove(_selectedSubscription);
+            toastService.ShowSuccess($"{result.responseMessage}", "Subscription Deletion Successful.");
+            _subscriptions.Clear();
+            await LoadSubscriptionsAsync();
             CloseModals();
         }
         finally
@@ -415,4 +433,13 @@
             _isDeleting = false;
         }
     }
+
+    private async Task HandleToggleInactive()
+    {
+        _showInactive = !_showInactive;
+        await LoadSubscriptionsAsync();
+    }
+
+    private async Task OnToggleChanged()
+        => await LoadSubscriptionsAsync();
 }

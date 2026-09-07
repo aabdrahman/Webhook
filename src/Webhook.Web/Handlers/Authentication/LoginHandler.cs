@@ -38,7 +38,7 @@ public class LoginHandler
                 await _localStorageService.RemoveItemAsync(ApplicationClientHelper.OtpRequestedUser);
                 if(rememberMe)
                 {
-                    await _localStorageService.SetItemAsync(ApplicationClientHelper.RememberMeKey, true);
+                    await _localStorageService.SetItemAsync(ApplicationClientHelper.RememberMeKey, loginUser.UserNameOrEmailAddress);
                 }
                 else
                 {

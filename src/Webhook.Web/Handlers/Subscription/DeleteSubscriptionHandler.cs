@@ -16,7 +16,7 @@ public class DeleteSubscriptionHandler
     {
         try
         {
-            var httpResponse = await _httpClient.DeleteAsync($"pi/WebhookSubscription/{subscriptionId}");
+            var httpResponse = await _httpClient.DeleteAsync($"api/WebhookSubscription/{subscriptionId}");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<string> responseBody = JsonSerializer.Deserialize<GenericResponse<string>>(responseContent,

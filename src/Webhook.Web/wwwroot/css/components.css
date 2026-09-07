@@ -719,9 +719,9 @@
     font-size: var(--text-sm);
 }
 
-    .toast.toast-exit {
-        animation: toastOut 0.2s ease forwards;
-    }
+.toast.toast-exit {
+    animation: toastOut 0.2s ease forwards;
+}
 
 @keyframes toastIn {
     from {
@@ -774,9 +774,9 @@
     cursor: pointer;
 }
 
-    .toast-close:hover {
-        color: var(--color-text-primary);
-    }
+.toast-close:hover {
+    color: var(--color-text-primary);
+}
 
 .toast-success .toast-icon {
     color: var(--color-success);
@@ -1284,4 +1284,39 @@
     align-items: center;
     gap: var(--space-5);
     animation: fadeInDown 0.2s ease both;
+}
+
+/* Toggle button */
+.toggle-btn {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-3);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: background var(--transition-base), border-color var(--transition-base);
+    flex-shrink: 0;
+}
+
+.toggle-btn-on {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.toggle-btn-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--color-text-primary);
+    transition: transform var(--transition-base);
+    display: block;
+}
+
+.toggle-btn-on .toggle-btn-thumb {
+    transform: translateX(20px);
+    background: white;
 }
