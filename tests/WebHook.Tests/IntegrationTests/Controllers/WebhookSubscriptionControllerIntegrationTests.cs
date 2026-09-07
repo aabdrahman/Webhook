@@ -106,7 +106,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
             SubscriberName = "Test Subscriber",
             SubscribedEvents = events ?? ["OrderCreated", "UserCreated"],
             SubscribedFields = ["name", "email"],
-            ContactEmail = contactEmail ?? string.Empty
+            ContactEmail = contactEmail
         };
 
     // =========================================================================

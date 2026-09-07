@@ -21,6 +21,6 @@ public record class CreateWebhookSubscriptionDto
     [CallBackUrlValidator]
     public string CallBackUrl { get; set; }
     [EmailAddress]
-    [Required(AllowEmptyStrings = true)]
-    public string? ContactEmail { get; set; } = string.Empty;
+    //[Required(AllowEmptyStrings = true,)]
+    public string? ContactEmail { get; set; } = null;
 }
