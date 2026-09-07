@@ -160,7 +160,7 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "User,USER")]
     [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Create([FromBody] CreateWebhookSubscriptionDto createWebhookSubscription)
     {

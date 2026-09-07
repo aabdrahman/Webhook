@@ -13,14 +13,18 @@
                 BadgeVariant="custom"
                 ActionText="New Subscription"
                 OnAction="NavigateToCreate" /> *@
-
-    <PageHeader Title="Subscriptions"
-                Description="Manage your webhook subscriptions."
-                BadgeValue="@_subscriptions.Count.ToString()"
-                BadgeType="custom"
-                BadgeCssClass="badge-inactive"
-                ActionText="New Subscription"
-                OnAction="NavigateToCreate" />
+    <AuthorizeView Roles="USER,User">
+        <Authorized>
+            <PageHeader Title="Subscriptions"
+                        Description="Manage your webhook subscriptions."
+                        BadgeValue="@_subscriptions.Count.ToString()"
+                        BadgeType="custom"
+                        BadgeCssClass="badge-inactive"
+                        ActionText="New Subscription"
+                        OnAction="NavigateToCreate" />
+        </Authorized>
+    </AuthorizeView>
+    
 
     <!-- Error alert -->
     <Alert Message="@_errorMessage" />

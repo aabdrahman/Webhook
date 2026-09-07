@@ -26,6 +26,9 @@ public static class ApplicationServiceExtensions
         //Subscriptions
         services.AddScoped<GetSubscriptionsHandler>();
         services.AddScoped<GetSubscriptionDetailsHandler>();
+        services.AddScoped<DeleteSubscriptionHandler>();
+        services.AddScoped<CreateSubscriptionHandler>();
+        services.AddScoped<ReactivateSubscriptionHandler>();
 
         //Event Catalogs
         services.AddScoped<GetEventCatalogsHandler>();
