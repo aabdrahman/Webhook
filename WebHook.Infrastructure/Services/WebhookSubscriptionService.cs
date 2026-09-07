@@ -357,6 +357,9 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A cancellation token that can be used to cancel the asynchronous
     /// operation before it completes.
     /// </param>
+    /// <param name="includeDeactivated">
+    /// This flag specifies if deactivated subscriptions should be spooled.
+    /// </param>
     /// <returns>
     /// A <see cref="GenericResponse{T}"/> of
     /// <see cref="IReadOnlyList{WebhookSubscriptionDto}"/> where:
@@ -366,7 +369,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
-    public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetAllWebhookSubscriptionAsync(CancellationToken ct = default)
+    public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetAllWebhookSubscriptionAsync(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllWebhookSubscriptionAsync));
 
@@ -374,7 +377,13 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         {
             _logger.Information("Fetching all webhook subscriptions....");
 
-            IReadOnlyList<WebhookSubscriptionDto> subscriptions = await _repositoryContext.WebhookSubscriptions.AsNoTracking().Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
+            var fetchSubscriptionQuery = _repositoryContext.WebhookSubscriptions.AsNoTracking();
+            if(includeDeactivated)
+            {
+                fetchSubscriptionQuery = fetchSubscriptionQuery.IgnoreQueryFilters();
+            }
+
+            IReadOnlyList<WebhookSubscriptionDto> subscriptions = await fetchSubscriptionQuery.Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
 
             _logger.Information("Webhook Subscriptions fetched successfully - {0}", subscriptions);
 
@@ -458,7 +467,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// <summary>
     /// Retrieves all the webhook subscriptions for the authenticated user
     /// </summary>
-    /// <param name="ct"></param>
+    /// <param name="ct">Cancellation token</param>
+    /// <param name="includeDeactivated">This is a flag that specifies if deactivated subscriptions should be fetched.</param>
     /// <returns>
     /// A <see cref="GenericResponse{T}"/> of <see cref="WebhookSubscriptionDto"/> where:
     /// <list type="bullet">
@@ -467,7 +477,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
-    public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetUserSubscriptionsAsync(CancellationToken ct = default)
+    public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetUserSubscriptionsAsync(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetUserSubscriptionsAsync));
         try
@@ -480,7 +490,13 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                 return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "Invalid User details.", HttpStatusCode.Forbidden);
             }
 
-            List<WebhookSubscriptionDto> userSubscriptions = await _repositoryContext.WebhookSubscriptions.Where(x => x.CreatedByUserId!.Value == userId).Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
+            var fetchSubscriptionQuery = _repositoryContext.WebhookSubscriptions.AsNoTracking();
+            if(includeDeactivated)
+            {
+                fetchSubscriptionQuery = fetchSubscriptionQuery.IgnoreQueryFilters();
+            }
+
+            List<WebhookSubscriptionDto> userSubscriptions = await fetchSubscriptionQuery.Where(x => x.CreatedByUserId!.Value == userId).Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
 
             _logger.Information("Subscriptions fetched successfully for user - {0} - {1}", userId, userSubscriptions);
 

@@ -14,11 +14,11 @@ public class GetSubscriptionsHandler
         _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameSecure);
     }
 
-    public async Task<(ApiResponseDto response, IReadOnlyList<WebhookSubscriptionDto> subscriptions)> HandleAsync(bool isAdmin = false)
+    public async Task<(ApiResponseDto response, IReadOnlyList<WebhookSubscriptionDto> subscriptions)> HandleAsync(bool isAdmin = false, bool includeDeactivated = false)
     {
         try
         {
-            var httpResponse = await _httpClient.GetAsync(isAdmin ? "api/WebhookSubscription" : "api/WebhookSubscription/get-user-subscriptions");
+            var httpResponse = await _httpClient.GetAsync(isAdmin ? $"api/WebhookSubscription?includeDeactivated={includeDeactivated}" : $"api/WebhookSubscription/get-user-subscriptions?includeDeactivated={includeDeactivated}");
 
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 

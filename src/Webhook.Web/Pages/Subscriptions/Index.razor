@@ -27,9 +27,8 @@
     
     <div class="card" style="margin-bottom:var(--space-5);">
         <div class="card-body">
-            <div style="display:flex;align-items:center;
-                justify-content:space-between;">
-                <span class="text-sm text-muted">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span class="text-sm text-secondary">
                     @(_showInactive
                         ? "Showing all subscriptions including inactive"
                         : "Showing active subscriptions only")
@@ -281,7 +280,7 @@
             var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
 
             bool isAdmin = authState.User.IsInRole("Admin") || authState.User.IsInRole("ADMIN");
-            var result = await getSubscriptionsHandler.HandleAsync(isAdmin);
+            var result = await getSubscriptionsHandler.HandleAsync(isAdmin, includeDeactivated: _showInactive);
 
             if (!result.response.successStatus)
             {
@@ -380,8 +379,9 @@
                 return;
             }
 
-            await LoadSubscriptionsAsync();
             _subscriptions.Clear();
+            await LoadSubscriptionsAsync();
+            
             toastService.ShowSuccess($"Operation Successful. {result.responseMessage}", _selectedSubscription.IsActive ? "Subscription Deactivation Successful." : "Subscription Reactivattion Successful.");
             CloseModals();
         }

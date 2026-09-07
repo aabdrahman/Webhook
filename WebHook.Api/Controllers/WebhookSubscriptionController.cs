@@ -40,6 +40,13 @@ public class WebhookSubscriptionController : ControllerBase
     /// <summary>
     /// Retrieves all webhook subscriptions
     /// </summary>
+    /// <param name="includeDeactivated">
+    /// This is a field provided in the query paramter that specifies if the deactivated subscriptions should be included
+    /// Deafult value is false.
+    /// </param>
+    /// <param name="ct">
+    /// This is the cancellation token that specifies if an operation is cancelled.
+    /// </param>
     /// <remarks>
     /// This endpoint returns a list of all subscribed webhooks.
     /// It is to be used by admins to discover all available webhook subscriptions.
@@ -62,12 +69,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpGet]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery]bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetAll));
         try
         {
-            var result = await _webhookSubscriptionService.GetAllWebhookSubscriptionAsync(new CancellationToken());
+            var result = await _webhookSubscriptionService.GetAllWebhookSubscriptionAsync(includeDeactivated, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
@@ -86,6 +93,9 @@ public class WebhookSubscriptionController : ControllerBase
     /// </summary>
     /// <param name="webhookSubscriptionId">
     /// The unique identifier of the webhook subscription with its key details.</param>
+    /// <param name="ct">
+    /// The cancellation token taht specifies if an operation has been cancelled.
+    /// </param>
     /// <remarks>
     /// This endpoint returns details of a specific webhook subsription.
     /// Supply a valid Webhook Subscription Id in the route parameter.
@@ -108,12 +118,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpGet("{webhookSubscriptionId:guid}")]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetById(Guid webhookSubscriptionId)
+    public async Task<IActionResult> GetById(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetById));
         try
         {
-            var result = await _webhookSubscriptionService.GetWebhookSubscriptionByIdAsync(webhookSubscriptionId, new CancellationToken());
+            var result = await _webhookSubscriptionService.GetWebhookSubscriptionByIdAsync(webhookSubscriptionId, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
@@ -131,6 +141,9 @@ public class WebhookSubscriptionController : ControllerBase
     /// </summary>
     /// <param name="createWebhookSubscription">
     /// The details of the webhook subscription to create.
+    /// </param>
+    /// <param name="ct">
+    /// The cancellation token taht specifies if an operation has been cancelled.
     /// </param>
     /// <remarks>
     /// This endpoint creates a new webhook subscription.
@@ -163,12 +176,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpPost]
     [Authorize(Roles = "User,USER")]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> Create([FromBody] CreateWebhookSubscriptionDto createWebhookSubscription)
+    public async Task<IActionResult> Create([FromBody] CreateWebhookSubscriptionDto createWebhookSubscription, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(Create));
         try
         {
-            var result = await _webhookSubscriptionService.CreateWebhookSubscriptionAsync(createWebhookSubscription, new CancellationToken());
+            var result = await _webhookSubscriptionService.CreateWebhookSubscriptionAsync(createWebhookSubscription, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
@@ -186,6 +199,9 @@ public class WebhookSubscriptionController : ControllerBase
     /// </summary>
     /// <param name="webhookSubscriptionId">
     /// The unique identifier of the webhook subscription.
+    /// </param>
+    /// <param name="ct">
+    /// The cancellation token taht specifies if an operation has been cancelled.
     /// </param>
     /// <remarks>
     /// This endpoint allows administrators to change the activation status of a webhook from deleted to undeleted.
@@ -210,12 +226,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpPut("{webhookSubscriptionId:guid}")]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> ActivateSubscription(Guid webhookSubscriptionId)
+    public async Task<IActionResult> ActivateSubscription(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(ActivateSubscription));
         try
         {
-            var result = await _webhookSubscriptionService.ActivateWebhookSubscriptionAsync(webhookSubscriptionId, new CancellationToken());
+            var result = await _webhookSubscriptionService.ActivateWebhookSubscriptionAsync(webhookSubscriptionId, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
@@ -233,6 +249,9 @@ public class WebhookSubscriptionController : ControllerBase
     /// </summary>
     /// <param name="webhookSubscriptionId">
     /// The unique identifier of the webhook subscription.
+    /// </param>
+    /// <param name="ct">
+    /// The cancellation token taht specifies if an operation has been cancelled.
     /// </param>
     /// <remarks>
     /// The endpoint allows teh subscriber or administrators to deactivate a subscription to prevent the system 
@@ -257,12 +276,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpDelete("{webhookSubscriptionId:guid}")]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> Delete(Guid webhookSubscriptionId)
+    public async Task<IActionResult> Delete(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(Delete));
         try
         {
-            var result = await _webhookSubscriptionService.DeleteWebhookSubscriptionAsync(webhookSubscriptionId, new CancellationToken());
+            var result = await _webhookSubscriptionService.DeleteWebhookSubscriptionAsync(webhookSubscriptionId, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
@@ -286,6 +305,9 @@ public class WebhookSubscriptionController : ControllerBase
     /// Only subscriptions owned by the requesting user are returned — this endpoint
     /// does not expose subscriptions belonging to other users.
     /// </remarks>
+    /// <param name="includeDeactivated">
+    /// This specifies if the deactivated subsciptions can be included.
+    /// </param>
     /// <param name="ct">
     /// A cancellation token that can be used to cancel the operation before it completes.
     /// </param>
@@ -308,12 +330,12 @@ public class WebhookSubscriptionController : ControllerBase
     [HttpGet("get-user-subscriptions")]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetUserSubscriptions(CancellationToken ct)
+    public async Task<IActionResult> GetUserSubscriptions([FromQuery]bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetUserSubscriptions));
         try
         {
-            var result = await _webhookSubscriptionService.GetUserSubscriptionsAsync(ct);
+            var result = await _webhookSubscriptionService.GetUserSubscriptionsAsync(includeDeactivated, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
