@@ -105,7 +105,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// </returns>
     public async Task<GenericResponse<string>> ActivateWebhookSubscriptionAsync(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
-        _logger = Log.ForContext(_methodName, nameof(ActivateWebhookSubscriptionAsync));
+        _logger = _logger.ForContext(_methodName, nameof(ActivateWebhookSubscriptionAsync));
 
         try
         {
@@ -197,7 +197,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// </returns>
     public async Task<GenericResponse<string>> CreateWebhookSubscriptionAsync(CreateWebhookSubscriptionDto createWebhookSubscription, CancellationToken ct = default)
     {
-        _logger = Log.ForContext(_methodName, nameof(CreateWebhookSubscriptionAsync));
+        _logger = _logger.ForContext(_methodName, nameof(CreateWebhookSubscriptionAsync));
 
         try
         {
@@ -297,7 +297,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// </returns>
     public async Task<GenericResponse<string>> DeleteWebhookSubscriptionAsync(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
-        _logger = Log.ForContext(_methodName, nameof(DeleteWebhookSubscriptionAsync));
+        _logger = _logger.ForContext(_methodName, nameof(DeleteWebhookSubscriptionAsync));
 
         try
         {
@@ -368,7 +368,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// </returns>
     public async Task<GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>> GetAllWebhookSubscriptionAsync(CancellationToken ct = default)
     {
-        _logger = Log.ForContext(_methodName, nameof(GetAllWebhookSubscriptionAsync));
+        _logger = _logger.ForContext(_methodName, nameof(GetAllWebhookSubscriptionAsync));
 
         try
         {
@@ -417,13 +417,24 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// </returns>
     public async Task<GenericResponse<WebhookSubscriptionDto>> GetWebhookSubscriptionByIdAsync(Guid webhookSubscriptionId, CancellationToken ct = default)
     {
-        _logger = Log.ForContext(_methodName, nameof(GetWebhookSubscriptionByIdAsync));
+        _logger = _logger.ForContext(_methodName, nameof(GetWebhookSubscriptionByIdAsync));
 
         try
         {
             _logger.Information("Fetching web hook subscription for id - {0}", webhookSubscriptionId);
 
-            WebhookSubscriptionDto? webhookSubscription = await _repositoryContext.WebhookSubscriptions.AsNoTracking().Select(WebhookSubscriptionMapper.ToDtoExpression()).FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
+            if (!Guid.TryParse(_authenticatedUserDetails.userId, out Guid userId))
+            {
+                _logger.Warning("Authenticated user details could not be parsed -- {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<WebhookSubscriptionDto>.Failure(null, "Details could not be fetched.", HttpStatusCode.Forbidden);
+            }
+
+            var getSubscriptionQuery = _repositoryContext.WebhookSubscriptions.AsNoTracking().Where(x => x.Id == webhookSubscriptionId);
+            if(!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                getSubscriptionQuery = getSubscriptionQuery.Where(x => x.CreatedByUserId == userId);
+            }
+            WebhookSubscriptionDto? webhookSubscription = await getSubscriptionQuery.Select(WebhookSubscriptionMapper.ToDtoExpression()).FirstOrDefaultAsync(ct);
 
             if (webhookSubscription is null)
             {

@@ -179,14 +179,21 @@ public class WebhookSubscriptionTests : IDisposable
     }
 
     [Fact]
-    public async Task GetWebhookSubscriptionByIdAsync_ExistingId_Returns200OK()
+    public async Task GetWebhookSubscriptionByIdAsync_ExistingId_User_CreatedByUser_Returns200OK()
     {
         //Arrange
+        using var requestCtx = new RepositoryContext(_dbContextOptions);
+        (Guid Id, string Email, string UserName) seededUser = await TestDataSeeder.SeedUserAsync(requestCtx);
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(seededUser.Id.ToString("N"));
+        _authenticatedUserDetailsMock.Setup(x => x.assignedRole).Returns("User");
         var sut = GetSut();
         var existingEventCatalogs = await sut.ctx.WebHookEventCatalogs.ToListAsync();
         Guid entityId = Guid.NewGuid();
         var webhookSubscriptionToInsert = BuildEntity("user 1", existingEventCatalogs.OrderBy(x => x.Id).Take(Random.Shared.Next(1, 4)).Select(x => x.Id).ToList());
         webhookSubscriptionToInsert.Id = entityId;
+        webhookSubscriptionToInsert.CreatedByUserId = seededUser.Id;
+        webhookSubscriptionToInsert.ContactEmail = seededUser.Email;
         await sut.ctx.WebhookSubscriptions.AddAsync(webhookSubscriptionToInsert);
         await sut.ctx.SaveChangesAsync();
 
@@ -201,9 +208,67 @@ public class WebhookSubscriptionTests : IDisposable
     }
 
     [Fact]
+    public async Task GetWebhookSubscriptionByIdAsync_ExistingId_Admin_Returns200OK()
+    {
+        using var requestCtx = new RepositoryContext(_dbContextOptions);
+        (Guid Id, string Email, string UserName) seededUser = await TestDataSeeder.SeedUserAsync(requestCtx);
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
+        _authenticatedUserDetailsMock.Setup(x => x.assignedRole).Returns("Admin");
+        var sut = GetSut();
+        var existingEventCatalogs = await sut.ctx.WebHookEventCatalogs.ToListAsync();
+        Guid entityId = Guid.NewGuid();
+        var webhookSubscriptionToInsert = BuildEntity("user 1", existingEventCatalogs.OrderBy(x => x.Id).Take(Random.Shared.Next(1, 4)).Select(x => x.Id).ToList());
+        webhookSubscriptionToInsert.Id = entityId;
+        webhookSubscriptionToInsert.ContactEmail = seededUser.Email;
+        webhookSubscriptionToInsert.CreatedByUserId = seededUser.Id;
+        await sut.ctx.WebhookSubscriptions.AddAsync(webhookSubscriptionToInsert);
+        await sut.ctx.SaveChangesAsync();
+
+        //Act
+        var result = await sut.svc.GetWebhookSubscriptionByIdAsync(entityId);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+    }
+
+    [Fact]
+    public async Task GetWebhookSubscriptionByIdAsync_ExistingId_User_NotCreatedByUser_Returns404NotFound()
+    {
+        using var requestCtx = new RepositoryContext(_dbContextOptions);
+        (Guid Id, string Email, string UserName) seededUser = await TestDataSeeder.SeedUserAsync(requestCtx);
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
+        _authenticatedUserDetailsMock.Setup(x => x.assignedRole).Returns("User");
+        var sut = GetSut();
+        var existingEventCatalogs = await sut.ctx.WebHookEventCatalogs.ToListAsync();
+        Guid entityId = Guid.NewGuid();
+        var webhookSubscriptionToInsert = BuildEntity("user 1", existingEventCatalogs.OrderBy(x => x.Id).Take(Random.Shared.Next(1, 4)).Select(x => x.Id).ToList());
+        webhookSubscriptionToInsert.Id = entityId;
+        webhookSubscriptionToInsert.ContactEmail = seededUser.Email;
+        webhookSubscriptionToInsert.CreatedByUserId = seededUser.Id;
+        await sut.ctx.WebhookSubscriptions.AddAsync(webhookSubscriptionToInsert);
+        await sut.ctx.SaveChangesAsync();
+
+        //Act
+        var result = await sut.svc.GetWebhookSubscriptionByIdAsync(entityId);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+    }
+
+    [Fact]
     public async Task GetWebhookSubscriptionByIdAsync_NonExistingId_Returns404NotFound()
     {
         //Arrange
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
+        _authenticatedUserDetailsMock.Setup(x => x.assignedRole).Returns("Admin");
         var sut = GetSut();
 
 
@@ -221,7 +286,9 @@ public class WebhookSubscriptionTests : IDisposable
     public async Task GetWebhookSubscriptionByIdAsync_CancellationRequested_ThrowsException_Returns500InternalServerError()
     {
         //Arrange
-        var sut = GetSut();
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
+        _authenticatedUserDetailsMock.Setup(x => x.assignedRole).Returns("Admin");
+        var sut = GetSut(authenticatedUserDetails: _authenticatedUserDetailsMock.Object);
         var cts = new CancellationTokenSource();
         cts.Cancel();
 

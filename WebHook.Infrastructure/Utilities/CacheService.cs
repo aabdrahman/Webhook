@@ -19,7 +19,7 @@ public sealed class CacheService : ICacheService
 
     public async Task<T?> GetItemsFromCacheAsync<T>(string cacheKey)
     {
-        _logger.ForContext("MethodName", nameof(GetItemsFromCacheAsync));
+        _logger = _logger.ForContext("MethodName", nameof(GetItemsFromCacheAsync));
         try
         {
             _logger.Information("Getting cached item for key - {0}", cacheKey);

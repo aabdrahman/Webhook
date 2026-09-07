@@ -82,6 +82,7 @@ public class WebhookSubscriptionController : ControllerBase
 
     /// <summary>
     /// Retrieves a webhook subsription by its unique identifier.
+    /// Spools based on authenticated user.
     /// </summary>
     /// <param name="webhookSubscriptionId">
     /// The unique identifier of the webhook subscription with its key details.</param>
@@ -105,7 +106,7 @@ public class WebhookSubscriptionController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<WebhookSubscriptionDto>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [HttpGet("{webhookSubscriptionId:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> GetById(Guid webhookSubscriptionId)
     {
