@@ -111,7 +111,19 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         {
             _logger.Information("Activate deleted webhook subscription - {0}", webhookSubscriptionId);
 
-            WebhookSubscription? webhookSubscriptionToActivate = await _repositoryContext.WebhookSubscriptions.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
+            if(!Guid.TryParse(_authenticatedUserDetails.userId, out Guid userId) || userId == default(Guid))
+            {
+                _logger.Warning("Authenticated user details could not be parsed - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid User details.", HttpStatusCode.Forbidden);
+            }
+
+            var getSubscriptionQueryable = _repositoryContext.WebhookSubscriptions.IgnoreQueryFilters();
+
+            getSubscriptionQueryable = _authenticatedUserDetails.assignedRole.Equals("User", StringComparison.OrdinalIgnoreCase) ?
+                getSubscriptionQueryable.Where(x => x.CreatedByUserId == userId) :
+                getSubscriptionQueryable;
+
+            WebhookSubscription? webhookSubscriptionToActivate = await getSubscriptionQueryable.FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
 
             if (webhookSubscriptionToActivate is null)
             {
@@ -229,6 +241,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
 
             subscriptionToInsert.WebhookEvents = submittedEventsToMap;
             subscriptionToInsert.CreatedByUserId = userId;
+            subscriptionToInsert.ContactEmail = string.IsNullOrEmpty(createWebhookSubscription.ContactEmail) ? _authenticatedUserDetails.emailAddress : createWebhookSubscription.ContactEmail;
 
             await _repositoryContext.WebhookSubscriptions.AddAsync(subscriptionToInsert, ct);
 
@@ -290,7 +303,23 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
         {
             _logger.Information("Deleting webhook subscription - {0}", webhookSubscriptionId);
 
-            WebhookSubscription? webhookSubscriptionToDelete = await _repositoryContext.WebhookSubscriptions.Include(x => x.WebhookEvents).FirstOrDefaultAsync(x => x.Id == webhookSubscriptionId, ct);
+            //Refactoring for security purposes
+            var getSubscriptionQuery = _repositoryContext.WebhookSubscriptions.Include(x => x.WebhookEvents).Where(x => x.Id == webhookSubscriptionId);
+
+            bool isParsableUserId = Guid.TryParse(_authenticatedUserDetails.userId, out Guid userId);
+
+            if (!isParsableUserId)
+            {
+                _logger.Warning("User id could not be parsed from authenticated details - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<string>.Failure("Operation Failed.", "Invalid User details.", HttpStatusCode.Forbidden);
+            }
+
+            //add another where clause to validate that filter fourtehr by user id, this ensures that a user cannot sppool for another user.
+            getSubscriptionQuery = _authenticatedUserDetails.assignedRole.Contains("User", StringComparison.OrdinalIgnoreCase) ?
+                getSubscriptionQuery.Where(x => x.CreatedByUserId == userId) :
+                getSubscriptionQuery;
+
+            WebhookSubscription? webhookSubscriptionToDelete = await getSubscriptionQuery.FirstOrDefaultAsync(ct);
 
             if (webhookSubscriptionToDelete is null)
             {

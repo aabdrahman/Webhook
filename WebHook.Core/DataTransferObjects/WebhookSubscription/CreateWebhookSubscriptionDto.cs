@@ -20,4 +20,7 @@ public record class CreateWebhookSubscriptionDto
     [Display(Name = "Call Back Url")]
     [CallBackUrlValidator]
     public string CallBackUrl { get; set; }
+    [EmailAddress]
+    [Required(AllowEmptyStrings = true)]
+    public string? ContactEmail { get; set; } = string.Empty;
 }

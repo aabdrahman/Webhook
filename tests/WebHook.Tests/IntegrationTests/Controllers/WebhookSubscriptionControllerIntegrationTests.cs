@@ -100,12 +100,13 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
         };
 
     private static CreateWebhookSubscriptionDto BuildCreateDto(
-        List<string>? events = null) => new()
+        List<string>? events = null, string contactEmail = null) => new()
         {
             CallBackUrl = "https://example.com/",
             SubscriberName = "Test Subscriber",
             SubscribedEvents = events ?? ["OrderCreated", "UserCreated"],
-            SubscribedFields = ["name", "email"]
+            SubscribedFields = ["name", "email"],
+            ContactEmail = contactEmail ?? string.Empty
         };
 
     // =========================================================================
