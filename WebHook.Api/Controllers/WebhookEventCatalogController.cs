@@ -58,12 +58,12 @@ public class WebhookEventCatalogController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAllEventCatalog()
+    public async Task<IActionResult> GetAllEventCatalog(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllEventCatalog));
         try
         {
-            var result = await _webhookEventCatalogService.GetAllEventCatalogAsync(new CancellationToken());
+            var result = await _webhookEventCatalogService.GetAllEventCatalogAsync(includeDeactivated, ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }

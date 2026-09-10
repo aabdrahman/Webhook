@@ -126,7 +126,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
         _client.DefaultRequestHeaders.Authorization = null;
 
         _factory.EventCatalogServiceMock
-            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<EventCatalogDto>>
                 .Failure(null, "No event catalog found.", HttpStatusCode.NotFound));
 
@@ -143,7 +143,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
     {
         // Arrange
         _factory.EventCatalogServiceMock
-            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<EventCatalogDto>>
                 .Failure(null, "No event catalog found.", HttpStatusCode.NotFound));
 
@@ -172,7 +172,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
         };
 
         _factory.EventCatalogServiceMock
-            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<EventCatalogDto>>
                 .Success(catalogs, "Event catalogs fetched successfully.", HttpStatusCode.OK));
 
@@ -195,7 +195,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
     {
         // Arrange
         _factory.EventCatalogServiceMock
-            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
@@ -210,7 +210,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
     {
         // Arrange
         _factory.EventCatalogServiceMock
-            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<EventCatalogDto>>
                 .Failure(null, "Not found.", HttpStatusCode.NotFound));
 
@@ -219,7 +219,7 @@ public sealed class WebhookEventCatalogControllerIntegrationTests
 
         // Assert
         _factory.EventCatalogServiceMock.Verify(
-            s => s.GetAllEventCatalogAsync(It.IsAny<CancellationToken>()),
+            s => s.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

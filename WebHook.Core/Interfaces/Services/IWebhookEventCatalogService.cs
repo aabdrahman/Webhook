@@ -13,5 +13,5 @@ public interface IWebhookEventCatalogService
     Task<GenericResponse<string>> CreateNewEventCatalogAsync(CreateEventCatalogDto createEventCatalogDto, CancellationToken ct = default);
     Task<GenericResponse<string>> EventCatalogActivationAsync(Guid EventCatalogId, bool isDeactivate = true, CancellationToken ct = default);
     Task<GenericResponse<EventCatalogDto>> GetEventCatalogByIdAsync(Guid EventCatalogId, CancellationToken ct = default);
-    Task<GenericResponse<IReadOnlyList<EventCatalogDto>>> GetAllEventCatalogAsync(CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<EventCatalogDto>>> GetAllEventCatalogAsync(bool includeDeactivated = false, CancellationToken ct = default);
 }

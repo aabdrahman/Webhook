@@ -433,7 +433,7 @@
             await Task.Delay(700);
 
             // bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
-            var result = await getEventCatalogsHandler.HandleAsync();
+            var result = await getEventCatalogsHandler.HandleAsync(includeDeactivated: _showInactive);
             bool success = result.response.successStatus;
 
             if (!success)

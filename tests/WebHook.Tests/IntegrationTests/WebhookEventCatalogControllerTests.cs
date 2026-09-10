@@ -63,7 +63,7 @@ public class WebhookEventCatalogControllerTests
     public async Task WebhookEventCatalogController_GetAllEventCatalog_ThrowsExceptionReturns500()
     {
         //Arange
-        _webhookEventCatalogService.Setup(wb => wb.GetAllEventCatalogAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException());
+        _webhookEventCatalogService.Setup(wb => wb.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException());
 
         //Act
         IActionResult result = await _webhookEventCatalogController.GetAllEventCatalog();
@@ -85,7 +85,7 @@ public class WebhookEventCatalogControllerTests
             GetSampleWebhookEventCatalogDto()
         };
         var expectedResponse = GenericResponse<IReadOnlyList<EventCatalogDto>>.Success(eventCatalogResponse, "Events Fetched Successfully.", HttpStatusCode.OK);
-        _webhookEventCatalogService.Setup(wb => wb.GetAllEventCatalogAsync(It.IsAny<CancellationToken>())).ReturnsAsync(expectedResponse);
+        _webhookEventCatalogService.Setup(wb => wb.GetAllEventCatalogAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(expectedResponse);
 
         //Act
         var result = await _webhookEventCatalogController.GetAllEventCatalog();

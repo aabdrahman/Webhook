@@ -14,11 +14,11 @@ public class GetEventCatalogsHandler
         _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameSecure);
     }
 
-    public async Task<(ApiResponseDto response, IReadOnlyList<EventCatalogDto> catalogs)> HandleAsync()
+    public async Task<(ApiResponseDto response, IReadOnlyList<EventCatalogDto> catalogs)> HandleAsync(bool includeDeactivated = false)
     {
         try
         {
-            var httpResponse = await _httpClient.GetAsync("api/WebhookEventCatalog");
+            var httpResponse = await _httpClient.GetAsync($"api/WebhookEventCatalog?includeDeactivated={includeDeactivated}");
 
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 

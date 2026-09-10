@@ -29,11 +29,11 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         return (context, new WebhookEventCatalogService(context));
     }
 
-    private WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
+    private WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated", bool isActive = true) => new WebHookEventCatalog()
     {
         Id = Guid.NewGuid(),
         EventName = name,
-        IsActive = true,
+        IsActive = isActive,
         Description = $"Test Event Catalog: {name}",
         CreatedAt = DateTimeOffset.UtcNow,
         AvailableFields = availableFields.ToDictionary(f => f, f => "string"),
@@ -238,7 +238,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         cts.Cancel();
 
         //Act
-        var result = await operationParameters.svc.GetAllEventCatalogAsync(cts.Token);
+        var result = await operationParameters.svc.GetAllEventCatalogAsync(false, cts.Token);
 
         //Assert
         Assert.NotNull(result);
@@ -247,15 +247,19 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllEventCatalogAsync_WithRecords_ReturnsAllRecordsAnd200()
+    public async Task GetAllEventCatalogAsync_WithRecords_ReturnsAllActiveRecordsAnd200()
     {
         //Arrange
         var operationParameters = GetSut();
+        List<WebHookEventCatalog> entities = 
+        [
+             BuildCatalogEntity(["productId", "orderCount"], "ProductOrdered"),
+            BuildCatalogEntity(["amount", "reference"], "PaymentRecived", isActive: false),
+            BuildCatalogEntity(["tranRef", "tranAmt"], "PaymentSuccessful")
+        ];
         await operationParameters.ctx.WebHookEventCatalogs.AddRangeAsync
         (
-            BuildCatalogEntity(["productId", "orderCount"], "ProductOrdered"),
-            BuildCatalogEntity(["amount", "reference"], "PaymentRecived"),
-            BuildCatalogEntity(["tranRef", "tranAmt"], "PaymentSuccessful")
+           entities
         );
         await operationParameters.ctx.SaveChangesAsync();
 
@@ -266,8 +270,9 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData);
         Assert.True(result!.ResponseData!.Any());
-
+        Assert.Equal(entities.Count(x => x.IsActive), result.ResponseData.Count);
     }
 
     [Fact]
@@ -286,7 +291,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllEventCatalogAsync_WithBothActiveAndInactiveRecords_ReturnsAllRecordsAnd200()
+    public async Task GetAllEventCatalogAsync_WithBothActiveAndInactiveRecords_ReturnsAllActiveRecordsAnd200()
     {
         //Arrange
         var operationParameters = GetSut();
@@ -312,6 +317,36 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.True(result!.ResponseData!.Any());
         Assert.Equal(3, result!.ResponseData!.Count());
+    }
+
+    [Fact]
+    public async Task GetAllEventCatalogAsync_WithBothActiveAndInactiveRecords_ReturnsAllAvailableRecordsAnd200()
+    {
+        //Arrange
+        var operationParameters = GetSut();
+        await operationParameters.ctx.WebHookEventCatalogs.AddRangeAsync
+        (
+            BuildCatalogEntity(["productId", "orderCount"], "ProductOrdered"),
+            BuildCatalogEntity(["amount", "reference"], "PaymentRecived"),
+            BuildCatalogEntity(["tranRef", "tranAmt"], "PaymentSuccessful")
+        );
+
+        var inactiveRecord = BuildCatalogEntity(["id", "phonenumber"], "UserRegistered");
+        inactiveRecord.IsActive = false;
+
+        await operationParameters.ctx.WebHookEventCatalogs.AddAsync(inactiveRecord);
+        await operationParameters.ctx.SaveChangesAsync();
+
+        //Act
+        var result = await operationParameters.svc.GetAllEventCatalogAsync(includeDeactivated: true);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData);
+        Assert.True(result.ResponseData.Any());
+        Assert.Equal(4, result.ResponseData.Count());
     }
 
     [Fact]

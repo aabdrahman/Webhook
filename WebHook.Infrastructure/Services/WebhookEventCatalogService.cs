@@ -189,14 +189,21 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
     /// <returns>
     /// A generic response containing the collection of webhook event catalogs.
     /// </returns>
-    public async Task<GenericResponse<IReadOnlyList<EventCatalogDto>>> GetAllEventCatalogAsync(CancellationToken ct = default)
+    public async Task<GenericResponse<IReadOnlyList<EventCatalogDto>>> GetAllEventCatalogAsync(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllEventCatalogAsync));
         try
         {
             _logger.Information("Fetching All Event Catalogs");
 
-            IReadOnlyList<EventCatalogDto> allEventCatalogs = await _repositoryContext.WebHookEventCatalogs.Select(EventCatalogMapper.ToDtoExpression()).ToListAsync(ct);
+            var getEventCatalogQuery = _repositoryContext.WebHookEventCatalogs.AsQueryable();
+
+            if (includeDeactivated)
+            {
+                getEventCatalogQuery = getEventCatalogQuery.IgnoreQueryFilters();
+            }
+
+            IReadOnlyList<EventCatalogDto> allEventCatalogs = await getEventCatalogQuery.Select(EventCatalogMapper.ToDtoExpression()).ToListAsync(ct);
 
             _logger.Information("Event catalogs fetched successfully - {0}", allEventCatalogs);
 
