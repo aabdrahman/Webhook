@@ -36,9 +36,12 @@ public static class ApplicationServiceExtensions
 
         //Event Catalogs
         services.AddScoped<GetEventCatalogsHandler>();
+        services.AddScoped<CreateEventCatalogHandler>();
+        services.AddScoped<ModifyEventCatalogStatusHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
+        //Utilities
         services.AddSingleton<ToastService>();
     }
 

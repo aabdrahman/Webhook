@@ -46,7 +46,7 @@ public class UnsubscribeFromEventHandler
     {
         try
         {
-            var httpResponse = await _httpClient.DeleteAsync($"/api/WebhookSubscription/{subscriptionId}/events?eventName={eventName}");
+            var httpResponse = await _httpClient.DeleteAsync($"api/WebhookSubscription/{subscriptionId}/events?eventName={eventName}");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<string> responseBody = JsonSerializer.Deserialize<GenericResponse<string>>(responseContent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??

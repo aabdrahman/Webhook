@@ -60,15 +60,19 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
         {
             _logger.Information("Create new event catalog - {0}", createEventCatalogDto);
 
-            //Validate the available fields dictionary to ensure that the values are of the correct type (string, int, bool, guid, datetime, float, decimal or double). If any value is not of the correct type, return a failure response.
-            if (!createEventCatalogDto.AvailableFields.All(kvp => kvp.Value.ToLower() == "string" || kvp.Value == "int" ||
-                                                            kvp.Value == "bool" || kvp.Value == "guid" ||
-                                                            kvp.Value == "datetime" || kvp.Value == "double" ||
-                                                            kvp.Value == "decimal" || kvp.Value == "float")
-                )
+            //Validate the available fields dictionary to ensure that the values are of the correct type (string, int, bool, guid, datetime, float, decimal or double).
+            //If any value is not of the correct type, return a failure response.
+            List<string> allowedDataTypes = ["string", "int", "bool", "guid", "datetime", "double", "decimal", "float" ];
+            Dictionary<string, string> notExistingItems = createEventCatalogDto.AvailableFields.Where(x => !allowedDataTypes.Contains(x.Value.ToLower())).ToDictionary();
+            //if (!createEventCatalogDto.AvailableFields.All(kvp => kvp.Value.ToLower() == "string" || kvp.Value == "int" ||
+            //                                                kvp.Value == "bool" || kvp.Value == "guid" ||
+            //                                                kvp.Value == "datetime" || kvp.Value == "double" ||
+            //                                                kvp.Value == "decimal" || kvp.Value == "float")
+            //    )
+            if(notExistingItems.Any())
             {
-                _logger.Information("Invalid field types in available fields - {0}", createEventCatalogDto.AvailableFields);
-                return GenericResponse<string>.Failure(null, "Invalid field types in available fields.", HttpStatusCode.BadRequest);
+                _logger.Information("Invalid field types in available fields - {0}", notExistingItems);
+                return GenericResponse<string>.Failure(null, $"Invalid field types in available fields. {string.Join(", ", notExistingItems.Select(x => x.Value).ToList())}", HttpStatusCode.BadRequest);
             }
 
             //Validate that a class can e created with the available fields dictionary. If not, return a failure response.

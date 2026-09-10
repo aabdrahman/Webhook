@@ -168,7 +168,7 @@ public class WebhookSubscriptionTests : IDisposable
         cts.Cancel();
 
         //Act
-        var result = await sut.svc.GetAllWebhookSubscriptionAsync(cts.Token);
+        var result = await sut.svc.GetAllWebhookSubscriptionAsync(false, cts.Token);
 
         //Assert
         Assert.NotNull(result);
@@ -803,7 +803,7 @@ public class WebhookSubscriptionTests : IDisposable
         var sut = GetSut(_authenticatedUserDetailsMock.Object);
 
         //Act
-        var result = await sut.svc.GetUserSubscriptionsAsync(CancellationToken.None);
+        var result = await sut.svc.GetUserSubscriptionsAsync(false, CancellationToken.None);
 
         //Assert
         Assert.NotNull(result);
@@ -855,7 +855,7 @@ public class WebhookSubscriptionTests : IDisposable
         var sut = GetSut(_authenticatedUserDetailsMock.Object);
 
         //Act
-        var result = await sut.svc.GetUserSubscriptionsAsync(CancellationToken.None);
+        var result = await sut.svc.GetUserSubscriptionsAsync(false, CancellationToken.None);
 
         //Assert
         Assert.NotNull(result);
@@ -891,7 +891,7 @@ public class WebhookSubscriptionTests : IDisposable
         var sut = GetSut(_authenticatedUserDetailsMock.Object);
 
         //Act
-        var result = await sut.svc.GetUserSubscriptionsAsync(CancellationToken.None);
+        var result = await sut.svc.GetUserSubscriptionsAsync(false, CancellationToken.None);
 
         //Assert
         Assert.NotNull(result);

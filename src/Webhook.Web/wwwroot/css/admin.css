@@ -109,7 +109,7 @@
     margin-bottom: var(--space-3);
 }
 
-/*.catalog-fields-list {
+.catalog-fields-list.view {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -118,7 +118,7 @@
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-md);
     padding: var(--space-3);
-}*/
+}
 
 .catalog-fields-list {
     display: grid;

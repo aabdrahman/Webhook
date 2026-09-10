@@ -15,6 +15,23 @@
                 ActionText="New Event Type"
                 OnAction="OpenCreateModal" />
 
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span class="text-sm text-secondary">
+                    @(_showInactive
+                        ? "Showing all event catalogs including inactive"
+                        : "Showing active event catalogs only")
+                </span>
+                <button type="button"
+                        class="toggle-btn @(_showInactive ? "toggle-btn-on" : "")"
+                        @onclick="HandleToggleInactive">
+                    <span class="toggle-btn-thumb"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <Alert Message="@_errorMessage" />
 
     @if (!_catalogs.Any() && string.IsNullOrWhiteSpace(_errorMessage))
@@ -104,6 +121,7 @@
     }
 }
 
+
 <!-- Create modal -->
 <Modal @bind-IsOpen="_showCreateModal"
        Title="New Event Type"
@@ -111,8 +129,7 @@
        OnClose="CloseModals"
        Size="lg">
 
-    <EditForm Model="_createModel"
-              OnValidSubmit="HandleCreate">
+    <EditForm Model="_createModel" OnValidSubmit="HandleCreate">
 
         <DataAnnotationsValidator />
 
@@ -127,11 +144,11 @@
                            @bind-Value="_createModel.EventCatalogName"
                            class="form-input"
                            placeholder="e.g. OrderCreated"
-                           disabled="@_isCreating" />
+                           disabled="@_isCreating" autocomplete="off" />
                 <ValidationMessage For="@(() => _createModel.EventCatalogName)"
                                    class="form-error" />
                 <span class="form-help">
-                    Use PascalCase — e.g. OrderCreated, PaymentReceived.
+                    Advisable to Use PascalCase — e.g. OrderCreated, PaymentReceived.
                 </span>
             </div>
 
@@ -141,11 +158,11 @@
                     Description
                     <span class="text-muted text-xs">(optional)</span>
                 </label>
-                <InputText id="description"
+                <InputTextArea id="description"
                            @bind-Value="_createModel.Description"
                            class="form-input"
                            placeholder="Brief description of when this event is raised."
-                           disabled="@_isCreating" />
+                           disabled="@_isCreating" autocomplete="off" row="4" cols="50" />
             </div>
 
             <!-- Available fields -->
@@ -165,7 +182,7 @@
                            class="form-input"
                            placeholder="Property name e.g. orderId"
                            @bind="_newFieldKey"
-                           disabled="@_isCreating" />
+                           disabled="@_isCreating" autocomplete="off" pattern="^[a-zA-Z_][a-zA-Z0-9_]*$" />
 
                     <select class="form-select"
                             @bind="_newFieldValue"
@@ -178,7 +195,7 @@
                         <option value="bool">bool</option>
                         <option value="Guid">Guid</option>
                         <option value="DateTime">DateTime</option>
-                        <option value="DateTimeOffset">DateTimeOffset</option>
+                        @* <option value="DateTimeOffset">DateTimeOffset</option> *@
                     </select>
 
                     <button type="button"
@@ -195,12 +212,17 @@
                         </svg>
                         Add
                     </button>
+
                 </div>
+                @if (_fieldKeyError)
+                {
+                    <span class="form-error">@_fieldKeyErrorMessage</span>
+                }
 
                 <!-- Fields list -->
                 @if (_createModel.AvailableFields.Any())
                 {
-                    <div class="catalog-fields-list">
+                    <div class="catalog-fields-list view">
                         @foreach (var field in _createModel.AvailableFields)
                         {
                             <div class="catalog-field-item">
@@ -297,25 +319,53 @@
 @if (_selectedCatalog is not null)
 {
     <Modal @bind-IsOpen="_showFieldsModal"
-           Title="@($"{_selectedCatalog.EventCatalogName} — Available Fields")"
+           Title="@_selectedCatalog!.EventCatalogName"
            ShowFooter="false"
            OnClose="CloseModals"
            Size="sm">
 
+        <!-- Catalog details -->
+        <div class="subscription-modal-details" style="margin-bottom:var(--space-4);">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Status</span>
+                <Badge Value="@(_selectedCatalog.IsActive ? "Active" : "Inactive")"
+                       Variant="subscription" />
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_selectedCatalog.Description))
+            {
+                <div class="subscription-modal-row">
+                    <span class="subscription-modal-label">Description</span>
+                    <span class="subscription-modal-value text-sm">
+                        @_selectedCatalog.Description
+                    </span>
+                </div>
+            }
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Fields</span>
+                <span class="subscription-modal-value text-sm">
+                    @_selectedCatalog.AvailableFields.Count
+                    field@(_selectedCatalog.AvailableFields.Count != 1 ? "s" : "")
+                </span>
+            </div>
+        </div>
+
+        <!-- Fields list -->
         @if (!_selectedCatalog.AvailableFields.Any())
         {
-            <p class="text-sm text-muted" style="text-align:center;
-               padding:var(--space-4) 0;">
+            <p class="text-sm text-muted"
+               style="text-align:center;padding:var(--space-4) 0;">
                 No fields defined for this event type.
             </p>
         }
         else
         {
-            <div class="catalog-fields-list">
+            <div class="catalog-fields-list view">
                 @foreach (var field in _selectedCatalog.AvailableFields)
                 {
                     <div class="catalog-field-item">
-                        <span class="catalog-field-key table-mono text-sm">@field.Key</span>
+                        <span class="catalog-field-key table-mono text-sm">
+                            @field.Key
+                        </span>
                         <span class="text-xs text-muted">→</span>
                         <span class="catalog-field-value table-mono text-sm"
                               style="color:var(--color-info);">
@@ -337,6 +387,7 @@
 
     private bool   _isLoading    = true;
     private string _errorMessage = string.Empty;
+    private bool _showInactive = false;
 
     private List<EventCatalogDto> _catalogs = [];
 
@@ -373,70 +424,67 @@
 
     private async Task LoadCatalogsAsync()
     {
+        
         _isLoading    = true;
         _errorMessage = string.Empty;
-
         try
         {
-            // TODO: replace with real service call
-            // var result = await EventCatalogService.GetAllAsync();
-            // if (!result.IsSuccessful)
-            // {
-            //     _errorMessage = result.ResponseMessage;
-            //     return;
-            // }
-            // _catalogs = result.ResponseData?.ToList() ?? [];
 
             await Task.Delay(700);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            // bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await getEventCatalogsHandler.HandleAsync();
+            bool success = result.response.successStatus;
 
             if (!success)
             {
-                _errorMessage = "Failed to load event catalog. Please try again.";
+                _errorMessage = $"Failed to load event catalog. {result.response.responseMessage}";
                 return;
             }
 
-            _catalogs =
-            [
-                new EventCatalogDto
-                {
-                    Id                = Guid.NewGuid(),
-                    EventCatalogName  = "OrderCreated",
-                    Description       = "Raised when a new order is created.",
-                    IsActive          = true,
-                    AvailableFields   = new Dictionary<string, string>
-                    {
-                        ["orderId"]    = "The unique order identifier",
-                        ["customerId"] = "The customer identifier",
-                        ["amount"]     = "The order total amount"
-                    }
-                },
-                new EventCatalogDto
-                {
-                    Id                = Guid.NewGuid(),
-                    EventCatalogName  = "PaymentReceived",
-                    Description       = "Raised when a payment is received.",
-                    IsActive          = true,
-                    AvailableFields   = new Dictionary<string, string>
-                    {
-                        ["paymentId"] = "The payment identifier",
-                        ["amount"]    = "The payment amount"
-                    }
-                },
-                new EventCatalogDto
-                {
-                    Id               = Guid.NewGuid(),
-                    EventCatalogName = "UserRegistered",
-                    Description      = "Raised when a new user registers.",
-                    IsActive         = false,
-                    AvailableFields  = new Dictionary<string, string>
-                    {
-                        ["userId"] = "The new user identifier",
-                        ["email"]  = "The user email address"
-                    }
-                }
-            ];
+            _catalogs = result.catalogs.ToList();
+
+            // _catalogs =
+            // [
+            //     new EventCatalogDto
+            //     {
+            //         Id                = Guid.NewGuid(),
+            //         EventCatalogName  = "OrderCreated",
+            //         Description       = "Raised when a new order is created.",
+            //         IsActive          = true,
+            //         AvailableFields   = new Dictionary<string, string>
+            //         {
+            //             ["orderId"]    = "The unique order identifier",
+            //             ["customerId"] = "The customer identifier",
+            //             ["amount"]     = "The order total amount"
+            //         }
+            //     },
+            //     new EventCatalogDto
+            //     {
+            //         Id                = Guid.NewGuid(),
+            //         EventCatalogName  = "PaymentReceived",
+            //         Description       = "Raised when a payment is received.",
+            //         IsActive          = true,
+            //         AvailableFields   = new Dictionary<string, string>
+            //         {
+            //             ["paymentId"] = "The payment identifier",
+            //             ["amount"]    = "The payment amount"
+            //         }
+            //     },
+            //     new EventCatalogDto
+            //     {
+            //         Id               = Guid.NewGuid(),
+            //         EventCatalogName = "UserRegistered",
+            //         Description      = "Raised when a new user registers.",
+            //         IsActive         = false,
+            //         AvailableFields  = new Dictionary<string, string>
+            //         {
+            //             ["userId"] = "The new user identifier",
+            //             ["email"]  = "The user email address"
+            //         }
+            //     }
+            // ];
+
         }
         finally
         {
@@ -485,12 +533,22 @@
     // Field management
     // -------------------------------------------------------------------------
 
+    private bool _fieldKeyError = false;
+    private string _fieldKeyErrorMessage = string.Empty;
+
     private void AddField()
     {
         if (string.IsNullOrWhiteSpace(_newFieldKey)) return;
 
-        _createModel.AvailableFields[_newFieldKey.Trim()] =
-            _newFieldValue.Trim();
+        _fieldKeyError = false;
+        if (!Regex.IsMatch(_newFieldKey.Trim(), @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+        {
+            _fieldKeyError        = true;
+            _fieldKeyErrorMessage = "Field name must be a valid C# property name — letters, digits, and underscores only, and must not start with a digit.";
+            return;
+        }
+
+        _createModel.AvailableFields[_newFieldKey.Trim().ToLower()] = _newFieldValue.Trim();
 
         _newFieldKey   = string.Empty;
         _newFieldValue = string.Empty;
@@ -518,27 +576,17 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await EventCatalogService.CreateAsync(new CreateEventCatalogDto
-            // {
-            //     EventCatalogName = _createModel.EventCatalogName,
-            //     Description      = _createModel.Description,
-            //     AvailableFields  = _createModel.AvailableFields
-            // });
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _createErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
 
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            var result = await createEventCatalogHandler.HandleAsync(_createModel);
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _createErrorMessage = "Failed to create event type. Please try again.";
+                _createErrorMessage = $"Failed to create event type. {result.responseMessage}";
                 return;
             }
 
@@ -548,8 +596,7 @@
                 Id               = Guid.NewGuid(),
                 EventCatalogName = _createModel.EventCatalogName,
                 Description      = _createModel.Description ?? string.Empty,
-                AvailableFields  = new Dictionary<string, string>(
-                    _createModel.AvailableFields),
+                AvailableFields  = new Dictionary<string, string>(_createModel.AvailableFields),
                 IsActive         = true
             });
 
@@ -584,11 +631,14 @@
 
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            var result = await modifyEventCatalogStatusHandler.HandleAsync(_selectedCatalog.Id, _selectedCatalog.IsActive);
+            bool success = result.successStatus;
 
             if (!success)
             {
-                _toggleErrorMessage = "Operation failed. Please try again.";
+                _toggleErrorMessage = $"Operation failed. {result.responseMessage}";
                 return;
             }
 
@@ -612,5 +662,14 @@
         {
             _isToggling = false;
         }
+    }
+
+    private async Task HandleToggleInactive()
+    {
+        _showInactive = !_showInactive;
+        _isLoading = true;
+        await LoadCatalogsAsync();
+        await Task.Delay(250);
+        _isLoading = false;
     }
 }

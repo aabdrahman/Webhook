@@ -106,7 +106,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.Conflict);
+        Assert.Equal(HttpStatusCode.Conflict, result.HttpStatusCode);
         Assert.Null(result.ResponseData);
         Assert.True(result?.ResponseMessage.Contains("already exists", StringComparison.OrdinalIgnoreCase));
     }
@@ -125,7 +125,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
 
         // Assert
         Assert.False(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.InternalServerError);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
 
         //Assert
         Assert.NotNull(result);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NoContent);
+        Assert.Equal(result.HttpStatusCode, HttpStatusCode.NoContent);
         Assert.True(result.IsSuccessful);
 
         var modifiedData = await operationParameters.ctx.WebHookEventCatalogs.FirstOrDefaultAsync(x => x.Id == eventCatalogEntity.Id);
@@ -187,7 +187,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.ResponseMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase));
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.ResponseMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase));
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.InternalServerError);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
     }
 
     [Fact]
@@ -265,7 +265,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.True(result!.ResponseData!.Any());
 
     }
@@ -282,7 +282,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]
@@ -326,7 +326,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]
@@ -344,7 +344,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.True(result.ResponseData.EventCatalogName.Contains(catalogEntity.EventName, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -370,7 +370,7 @@ public sealed class WebhookEventCatalogServiceTests : IDisposable
         //Assert
         Assert.NotNull(result);
         Assert.True(result.IsSuccessful);
-        Assert.True(result.HttpStatusCode == HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.True(result.ResponseData.EventCatalogName.Contains(targetCatalog.EventName, StringComparison.OrdinalIgnoreCase));
     }
 

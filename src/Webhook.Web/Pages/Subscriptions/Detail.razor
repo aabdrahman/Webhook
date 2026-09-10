@@ -430,7 +430,7 @@
 
             await Task.Delay(600);
             var result = await getSubscriptionDetailsHandler.HandleAsync(Id);
-            if (!result.response.successStatus && result.subscription is not null)
+            if (!result.response.successStatus && result.subscription is null)
             {
                 _errorMessage = result.response.responseMessage;
                 return;
@@ -643,7 +643,7 @@
             await Task.Delay(600);
             //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
-            var result = await unsubscribeFromEvenetHandler.HandleAsync(_subscription!.Id, _selectedEvent);
+            var result = await unsubscribeFromEventHandler.HandleAsync(_subscription!.Id, _selectedEvent);
             bool success = result.successStatus;
 
             if (!success)
@@ -701,7 +701,7 @@
 
     private async Task GetNewFormState()
     {
-        await Task.Delay(1000);
+        await Task.Delay(100);
         await InvokeAsync(StateHasChanged);
         // await LoadSubscriptionAsync();
         // await LoadRecentDeliveriesAsync();

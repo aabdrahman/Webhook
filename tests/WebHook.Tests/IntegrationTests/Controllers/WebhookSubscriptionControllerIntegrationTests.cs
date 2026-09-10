@@ -128,7 +128,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Failure(null, "No subscriptions found.", HttpStatusCode.NotFound));
 
@@ -157,7 +157,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
         };
 
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Success(subscriptions, "Fetched successfully.", HttpStatusCode.OK));
 
@@ -180,7 +180,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
@@ -195,7 +195,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetAllWebhookSubscriptionAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Failure(null, "Not found.", HttpStatusCode.NotFound));
 
@@ -204,7 +204,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
 
         // Assert
         _factory.WebhookSubscriptionServiceMock.Verify(
-            s => s.GetAllWebhookSubscriptionAsync(It.IsAny<CancellationToken>()),
+            s => s.GetAllWebhookSubscriptionAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -345,7 +345,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Failure(null, "No subscriptions found for user.", HttpStatusCode.NotFound));
 
@@ -373,7 +373,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
         };
 
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Success(userSubscriptions, "Fetched successfully.", HttpStatusCode.OK));
 
@@ -401,7 +401,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
         };
 
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Success(expected, "OK.", HttpStatusCode.OK));
 
@@ -423,7 +423,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
         // Act
@@ -438,7 +438,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
     {
         // Arrange
         _factory.WebhookSubscriptionServiceMock
-            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Failure(null, "Not found.", HttpStatusCode.NotFound));
 
@@ -447,7 +447,7 @@ public sealed class WebhookSubscriptionControllerIntegrationTests
 
         // Assert
         _factory.WebhookSubscriptionServiceMock.Verify(
-            s => s.GetUserSubscriptionsAsync(It.IsAny<CancellationToken>()),
+            s => s.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
