@@ -4,6 +4,7 @@ using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Authentication;
 using Webhook.Web.Handlers.EventCatalog;
+using Webhook.Web.Handlers.ServiceClient;
 using Webhook.Web.Handlers.Subscription;
 using Webhook.Web.Handlers.User;
 using Webhook.Web.Helper;
@@ -38,6 +39,14 @@ public static class ApplicationServiceExtensions
         services.AddScoped<GetEventCatalogsHandler>();
         services.AddScoped<CreateEventCatalogHandler>();
         services.AddScoped<ModifyEventCatalogStatusHandler>();
+
+        //Service Clients
+        services.AddScoped<GetOnboardedServiceClientsHandler>();
+        services.AddScoped<OnboardNewClientHandler>();
+        services.AddScoped<GetClientDetailsByClientIdHandler>();
+        services.AddScoped<DeleteServiceClientHandler>();
+        services.AddScoped<ReactivateServiceClientHandler>();
+        services.AddScoped<RequestNewServiceClientKeyHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
