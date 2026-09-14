@@ -1,0 +1,15 @@
+﻿@using WebHook.Core.DataTransferObjects.WebhookServiceClient
+@using Webhook.Web.Handlers.ServiceClient
+@using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog
+@using Webhook.Web.Handlers.EventCatalog
+
+@inject GetClientDetailsByClientIdHandler getClientDetailsByClientIdHandler
+@inject OnboardNewClientHandler onboardNewClientHandler
+@inject GetOnboardedServiceClientsHandler getOnboardedServiceClientsHandler
+@inject DeleteServiceClientHandler deleteServiceClientHandler
+@inject ReactivateServiceClientHandler reactivateServiceClientHandler
+@inject RequestNewServiceClientKeyHandler requestNewServiceClientKeyHandler
+
+@inject GetServiceClientSubscribedCatalogsHandler getServiceClientSubscribedCatalogsHandler
+
+@inject GetEventCatalogsHandler getEventCatalogsHandler

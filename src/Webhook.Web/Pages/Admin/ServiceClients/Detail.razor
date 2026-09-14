@@ -1,4 +1,4 @@
-@page "/admin/service-clients/{Id:guid}"
+@page "/admin/service-clients/{Id}"
 @attribute [Authorize(Roles = "Admin,ADMIN")]
 
 <PageTitle>Service Client Detail — WebhookHub</PageTitle>
@@ -151,7 +151,7 @@
                     else if (!_assignedCatalogs.Any())
                     {
                         <EmptyState Title="No catalogs assigned"
-                                    Description="Assign event types this service can publish."
+                                    Description="@(string.Concat("Assign event types this service can publish. ", _catalogsMessage))"
                                     Icon="catalog" />
                     }
                     else
@@ -195,8 +195,7 @@
     </div>
 }
 
-@if (!_isLoading && _client is null &&
-     string.IsNullOrWhiteSpace(_errorMessage))
+@if (!_isLoading && _client is null && string.IsNullOrWhiteSpace(_errorMessage))
 {
     <EmptyState Title="Client not found"
                 Description="The service client you are looking for does not exist."
@@ -319,6 +318,13 @@
     {
         <Spinner Centered="true" />
     }
+    else if (!string.IsNullOrEmpty(_getCatalogsErrorMessage))
+    {
+        <p class="text-sm text-muted"
+           style="text-align:center;padding:var(--space-4) 0;">
+            @_getCatalogsErrorMessage
+        </p>
+    }
     else if (!_availableCatalogs.Any())
     {
         <p class="text-sm text-muted"
@@ -349,46 +355,48 @@
     }
 </Modal>
 
-@code {
+    @code {
 
-    [Parameter] public Guid Id { get; set; }
+    [Parameter] public string Id { get; set; }
 
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
 
-    private bool                    _isLoading        = true;
-    private bool                    _isLoadingCatalogs = true;
-    private string                  _errorMessage     = string.Empty;
-    private bool                    _showClientKey    = false;
-    private string                  _clientKey        = "ck_live_placeholder_key";
+    private bool _isLoading        = true;
+    private bool _isLoadingCatalogs = true;
+    private string _errorMessage     = string.Empty;
+    private bool _showClientKey    = false;
+    private string _clientKey        = "ck_live_placeholder_key";
     private WebhookServiceClientDto? _client;
+    private string _catalogsMessage = string.Empty;
 
     // Assigned catalogs
     private List<WebhookServiceClientCatalogDto> _assignedCatalogs = [];
 
     // Toggle modal
-    private bool   _showToggleModal    = false;
-    private bool   _isToggling         = false;
+    private bool _showToggleModal = false;
+    private bool _isToggling = false;
     private string _toggleErrorMessage = string.Empty;
 
     // Rotate key modal
-    private bool   _showRotateKeyModal    = false;
-    private bool   _isRotatingKey         = false;
+    private bool _showRotateKeyModal = false;
+    private bool _isRotatingKey = false;
     private string _rotateKeyErrorMessage = string.Empty;
 
     // Remove catalog modal
-    private bool                           _showRemoveCatalogModal    = false;
-    private bool                           _isRemovingCatalog         = false;
-    private string                         _removeCatalogErrorMessage = string.Empty;
+    private bool  _showRemoveCatalogModal = false;
+    private bool _isRemovingCatalog = false;
+    private string _removeCatalogErrorMessage = string.Empty;
     private WebhookServiceClientCatalogDto? _selectedCatalog;
 
     // Add catalog modal
-    private bool         _showAddCatalogModal        = false;
-    private bool         _isLoadingAvailableCatalogs = false;
-    private bool         _isAddingCatalog            = false;
-    private string       _addingCatalogName          = string.Empty;
-    private List<string> _availableCatalogs          = [];
+    private bool _showAddCatalogModal = false;
+    private bool _isLoadingAvailableCatalogs = false;
+    private bool _isAddingCatalog = false;
+    private string _addingCatalogName = string.Empty;
+    private List<string> _availableCatalogs = [];
+    private string _getCatalogsErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -407,26 +415,36 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService.GetByIdAsync(Id);
-            // if (!result.IsSuccessful)
-            // {
-            //     _errorMessage = result.ResponseMessage;
-            //     return;
-            // }
-            // _client = result.ResponseData;
 
             await Task.Delay(600);
+            var result = await getClientDetailsByClientIdHandler.HandleAsync(Id);
 
-            _client = new WebhookServiceClientDto
+            if (!result.response.successStatus)
             {
-                Id                = Id,
-                ServiceClientName = "Order Management Service",
-                ClientId          = "order-service-prod",
-                ActiveStatus      = true,
-                SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
-                CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
-            };
+                _errorMessage = $"Client Details could not be fetched. {result.response.responseMessage}";
+                _client = null;
+                return;
+            }
+
+            if(result.serviceClient is null)
+            {
+                _errorMessage = $"Client Details could not be fetched. {result.response.responseMessage}";
+                _client = null;
+                return;
+            }
+
+            _client = result.serviceClient;
+            _clientKey = result.serviceClient.ClientId ?? string.Empty;
+
+            // _client = new WebhookServiceClientDto
+            // {
+            //     Id                = Guid.NewGuid(),
+            //     ServiceClientName = "Order Management Service",
+            //     ClientId          = "order-service-prod",
+            //     ActiveStatus      = true,
+            //     SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
+            //     CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
+            // };
         }
         finally
         {
@@ -446,24 +464,40 @@
             // _assignedCatalogs = result.ResponseData?.ToList() ?? [];
 
             await Task.Delay(400);
+            if(_client is null)
+            {
+                _assignedCatalogs = [];
+                return;
+            }
 
-            _assignedCatalogs =
-            [
-                new WebhookServiceClientCatalogDto
-                {
-                    Id             = Guid.NewGuid(),
-                    ServiceClientId = Id,
-                    CatalogName    = "OrderCreated",
-                    IsActive       = true
-                },
-                new WebhookServiceClientCatalogDto
-                {
-                    Id             = Guid.NewGuid(),
-                    ServiceClientId = Id,
-                    CatalogName    = "OrderCancelled",
-                    IsActive       = true
-                }
-            ];
+            var result = await getServiceClientSubscribedCatalogsHandler.HandleAsync(_client.Id);
+
+            if (!result.response.successStatus)
+            {
+                _assignedCatalogs = [];
+                _catalogsMessage = result.response.responseMessage;
+                return;
+            }
+
+            _assignedCatalogs = result.servceClientCatalogs.ToList();
+
+            // _assignedCatalogs =
+            // [
+            //     new WebhookServiceClientCatalogDto
+            //     {
+            //         Id             = Guid.NewGuid(),
+            //         ServiceClientId = Guid.NewGuid(),
+            //         CatalogName    = "OrderCreated",
+            //         IsActive       = true
+            //     },
+            //     new WebhookServiceClientCatalogDto
+            //     {
+            //         Id             = Guid.NewGuid(),
+            //         ServiceClientId = Guid.NewGuid(),
+            //         CatalogName    = "OrderCancelled",
+            //         IsActive       = true
+            //     }
+            // ];
         }
         finally
         {
@@ -477,23 +511,33 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var all    = await EventCatalogService.GetAllActiveAsync();
-            // var assigned = _assignedCatalogs.Select(c => c.CatalogName);
-            // _availableCatalogs = all.ResponseData
-            //     .Select(c => c.EventCatalogName)
-            //     .Where(n => !assigned.Contains(n))
-            //     .ToList();
-
             await Task.Delay(400);
+            var result = await getEventCatalogsHandler.HandleAsync();
+
+            if (!result.response.successStatus)
+            {
+                _availableCatalogs = [];
+                _getCatalogsErrorMessage = result.response.responseMessage;
+                return;
+            }
+
+            if (!result.catalogs.Any())
+            {
+                _availableCatalogs = [];
+                _getCatalogsErrorMessage = result.response.responseMessage;
+                return;
+            }
 
             var assigned = _assignedCatalogs.Select(c => c.CatalogName).ToHashSet();
+            var catalogsFromResult = result.catalogs.Select(x => x.EventCatalogName).ToList();
 
-            _availableCatalogs = new List<string>
-                { "OrderCreated", "OrderCancelled", "PaymentReceived",
-                  "UserRegistered", "OrderShipped" }
-                .Where(c => !assigned.Contains(c))
-                .ToList();
+            _availableCatalogs = catalogsFromResult.Where(x => !assigned.Contains(x)).ToList();
+
+            // _availableCatalogs = new List<string>
+            //     { "OrderCreated", "OrderCancelled", "PaymentReceived",
+            //       "UserRegistered", "OrderShipped" }
+            //     .Where(c => !assigned.Contains(c))
+            //     .ToList();
         }
         finally
         {
@@ -703,7 +747,7 @@
             _assignedCatalogs.Add(new WebhookServiceClientCatalogDto
             {
                 Id              = Guid.NewGuid(),
-                ServiceClientId = Id,
+                ServiceClientId = Guid.NewGuid(),
                 CatalogName     = catalogName,
                 IsActive        = true
             });

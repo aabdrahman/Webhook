@@ -15,9 +15,27 @@
                 ActionText="Onboard Client"
                 OnAction="OpenOnboardModal" />
 
+    <div class="card" style="margin-bottom:var(--space-5);">
+        <div class="card-body">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span class="text-sm text-secondary">
+                    @(_showInactive
+                        ? "Showing all service clients including inactive"
+                        : "Showing active service clients only")
+                </span>
+                <button type="button"
+                        class="toggle-btn @(_showInactive ? "toggle-btn-on" : "")"
+                        @onclick="HandleToggleInactive">
+                    <span class="toggle-btn-thumb"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <Alert Message="@_errorMessage" />
 
-    @if (!_clients.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    @* @if (!_clients.Any() && string.IsNullOrWhiteSpace(_errorMessage)) *@
+    @if(!_clients.Any())
     {
         <EmptyState Title="No service clients yet"
                     Description="Onboard your first internal service to start publishing events."
@@ -45,7 +63,7 @@
                             @foreach (var client in _clients)
                             {
                                 <tr class="table-row-clickable"
-                                    @onclick="() => NavigateToDetail(client.Id)">
+                                    @onclick="() => NavigateToDetail(client.ClientId)">
                                     <td>
                                         <span class="subscription-name">
                                             @client.ServiceClientName
@@ -201,17 +219,26 @@
 
                 @if (_isLoadingCatalog)
                 {
-                    <Spinner Size="sm" />
+                    @* <Spinner Size="sm" /> *@
+                    <div class="catalog-fields-list">
+                        @for (int i = 0; i < 4; i++)
+                        {
+                            <div class="catalog-field-item">
+                                <SkeletonLoader Shape="text" Width="120px" Height="16px" />
+                            </div>
+                        }
+                    </div>
                 }
                 else if (!_catalogOptions.Any())
                 {
-                    <p class="text-sm text-muted">
+                    <p class="text-sm text-secondary">
                         No active event types found. Create event types first.
+                        <span class="text-sm text-secondary">@_loadCatalogErrorResponse</span>
                     </p>
                 }
                 else
                 {
-                    <div class="catalog-fields-list">
+                    @* <div class="catalog-fields-list">
                         @foreach (var catalog in _catalogOptions)
                         {
                             <label class="auth-checkbox-label catalog-field-item"
@@ -219,6 +246,21 @@
                                 <input type="checkbox"
                                        class="auth-checkbox"
                                        checked="@_onboardModel.AllowedEventTypes.Contains(catalog)"
+                                       @onchange="(e) => ToggleCatalog(catalog, (bool)e.Value!)"
+                                       disabled="@_isOnboarding" />
+                                <span class="table-mono text-sm">@catalog</span>
+                            </label>
+                        }
+                    </div> *@
+                    <div class="catalog-fields-list">
+                        @foreach (var catalog in _catalogOptions)
+                        {
+                            var isChecked = _onboardModel.AllowedEventTypes.Contains(catalog);
+                            <label class="auth-checkbox-label catalog-field-item"
+                                   style="cursor:pointer;">
+                                <input type="checkbox"
+                                       class="auth-checkbox"
+                                       checked="@isChecked"
                                        @onchange="(e) => ToggleCatalog(catalog, (bool)e.Value!)"
                                        disabled="@_isOnboarding" />
                                 <span class="table-mono text-sm">@catalog</span>
@@ -345,31 +387,33 @@
     private List<WebhookServiceClientDto> _clients = [];
 
     // Onboard modal
-    private bool          _showOnboardModal    = false;
-    private bool          _isOnboarding        = false;
-    private bool          _isLoadingCatalog    = false;
-    private bool          _allowedEventsError  = false;
-    private string        _onboardErrorMessage = string.Empty;
-    private OnboardModel  _onboardModel        = new();
-    private List<string>  _catalogOptions      = [];
+    private bool _showOnboardModal = false;
+    private bool _isOnboarding = false;
+    private bool _isLoadingCatalog = false;
+    private bool _allowedEventsError  = false;
+    private string _onboardErrorMessage = string.Empty;
+    private CreateServiceClientDto _onboardModel = new CreateServiceClientDto(){ AllowedEventTypes = [] };
+    private List<string> _catalogOptions = [];
+    private string _loadCatalogErrorResponse = string.Empty;
 
     // Toggle modal
-    private bool                   _showToggleModal    = false;
-    private bool                   _isToggling         = false;
-    private string                 _toggleErrorMessage = string.Empty;
+    private bool _showToggleModal = false;
+    private bool _isToggling = false;
+    private string _toggleErrorMessage = string.Empty;
     private WebhookServiceClientDto? _selectedClient;
 
     // Rotate key modal
-    private bool   _showRotateKeyModal    = false;
-    private bool   _isRotatingKey         = false;
+    private bool _showRotateKeyModal = false;
+    private bool _isRotatingKey = false;
     private string _rotateKeyErrorMessage = string.Empty;
+    private bool _showInactive;
 
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
     protected override async Task OnInitializedAsync()
-        => await LoadClientsAsync();
+    => await LoadClientsAsync();
 
     private async Task LoadClientsAsync()
     {
@@ -388,45 +432,57 @@
             // _clients = result.ResponseData?.ToList() ?? [];
 
             await Task.Delay(700);
+            var result = await getOnboardedServiceClientsHandler.HandleAsync(_showInactive);
+            bool success = result.response.successStatus;
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            // bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _errorMessage = "Failed to load service clients. Please try again.";
+                _errorMessage = $"Failed to load service clients. {result.response.responseMessage}";
+                _clients = [];
                 return;
             }
 
-            _clients =
-            [
-                new WebhookServiceClientDto
-                {
-                    Id                = Guid.NewGuid(),
-                    ServiceClientName = "Order Management Service",
-                    ClientId          = "order-service-prod",
-                    ActiveStatus      = true,
-                    SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
-                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
-                },
-                new WebhookServiceClientDto
-                {
-                    Id                = Guid.NewGuid(),
-                    ServiceClientName = "Payment Gateway",
-                    ClientId          = "payment-gateway-prod",
-                    ActiveStatus      = true,
-                    SubscribedCatalogs = ["PaymentReceived"],
-                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-20)
-                },
-                new WebhookServiceClientDto
-                {
-                    Id                = Guid.NewGuid(),
-                    ServiceClientName = "Notification Service",
-                    ClientId          = "notification-prod",
-                    ActiveStatus      = false,
-                    SubscribedCatalogs = ["UserRegistered"],
-                    CreatedAt         = DateTimeOffset.UtcNow.AddDays(-10)
-                }
-            ];
+            if (!result.webhookServiceClients.Any())
+            {
+                _errorMessage = $"Failed to load service clients. {result.response.responseMessage}";
+                _clients = result.webhookServiceClients.ToList();
+                return;
+            }
+
+            _clients = result.webhookServiceClients.ToList();
+
+            // _clients =
+            // [
+            //     new WebhookServiceClientDto
+            //     {
+            //         Id                = Guid.NewGuid(),
+            //         ServiceClientName = "Order Management Service",
+            //         ClientId          = "order-service-prod",
+            //         ActiveStatus      = true,
+            //         SubscribedCatalogs = ["OrderCreated", "OrderCancelled"],
+            //         CreatedAt         = DateTimeOffset.UtcNow.AddDays(-30)
+            //     },
+            //     new WebhookServiceClientDto
+            //     {
+            //         Id                = Guid.NewGuid(),
+            //         ServiceClientName = "Payment Gateway",
+            //         ClientId          = "payment-gateway-prod",
+            //         ActiveStatus      = true,
+            //         SubscribedCatalogs = ["PaymentReceived"],
+            //         CreatedAt         = DateTimeOffset.UtcNow.AddDays(-20)
+            //     },
+            //     new WebhookServiceClientDto
+            //     {
+            //         Id                = Guid.NewGuid(),
+            //         ServiceClientName = "Notification Service",
+            //         ClientId          = "notification-prod",
+            //         ActiveStatus      = false,
+            //         SubscribedCatalogs = ["UserRegistered"],
+            //         CreatedAt         = DateTimeOffset.UtcNow.AddDays(-10)
+            //     }
+            // ];
         }
         finally
         {
@@ -446,12 +502,20 @@
             //     .Select(c => c.EventCatalogName).ToList() ?? [];
 
             await Task.Delay(400);
+            var result = await getEventCatalogsHandler.HandleAsync();
+            if (!result.response.successStatus)
+            {
+                _loadCatalogErrorResponse = result.response.responseMessage;
+                return;
+            }
 
-            _catalogOptions =
-            [
-                "OrderCreated", "OrderCancelled", "PaymentReceived",
-                "UserRegistered", "OrderShipped"
-            ];
+            _catalogOptions = result.catalogs.Select(x => x.EventCatalogName).ToList();
+
+            // _catalogOptions =
+            // [
+            //     "OrderCreated", "OrderCancelled", "PaymentReceived",
+            //     "UserRegistered", "OrderShipped"
+            // ];
         }
         finally
         {
@@ -463,7 +527,7 @@
     // Navigation
     // -------------------------------------------------------------------------
 
-    private void NavigateToDetail(Guid id)
+    private void NavigateToDetail(string id)
         => navigationManager.NavigateTo($"/admin/service-clients/{id}");
 
     // -------------------------------------------------------------------------
@@ -472,7 +536,7 @@
 
     private async Task OpenOnboardModal()
     {
-        _onboardModel       = new();
+        _onboardModel       = new CreateServiceClientDto(){ AllowedEventTypes = [] };
         _allowedEventsError = false;
         _onboardErrorMessage = string.Empty;
         _showOnboardModal   = true;
@@ -554,12 +618,14 @@
             // }
 
             await Task.Delay(800);
-
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await onboardNewClientHandler.HandleAsync(_onboardModel);
+            bool success = result.response.successStatus;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _onboardErrorMessage = "Failed to onboard client. Please try again.";
+                _onboardErrorMessage = $"Failed to onboard client. {result.response.responseMessage}";
+                toastService.ShowError($"Failed to onboard client. {result.response.responseMessage}", durationMs: 6500);
                 return;
             }
 
@@ -573,7 +639,7 @@
                 CreatedAt         = DateTimeOffset.UtcNow
             });
 
-            toastService.ShowSuccess($"{_onboardModel.ServiceName} onboarded successfully.");
+            toastService.ShowSuccess($"{_onboardModel.ServiceName} onboarded successfully. Client Key: {result.responseDetails?.ClientKey ?? ""}", durationMs:7500);
             CloseModals();
         }
         finally
@@ -603,12 +669,14 @@
             // }
 
             await Task.Delay(800);
+            var result = _selectedClient.ActiveStatus ? await deleteServiceClientHandler.HandleAsync(_selectedClient.ClientId) : await reactivateServiceClientHandler.HandleAsync(_selectedClient.ClientId);
+            bool success = result.successStatus;
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _toggleErrorMessage = "Operation failed. Please try again.";
+                _toggleErrorMessage = $"Operation failed. {result.responseMessage}";
                 return;
             }
 
@@ -679,26 +747,10 @@
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Local onboard model
-    // -------------------------------------------------------------------------
-
-    private sealed class OnboardModel
+    private async Task HandleToggleInactive()
     {
-        [Required(ErrorMessage = "Service name is required.")]
-        [MaxLength(50, ErrorMessage = "Service name cannot exceed 50 characters.")]
-        public string ServiceName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Client ID is required.")]
-        [MaxLength(50, ErrorMessage = "Client ID cannot exceed 50 characters.")]
-        [RegularExpression(@"^[a-z0-9]+(-[a-z0-9]+)*$",
-            ErrorMessage = "Lowercase alphanumeric with hyphens only. e.g. order-service-prod")]
-        public string ClientId { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Contact email is required.")]
-        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
-        public string ContactEmail { get; set; } = string.Empty;
-
-        public List<string> AllowedEventTypes { get; set; } = [];
+        
+        _showInactive = !_showInactive;
+        await LoadClientsAsync();
     }
 }

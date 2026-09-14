@@ -17,7 +17,7 @@ public class GetOnboardedServiceClientsHandler
     {
         try
         {
-            var httpResponse = await _httpClient.GetAsync("api/WebhookServiceClientsapi/WebhookServiceClients");
+            var httpResponse = await _httpClient.GetAsync($"api/WebhookServiceClients?includeDeactivated={includeDeactivated}");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<IReadOnlyList<WebhookServiceClientDto>> responseBody = JsonSerializer.Deserialize<GenericResponse<IReadOnlyList<WebhookServiceClientDto>>>(responseContent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??

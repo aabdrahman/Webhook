@@ -5,6 +5,7 @@ using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Authentication;
 using Webhook.Web.Handlers.EventCatalog;
 using Webhook.Web.Handlers.ServiceClient;
+using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog;
 using Webhook.Web.Handlers.Subscription;
 using Webhook.Web.Handlers.User;
 using Webhook.Web.Helper;
@@ -47,6 +48,9 @@ public static class ApplicationServiceExtensions
         services.AddScoped<DeleteServiceClientHandler>();
         services.AddScoped<ReactivateServiceClientHandler>();
         services.AddScoped<RequestNewServiceClientKeyHandler>();
+
+        //Service Client Event Catalogs
+        services.AddScoped<GetServiceClientSubscribedCatalogsHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
