@@ -75,11 +75,15 @@
                     }
                     else
                     {
-                        <button class="btn btn-ghost btn-sm"
-                                @onclick="HandleClose"
-                                disabled="@IsConfirming">
-                            @CancelText
-                        </button>
+                        @if (ShowCloseButton)
+                        {
+                            <button class="btn btn-ghost btn-sm"
+                                    @onclick="HandleClose"
+                                    disabled="@IsConfirming">
+                                @CancelText
+                            </button>
+                        }
+                        
 
                         <LoadingButton Text="@ConfirmText"
                                        LoadingText="@(string.Concat(ConfirmText, "......"))"
@@ -113,6 +117,7 @@
     [Parameter] public bool            ShowFooter      { get; set; } = true;
     [Parameter] public RenderFragment? ChildContent    { get; set; }
     [Parameter] public RenderFragment? FooterContent   { get; set; }
+    [Parameter] public bool ShowCloseButton { get; set; } = true;
 
     /// <summary>Two-way bind support — @bind-IsOpen="..."</summary>
     [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }

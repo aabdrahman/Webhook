@@ -148,97 +148,131 @@
        OnClose="CloseModals"
        Size="lg">
 
-    <EditForm Model="_onboardModel" OnValidSubmit="HandleOnboard">
-        <DataAnnotationsValidator />
+    @if (_isOnboardedSuccessfully)
+    {
+        <!-- Success state — show generated client key -->
+        <Alert Type="success" Message="Service client onboarded successfully. Copy the client key below before closing as it will not be shown again." />
 
-        <div style="display:flex;flex-direction:column;gap:var(--space-5);">
-
-            <!-- Service name -->
-            <div class="form-group">
-                <label class="form-label form-label-required" for="serviceName">
-                    Service name
-                </label>
-                <InputText id="serviceName"
-                           @bind-Value="_onboardModel.ServiceName"
-                           class="form-input"
-                           placeholder="e.g. Order Management Service"
-                           disabled="@_isOnboarding" autocomplete="off" />
-                <ValidationMessage For="@(() => _onboardModel.ServiceName)"
-                                   class="form-error" />
-            </div>
-
-            <!-- Client ID -->
-            <div class="form-group">
-                <label class="form-label form-label-required" for="clientId">
-                    Client ID
-                </label>
-                <InputText id="clientId"
-                           @bind-Value="_onboardModel.ClientId"
-                           class="form-input"
-                           placeholder="e.g. order-service-prod"
-                           disabled="@_isOnboarding" autocomplete="off" />
-                <ValidationMessage For="@(() => _onboardModel.ClientId)"
-                                   class="form-error" />
-                <span class="form-help">
-                    Lowercase alphanumeric with hyphens only. Cannot be changed after creation.
+        <div class="subscription-modal-details" style="margin-top:var(--space-4);">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Service</span>
+                <span class="subscription-modal-value">
+                    @_onboardModel.ServiceName
                 </span>
             </div>
-
-            <!-- Contact email -->
-            <div class="form-group">
-                <label class="form-label form-label-required" for="contactEmail">
-                    Contact email
-                </label>
-                <div class="form-input-wrapper">
-                    <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2
-                                 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                        <polyline points="22,6 12,13 2,6" />
-                    </svg>
-                    <InputText id="contactEmail"
-                               @bind-Value="_onboardModel.ContactEmail"
-                               class="form-input has-icon-left"
-                               placeholder="team@service.com"
-                               autocomplete="off"
-                               disabled="@_isOnboarding" />
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client ID</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_onboardModel.ClientId
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Client Key</span>
+                <div class="detail-field-value">
+                    <CopyButton Value="@_newClientKey" DisplayText="@_newClientKey" />
                 </div>
-                <ValidationMessage For="@(() => _onboardModel.ContactEmail)"
-                                   class="form-error" />
             </div>
+        </div>
 
-            <!-- Allowed event types -->
-            <div class="form-group">
-                <label class="form-label form-label-required">
-                    Allowed event types
-                </label>
-                <span class="form-help" style="margin-bottom:var(--space-3);">
-                    Select the event types this service is allowed to publish.
-                </span>
+        <div class="modal-footer"
+             style="margin:var(--space-4) calc(var(--space-6) * -1)
+            calc(var(--space-6) * -1);border-radius:0;">
+            <LoadingButton Text="Done" Variant="primary" OnClick="CloseModals" />
+        </div>
+    }
+    else
+    {
+        <EditForm Model="_onboardModel" OnValidSubmit="HandleOnboard">
+            <DataAnnotationsValidator />
 
-                @if (_isLoadingCatalog)
-                {
-                    @* <Spinner Size="sm" /> *@
-                    <div class="catalog-fields-list">
-                        @for (int i = 0; i < 4; i++)
-                        {
-                            <div class="catalog-field-item">
-                                <SkeletonLoader Shape="text" Width="120px" Height="16px" />
-                            </div>
-                        }
+            <div style="display:flex;flex-direction:column;gap:var(--space-5);">
+
+                <!-- Service name -->
+                <div class="form-group">
+                    <label class="form-label form-label-required" for="serviceName">
+                        Service name
+                    </label>
+                    <InputText id="serviceName"
+                               @bind-Value="_onboardModel.ServiceName"
+                               class="form-input"
+                               placeholder="e.g. Order Management Service"
+                               disabled="@_isOnboarding" autocomplete="off" />
+                    <ValidationMessage For="@(() => _onboardModel.ServiceName)"
+                                       class="form-error" />
+                </div>
+
+                <!-- Client ID -->
+                <div class="form-group">
+                    <label class="form-label form-label-required" for="clientId">
+                        Client ID
+                    </label>
+                    <InputText id="clientId"
+                               @bind-Value="_onboardModel.ClientId"
+                               class="form-input"
+                               placeholder="e.g. order-service-prod"
+                               disabled="@_isOnboarding" autocomplete="off" />
+                    <ValidationMessage For="@(() => _onboardModel.ClientId)"
+                                       class="form-error" />
+                    <span class="form-help">
+                        Lowercase alphanumeric with hyphens only. Cannot be changed after creation.
+                    </span>
+                </div>
+
+                <!-- Contact email -->
+                <div class="form-group">
+                    <label class="form-label form-label-required" for="contactEmail">
+                        Contact email
+                    </label>
+                    <div class="form-input-wrapper">
+                        <svg class="form-input-icon-left" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2
+                            2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                            <polyline points="22,6 12,13 2,6" />
+                        </svg>
+                        <InputText id="contactEmail"
+                                   @bind-Value="_onboardModel.ContactEmail"
+                                   class="form-input has-icon-left"
+                                   placeholder="team@service.com"
+                                   autocomplete="off"
+                                   disabled="@_isOnboarding" />
                     </div>
-                }
-                else if (!_catalogOptions.Any())
-                {
-                    <p class="text-sm text-secondary">
-                        No active event types found. Create event types first.
-                        <span class="text-sm text-secondary">@_loadCatalogErrorResponse</span>
-                    </p>
-                }
-                else
-                {
-                    @* <div class="catalog-fields-list">
+                    <ValidationMessage For="@(() => _onboardModel.ContactEmail)"
+                                       class="form-error" />
+                </div>
+
+                <!-- Allowed event types -->
+                <div class="form-group">
+                    <label class="form-label form-label-required">
+                        Allowed event types
+                    </label>
+                    <span class="form-help" style="margin-bottom:var(--space-3);">
+                        Select the event types this service is allowed to publish.
+                    </span>
+
+                    @if (_isLoadingCatalog)
+                    {
+                        @* <Spinner Size="sm" /> *@
+                        <div class="catalog-fields-list">
+                            @for (int i = 0; i < 4; i++)
+                            {
+                                <div class="catalog-field-item">
+                                    <SkeletonLoader Shape="text" Width="120px" Height="16px" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else if (!_catalogOptions.Any())
+                    {
+                        <p class="text-sm text-secondary">
+                            No active event types found. Create event types first.
+                            <span class="text-sm text-secondary">@_loadCatalogErrorResponse</span>
+                        </p>
+                    }
+                    else
+                    {
+                        @* <div class="catalog-fields-list">
                         @foreach (var catalog in _catalogOptions)
                         {
                             <label class="auth-checkbox-label catalog-field-item"
@@ -252,52 +286,54 @@
                             </label>
                         }
                     </div> *@
-                    <div class="catalog-fields-list">
-                        @foreach (var catalog in _catalogOptions)
-                        {
-                            var isChecked = _onboardModel.AllowedEventTypes.Contains(catalog);
-                            <label class="auth-checkbox-label catalog-field-item"
-                                   style="cursor:pointer;">
-                                <input type="checkbox"
-                                       class="auth-checkbox"
-                                       checked="@isChecked"
-                                       @onchange="(e) => ToggleCatalog(catalog, (bool)e.Value!)"
-                                       disabled="@_isOnboarding" />
-                                <span class="table-mono text-sm">@catalog</span>
-                            </label>
-                        }
-                    </div>
-                }
+                        <div class="catalog-fields-list">
+                            @foreach (var catalog in _catalogOptions)
+                            {
+                                var isChecked = _onboardModel.AllowedEventTypes.Contains(catalog);
+                                <label class="auth-checkbox-label catalog-field-item"
+                                       style="cursor:pointer;">
+                                    <input type="checkbox"
+                                           class="auth-checkbox"
+                                           checked="@isChecked"
+                                           @onchange="(e) => ToggleCatalog(catalog, (bool)e.Value!)"
+                                           disabled="@_isOnboarding" />
+                                    <span class="table-mono text-sm">@catalog</span>
+                                </label>
+                            }
+                        </div>
+                    }
 
-                @if (_allowedEventsError)
-                {
-                    <span class="form-error">
-                        At least one event type must be assigned.
-                    </span>
-                }
+                    @if (_allowedEventsError)
+                    {
+                        <span class="form-error">
+                            At least one event type must be assigned.
+                        </span>
+                    }
+                </div>
+
+                <Alert Message="@_onboardErrorMessage" />
+
+                <!-- Footer -->
+                <div class="modal-footer"
+                     style="margin:0 calc(var(--space-6) * -1)
+                    calc(var(--space-6) * -1);border-radius:0;">
+                    <button type="button"
+                            class="btn btn-ghost btn-sm"
+                            @onclick="CloseModals"
+                            disabled="@_isOnboarding">
+                        Cancel
+                    </button>
+                    <LoadingButton Text="Onboard Client"
+                                   LoadingText="Onboarding..."
+                                   IsLoading="@_isOnboarding"
+                                   Type="submit" />
+                </div>
+
             </div>
+        </EditForm>
 
-            <Alert Message="@_onboardErrorMessage" />
-
-            <!-- Footer -->
-            <div class="modal-footer"
-                 style="margin:0 calc(var(--space-6) * -1)
-                        calc(var(--space-6) * -1);border-radius:0;">
-                <button type="button"
-                        class="btn btn-ghost btn-sm"
-                        @onclick="CloseModals"
-                        disabled="@_isOnboarding">
-                    Cancel
-                </button>
-                <LoadingButton Text="Onboard Client"
-                               LoadingText="Onboarding..."
-                               IsLoading="@_isOnboarding"
-                               Type="submit" />
-            </div>
-
-        </div>
-    </EditForm>
-
+    }
+   
 </Modal>
 
 <!-- Toggle modal -->
@@ -346,6 +382,55 @@
 {
     <Modal @bind-IsOpen="_showRotateKeyModal"
            Title="Rotate Client Key"
+           ConfirmText="@(_isRotatedSuccessfully ? "Done" : "Rotate Key")"
+           ConfirmVariant="@(_isRotatedSuccessfully ? "primary" : "danger")"
+           IsConfirming="@_isRotatingKey"
+           OnConfirm="HandleRotateKeyConfirm"
+           OnClose="CloseModals" ShowCloseButton="@(!_isRotatedSuccessfully)">
+
+        @if (_isRotatedSuccessfully)
+        {
+            <!-- Success state — show new key -->
+            <Alert Type="success" Message="Key rotated successfully. Copy the new key below before closing — it will not be shown again." />
+
+            <div class="detail-field" style="margin-top:var(--space-4);">
+                <span class="detail-field-label">New Client Key</span>
+                <div class="detail-field-value">
+                    <CopyButton Value="@_newClientKey" DisplayText="@_newClientKey" />
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Confirmation state -->
+            @if (_selectedClient is not null)
+            {
+                <div class="subscription-modal-details">
+                    <div class="subscription-modal-row">
+                        <span class="subscription-modal-label">Service</span>
+                        <span class="subscription-modal-value">
+                            @_selectedClient.ServiceClientName
+                        </span>
+                    </div>
+                    <div class="subscription-modal-row">
+                        <span class="subscription-modal-label">Client ID</span>
+                        <span class="subscription-modal-value table-mono text-sm">
+                            @_selectedClient.ClientId
+                        </span>
+                    </div>
+                </div>
+
+                <Alert Type="warning"
+                       Message="The current key will be immediately invalidated. Update the service with the new key before it can publish events again." />
+
+                <Alert Message="@_rotateKeyErrorMessage" />
+            }
+        }
+
+    </Modal>
+
+    @* <Modal @bind-IsOpen="_showRotateKeyModal"
+           Title="Rotate Client Key"
            ConfirmText="Rotate Key"
            ConfirmVariant="danger"
            IsConfirming="@_isRotatingKey"
@@ -367,12 +452,13 @@
             </div>
         </div>
 
-        <Alert Type="warning"
-               Message="Rotating the key will immediately invalidate the current key. The service must be updated with the new key before it can publish events again." />
+        <Alert Visible="_isRotatedSuccessfully" Message="@($"New Service client key - {_newClientKey}")" Type="success" />
 
-        <Alert Message="@_rotateKeyErrorMessage" />
+        <Alert Type="warning" Message="Rotating the key will immediately invalidate the current key. The service must be updated with the new key before it can publish events again." />
 
-    </Modal>
+        <Alert Visible="@(!string.IsNullOrEmpty(_rotateKeyErrorMessage))" Message="@_rotateKeyErrorMessage" />
+
+    </Modal> *@
 }
 
 @code {
@@ -395,6 +481,8 @@
     private CreateServiceClientDto _onboardModel = new CreateServiceClientDto(){ AllowedEventTypes = [] };
     private List<string> _catalogOptions = [];
     private string _loadCatalogErrorResponse = string.Empty;
+    private string _newClientKey = string.Empty;
+    private bool _isOnboardedSuccessfully = false;
 
     // Toggle modal
     private bool _showToggleModal = false;
@@ -407,6 +495,7 @@
     private bool _isRotatingKey = false;
     private string _rotateKeyErrorMessage = string.Empty;
     private bool _showInactive;
+    private bool _isRotatedSuccessfully = false;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -483,6 +572,7 @@
             //         CreatedAt         = DateTimeOffset.UtcNow.AddDays(-10)
             //     }
             // ];
+
         }
         finally
         {
@@ -567,6 +657,11 @@
         _rotateKeyErrorMessage = string.Empty;
         _onboardErrorMessage   = string.Empty;
         _allowedEventsError    = false;
+        _isRotatedSuccessfully = false;
+        _rotateKeyErrorMessage = string.Empty;
+        _newClientKey = string.Empty;
+        _isOnboardedSuccessfully = false;
+        
     }
 
     // -------------------------------------------------------------------------
@@ -601,21 +696,6 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService.OnboardAsync(
-            //     new CreateServiceClientDto
-            //     {
-            //         ServiceName       = _onboardModel.ServiceName,
-            //         ClientId          = _onboardModel.ClientId,
-            //         ContactEmail      = _onboardModel.ContactEmail,
-            //         AllowedEventTypes = _onboardModel.AllowedEventTypes
-            //     });
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _onboardErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
 
             await Task.Delay(800);
             var result = await onboardNewClientHandler.HandleAsync(_onboardModel);
@@ -629,6 +709,9 @@
                 return;
             }
 
+            _isOnboardedSuccessfully = result.response.successStatus;
+            _newClientKey = result.responseDetails.ClientKey;
+
             _clients.Add(new WebhookServiceClientDto
             {
                 Id                = Guid.NewGuid(),
@@ -639,8 +722,8 @@
                 CreatedAt         = DateTimeOffset.UtcNow
             });
 
-            toastService.ShowSuccess($"{_onboardModel.ServiceName} onboarded successfully. Client Key: {result.responseDetails?.ClientKey ?? ""}", durationMs:7500);
-            CloseModals();
+            toastService.ShowSuccess($"{_onboardModel.ServiceName} onboarded successfully.", durationMs:7500);
+            //CloseModals();
         }
         finally
         {
@@ -657,16 +740,6 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = _selectedClient.ActiveStatus
-            //     ? await ServiceClientService.DeactivateAsync(_selectedClient.Id)
-            //     : await ServiceClientService.ReactivateAsync(_selectedClient.Id);
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _toggleErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
 
             await Task.Delay(800);
             var result = _selectedClient.ActiveStatus ? await deleteServiceClientHandler.HandleAsync(_selectedClient.ClientId) : await reactivateServiceClientHandler.HandleAsync(_selectedClient.ClientId);
@@ -707,38 +780,57 @@
         if (_selectedClient is null) return;
 
         _rotateKeyErrorMessage = string.Empty;
+        _isRotatingKey = true;
+
+        try
+        {
+            var result = await requestNewServiceClientKeyHandler.HandleAsync(
+                new RequestNewClientKeyDto
+                {
+                    ClientId = _selectedClient.ClientId,
+                    ServiceName = _selectedClient.ServiceClientName
+                });
+
+            if (!result.response.successStatus)
+            {
+                _rotateKeyErrorMessage = result.response.responseMessage;
+                return;
+            }
+
+            _newClientKey = result.responseDetails?.ClientKey ?? string.Empty;
+            _isRotatedSuccessfully = true;
+        }
+        finally
+        {
+            _isRotatingKey = false;
+        }
+    }
+
+    private async Task HandleRotateKey2()
+    {
+        if (_selectedClient is null) return;
+
+        _rotateKeyErrorMessage = string.Empty;
         _isRotatingKey         = true;
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService.RotateKeyAsync(
-            //     new RequestNewClientKeyDto
-            //     {
-            //         ServiceName = _selectedClient.ServiceClientName,
-            //         ClientId    = _selectedClient.ClientId
-            //     });
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _rotateKeyErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
 
             await Task.Delay(800);
-
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await requestNewServiceClientKeyHandler.HandleAsync(new RequestNewClientKeyDto() { ClientId = _selectedClient.ClientId, ServiceName = _selectedClient.ServiceClientName });
+            bool success = result.response.successStatus;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _rotateKeyErrorMessage = "Failed to rotate key. Please try again.";
+                _rotateKeyErrorMessage = $"Failed to rotate key. {result.response.responseMessage}";
                 return;
             }
 
-            toastService.ShowSuccess(
-                $"Key rotated for {_selectedClient.ServiceClientName}. " +
-                "Ensure the service is updated with the new key.");
-
+            _newClientKey = result.responseDetails?.ClientKey ?? string.Empty;
+            _isRotatedSuccessfully = result.response.successStatus;
+            await Task.Delay(3000);
+            toastService.ShowSuccess($"Key rotated for {_selectedClient.ServiceClientName}. Ensure the service is updated with the new key - {_newClientKey}");
             CloseModals();
         }
         finally
@@ -752,5 +844,27 @@
         
         _showInactive = !_showInactive;
         await LoadClientsAsync();
+    }
+
+    private async Task HandleRotateKeyConfirm()
+    {
+        if (_isRotatedSuccessfully)
+        {
+            CloseModals();
+            return;
+        }
+
+        await HandleRotateKey();
+    }
+
+    private async Task HandleOnboardConfirm()
+    {
+        if (_isOnboardedSuccessfully)
+        {
+            CloseModals();
+            return;
+        }
+
+        await HandleOnboard();
     }
 }

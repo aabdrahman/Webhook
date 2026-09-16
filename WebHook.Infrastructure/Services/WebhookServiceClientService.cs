@@ -112,7 +112,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         {
             _logger.Information("Get client details with id - {0}", clientId);
 
-            WebhookServiceClientDto? onboardedClient = await _repositoryContext.WebhookServiceClients.Select(WebhookServiceClientMapper.ToDtoExpression()).FirstOrDefaultAsync(x => x.ClientId == clientId.ToLower(), ct);
+            WebhookServiceClientDto? onboardedClient = await _repositoryContext.WebhookServiceClients.IgnoreQueryFilters().Select(WebhookServiceClientMapper.ToDtoExpression()).FirstOrDefaultAsync(x => x.ClientId == clientId.ToLower(), ct);
 
             if(onboardedClient is null)
             {
@@ -194,7 +194,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
             await _repositoryContext.SaveChangesAsync(ct);
 
             _logger.Information("Service Client onboarded successfully - {0}, {1}", createServiceClient.ServiceName, createServiceClient.ClientId);
-            return GenericResponse<ServiceClientOnboardingResponse>.Success(new ServiceClientOnboardingResponse() { ClientId = webhookServiceClient.ClientId, ClientKey = webhookServiceClient.ClientKey }, "Service Client Onboarded successfully.", HttpStatusCode.Created);
+            return GenericResponse<ServiceClientOnboardingResponse>.Success(new ServiceClientOnboardingResponse() { ClientId = webhookServiceClient.ClientId, ClientKey = clientKey }, "Service Client Onboarded successfully.", HttpStatusCode.Created);
 
         }
         catch (Exception ex)

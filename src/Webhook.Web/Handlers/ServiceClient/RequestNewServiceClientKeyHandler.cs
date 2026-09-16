@@ -18,7 +18,7 @@ public class RequestNewServiceClientKeyHandler
     {
         try
         {
-            var httpResponse = await _httpClient.PostAsJsonAsync("api/WebhookServiceClients/request-new-key", requestNewClientKey);
+            var httpResponse = await _httpClient.PutAsJsonAsync("api/WebhookServiceClients/request-new-key", requestNewClientKey);
             string responseCOntent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<ServiceClientOnboardingResponse> responseBody = JsonSerializer.Deserialize<GenericResponse<ServiceClientOnboardingResponse>>(responseCOntent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??

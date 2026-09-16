@@ -594,7 +594,7 @@
             _catalogs.Add(new EventCatalogDto
             {
                 Id               = Guid.NewGuid(),
-                EventCatalogName = _createModel.EventCatalogName,
+                EventCatalogName = _createModel.EventCatalogName.ToLower(),
                 Description      = _createModel.Description ?? string.Empty,
                 AvailableFields  = new Dictionary<string, string>(_createModel.AvailableFields),
                 IsActive         = true
@@ -618,17 +618,6 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await EventCatalogService.ToggleAsync(
-            //     _selectedCatalog.Id,
-            //     isDeactivate: _selectedCatalog.IsActive);
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _toggleErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
-
             await Task.Delay(800);
 
             //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
