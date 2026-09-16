@@ -14,6 +14,7 @@
     - ShowFooter:      renders the default footer with confirm/cancel (default: true)
     - ChildContent:    the modal body — any Razor content
     - FooterContent:   optional custom footer replacing the default buttons
+    - ShowCloseButton:   optional custom show close button, defaults to true
 
     Usage — destructive confirmation:
         <Modal IsOpen="@_showDeleteModal"
@@ -138,8 +139,9 @@
     private async Task HandleBackdropClick()
     {
         // Do not close on backdrop click if a confirmation is in progress
+        // we do not want to close by any means
         if (IsConfirming) return;
-        await HandleClose();
+        //await HandleClose();
     }
 
     private async Task HandleConfirm()
