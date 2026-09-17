@@ -34,6 +34,18 @@
     pointer-events: none;
 }
 
+/*Success*/
+.btn-success {
+    background: var(--color-success);
+    color: #fff;
+    border-color: var(--color-success);
+}
+
+.btn-success:hover:not(:disabled) {
+    background: var(--color-success-muted);
+    box-shadow: var(--color-success-glow);
+}
+
 /* Primary */
 .btn-primary {
     background: var(--color-primary);
@@ -41,11 +53,11 @@
     border-color: var(--color-primary);
 }
 
-    .btn-primary:hover:not(:disabled) {
-        background: var(--color-primary-hover);
-        border-color: var(--color-primary-hover);
-        box-shadow: var(--shadow-glow-primary);
-    }
+.btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    box-shadow: var(--shadow-glow-primary);
+}
 
 /* Secondary */
 .btn-secondary {
@@ -54,10 +66,10 @@
     border-color: var(--color-border);
 }
 
-    .btn-secondary:hover:not(:disabled) {
-        background: var(--color-surface-raised);
-        border-color: var(--color-text-muted);
-    }
+.btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface-raised);
+    border-color: var(--color-text-muted);
+}
 
 /* Danger */
 .btn-danger {
@@ -79,10 +91,10 @@
     border-color: transparent;
 }
 
-    .btn-ghost:hover:not(:disabled) {
-        background: var(--color-surface-3);
-        color: var(--color-text-primary);
-    }
+.btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-3);
+    color: var(--color-text-primary);
+}
 
 /* Outline */
 .btn-outline {

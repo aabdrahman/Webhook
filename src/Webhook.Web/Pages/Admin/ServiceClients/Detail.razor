@@ -25,17 +25,22 @@
                 ActionVariant="@(_client.ActiveStatus ? "danger" : "primary")"
                 OnAction="OpenToggleModal">
         <AdditionalActions>
-            <button class="btn btn-ghost btn-sm"
-                    style="color:var(--color-info);"
-                    @onclick="OpenRotateKeyModal">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     style="width:14px;height:14px;">
-                    <polyline points="23 4 23 10 17 10" />
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                </svg>
-                Rotate Key
-            </button>
+            @* Ensures that the rotate button is only enabled/visible for an active service client *@
+            @if (_client.ActiveStatus)
+            {
+                <button class="btn btn-ghost btn-sm"
+                        style="color:var(--color-info);"
+                        @onclick="OpenRotateKeyModal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         style="width:14px;height:14px;">
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                    </svg>
+                    Rotate Key
+                </button>
+            }
+            
         </AdditionalActions>
     </PageHeader>
 
@@ -131,17 +136,22 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">Assigned Catalogs</h2>
-                    <button class="btn btn-outline btn-sm"
-                            @onclick="OpenAddCatalogModal">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2.5" stroke-linecap="round"
-                             stroke-linejoin="round"
-                             style="width:13px;height:13px;">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5"  y1="12" x2="19" y2="12" />
-                        </svg>
-                        Add
-                    </button>
+                    @* Ensures users can only assign catalog for active service clients only *@
+                    @if (_client.ActiveStatus)
+                    {
+                        <button class="btn btn-outline btn-sm"
+                                @onclick="OpenAddCatalogModal">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2.5" stroke-linecap="round"
+                                 stroke-linejoin="round"
+                                 style="width:13px;height:13px;">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Add
+                        </button>
+                    }
+                    
                 </div>
                 <div class="card-body" style="padding:0;">
                     @if (_isLoadingCatalogs)
@@ -249,33 +259,49 @@
 <!-- Rotate key modal -->
 <Modal @bind-IsOpen="_showRotateKeyModal"
        Title="Rotate Client Key"
-       ConfirmText="Rotate Key"
-       ConfirmVariant="danger"
+       ConfirmText="@(_isRotatedSuccessfully ? "Done" : "Rotate Key")"
+       ConfirmVariant="@(_isRotatedSuccessfully ? "primary" : "danger")"
        IsConfirming="@_isRotatingKey"
-       OnConfirm="HandleRotateKey"
-       OnClose="CloseModals">
+       OnConfirm="HandleRotateKeyConfirm"
+       OnClose="CloseModals" 
+       ShowCloseButton="@(!_isRotatedSuccessfully)">
 
     @if (_client is not null)
     {
-        <div class="subscription-modal-details">
-            <div class="subscription-modal-row">
-                <span class="subscription-modal-label">Service</span>
-                <span class="subscription-modal-value">
-                    @_client.ServiceClientName
-                </span>
-            </div>
-            <div class="subscription-modal-row">
-                <span class="subscription-modal-label">Client ID</span>
-                <span class="subscription-modal-value table-mono text-sm">
-                    @_client.ClientId
-                </span>
-            </div>
-        </div>
+        if (_isRotatedSuccessfully)
+        {
+            <!-- Success state — show new key -->
+            <Alert Type="success" Message="Key rotated successfully. Copy the new key below before closing as it will not be shown again." />
 
-        <Alert Type="warning"
-               Message="The current key will be immediately invalidated. Update the service with the new key before it can publish events again." />
+            <div class="detail-field" style="margin-top:var(--space-4);">
+                <span class="detail-field-label">New Client Key</span>
+                <div class="detail-field-value">
+                    <CopyButton Value="@_newClientKey" DisplayText="@_newClientKey" />
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="subscription-modal-details">
+                <div class="subscription-modal-row">
+                    <span class="subscription-modal-label">Service</span>
+                    <span class="subscription-modal-value">
+                        @_client.ServiceClientName
+                    </span>
+                </div>
+                <div class="subscription-modal-row">
+                    <span class="subscription-modal-label">Client ID</span>
+                    <span class="subscription-modal-value table-mono text-sm">
+                        @_client.ClientId
+                    </span>
+                </div>
+            </div>
 
-        <Alert Message="@_rotateKeyErrorMessage" />
+            <Alert Type="warning" Message="The current key will be immediately invalidated. Update the service with the new key before it can publish events again." />
+
+            <Alert Message="@_rotateKeyErrorMessage" />
+        }
+        
     }
 </Modal>
 
@@ -383,6 +409,8 @@
     private bool _showRotateKeyModal = false;
     private bool _isRotatingKey = false;
     private string _rotateKeyErrorMessage = string.Empty;
+    private string _newClientKey = string.Empty;
+    private bool _isRotatedSuccessfully = false;
 
     // Remove catalog modal
     private bool  _showRemoveCatalogModal = false;
@@ -564,6 +592,7 @@
     private void OpenRotateKeyModal()
     {
         _rotateKeyErrorMessage = string.Empty;
+        _newClientKey = string.Empty;
         _showRotateKeyModal    = true;
     }
 
@@ -590,6 +619,8 @@
         _toggleErrorMessage        = string.Empty;
         _rotateKeyErrorMessage     = string.Empty;
         _removeCatalogErrorMessage = string.Empty;
+        _newClientKey = string.Empty;
+        _isRotatedSuccessfully = false;
     }
 
     // -------------------------------------------------------------------------
@@ -608,11 +639,15 @@
             // TODO: replace with real service call
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = _client.ActiveStatus ? await deleteServiceClientHandler.HandleAsync(_client.ClientId) : await reactivateServiceClientHandler.HandleAsync(_client.ClientId);
+
+            bool success = result.successStatus;
+
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _toggleErrorMessage = "Operation failed. Please try again.";
+                _toggleErrorMessage = $"Operation failed. {result.responseMessage}";
                 return;
             }
 
@@ -640,41 +675,52 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService.RotateKeyAsync(
-            //     new RequestNewClientKeyDto
-            //     {
-            //         ServiceName = _client.ServiceClientName,
-            //         ClientId    = _client.ClientId
-            //     });
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _rotateKeyErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
-            // _clientKey = result.ResponseData.NewKey;
-
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;.
+            var result = await requestNewServiceClientKeyHandler.HandleAsync(new RequestNewClientKeyDto(){ ClientId = _client.ClientId, ServiceName = _client.ServiceClientName });
+            bool success = result.response.successStatus;
 
             if (!success)
             {
-                _rotateKeyErrorMessage = "Failed to rotate key. Please try again.";
+                _isRotatedSuccessfully = false;
+                _rotateKeyErrorMessage = $"Failed to rotate key. {result.response.responseMessage}";
                 return;
             }
 
-            _clientKey     = $"ck_live_{Guid.NewGuid():N}";
-            _showClientKey = true; // reveal new key automatically
+            if(result.responseDetails is null || string.IsNullOrEmpty(result.responseDetails.ClientKey))
+            {
+                _isRotatedSuccessfully = false;
+                _rotateKeyErrorMessage = $"No client key. {result.response.responseMessage}";
+                return;
+            }
+
+            //_clientKey     = $"ck_live_{Guid.NewGuid():N}";
+            //_showClientKey = true; // reveal new key automatically
+
+            _isRotatedSuccessfully = result.response.successStatus;
+            _newClientKey = result.responseDetails.ClientKey;
+            _clientKey = result.responseDetails.ClientKey;
 
             toastService.ShowSuccess("Key rotated successfully. Copy the new key now.");
-            CloseModals();
+            //CloseModals();
         }
         finally
         {
             _isRotatingKey = false;
         }
+    }
+
+    private async Task HandleRotateKeyConfirm()
+    {
+        if (_isRotatedSuccessfully)
+        {
+            CloseModals();
+            return;
+        }
+
+        await HandleRotateKey();
+
     }
 
     private async Task HandleRemoveCatalog()
