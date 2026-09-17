@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
+using Webhook.Web.Handlers.Admin;
 using Webhook.Web.Handlers.Authentication;
 using Webhook.Web.Handlers.EventCatalog;
 using Webhook.Web.Handlers.ServiceClient;
@@ -54,7 +55,11 @@ public static class ApplicationServiceExtensions
         services.AddScoped<SubscribeToEventCatalogHandler>();
         services.AddScoped<UnSubscribeFromEventCatalogHandler>();
 
+        //Authentication
         services.AddTransient<AuthenticationTokenHandler>();
+
+        //Admin Health Check
+        services.AddScoped<HealthCheckStatusHandler>();
 
         //Utilities
         services.AddSingleton<ToastService>();

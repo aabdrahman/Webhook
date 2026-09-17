@@ -5,6 +5,7 @@
 
 @using Webhook.Web.Handlers.EventCatalog
 @using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog
+@using Webhook.Web.Handlers.Admin
 
 
 @inject GetEventCatalogsHandler getEventCatalogsHandler
@@ -12,3 +13,5 @@
 @inject CreateEventCatalogHandler createEventCatalogHandler
 @inject SubscribeToEventCatalogHandler subscribeToEventCatalogHandler
 @inject UnSubscribeFromEventCatalogHandler unsubscribeFromEventCatalogHandler
+
+@inject HealthCheckStatusHandler healthCheckStatusHandler

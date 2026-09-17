@@ -51,7 +51,7 @@
                         <div style="display:flex;align-items:center;
                                     gap:var(--space-2);margin-top:var(--space-1);">
                             <StatusDot Status="@_overallStatus" Size="lg"
-                                       Pulse="@(_overallStatus == "Healthy")" />
+                                       Pulse="@(_overallStatus.Contains("Healthy", StringComparison.OrdinalIgnoreCase))" />
                             <span class="metric-card-value"
                                   style="color:@OverallStatusColor;">
                                 @_overallStatus
@@ -62,27 +62,27 @@
                         <span class="metric-card-label">Healthy</span>
                         <span class="metric-card-value"
                               style="color:var(--color-success);">
-                            @_checks.Count(c => c.Status == "Healthy")
+                            @_checks.Count(c => c.Status.Contains("Healthy", StringComparison.OrdinalIgnoreCase))
                         </span>
                     </div>
                     <div class="health-overall-item">
                         <span class="metric-card-label">Degraded</span>
                         <span class="metric-card-value"
                               style="color:var(--color-warning);">
-                            @_checks.Count(c => c.Status == "Degraded")
+                            @_checks.Count(c => c.Status.Contains("Degraded", StringComparison.OrdinalIgnoreCase))
                         </span>
                     </div>
                     <div class="health-overall-item">
                         <span class="metric-card-label">Unhealthy</span>
                         <span class="metric-card-value"
                               style="color:var(--color-danger);">
-                            @_checks.Count(c => c.Status == "Unhealthy")
+                            @_checks.Count(c => c.Status.Contains("Unhealthy", StringComparison.OrdinalIgnoreCase))
                         </span>
                     </div>
                     <div class="health-overall-item">
                         <span class="metric-card-label">Total Duration</span>
                         <span class="metric-card-value text-sm">
-                            @_totalDurationMs ms
+                            @_totalDurationMs.ToString("F2") ms
                         </span>
                     </div>
                 </div>
@@ -91,18 +91,18 @@
 
         <!-- Individual checks -->
         <div class="health-checks-grid">
-            @foreach (var check in _checks.OrderBy(c => c.Status == "Healthy" ? 2 : c.Status == "Degraded" ? 1 : 0))
+            @foreach (var check in _checks.OrderBy(c => c.Status.Contains("Healthy", StringComparison.OrdinalIgnoreCase) ? 2 : c.Status.Contains("Degraded", StringComparison.OrdinalIgnoreCase) ? 1 : 0))
             {
                 <div class="card health-check-card
-                    @(check.Status == "Unhealthy"
+                    @(check.Status.Contains("Unhealthy", StringComparison.OrdinalIgnoreCase)
                         ? "health-check-card-unhealthy"
-                        : check.Status == "Degraded"
+                        : check.Status.Contains("Degraded", StringComparison.OrdinalIgnoreCase)
                             ? "health-check-card-degraded"
                             : "health-check-card-healthy")">
                     <div class="card-body">
                         <div class="health-check-header">
                             <StatusDot Status="@check.Status"
-                                       Pulse="@(check.Status == "Healthy")" />
+                                       Pulse="@(check.Status.Contains("Healthy", StringComparison.OrdinalIgnoreCase))" />
                             <span class="health-check-name table-mono">
                                 @check.Name
                             </span>
@@ -120,8 +120,8 @@
                         }
 
                         <div class="health-check-meta">
-                            <span class="text-xs text-muted">
-                                Duration: <strong>@check.DurationMs ms</strong>
+                            <span class="text-xs text-secondary">
+                                Duration: <strong>@check.DurationMs.ToString("F2") ms</strong>
                             </span>
                             @if (!string.IsNullOrWhiteSpace(check.Exception))
                             {
@@ -230,7 +230,11 @@
 
             await Task.Delay(600);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await healthCheckStatusHandler.HandleAsync();
+
+            bool success = result is not null;
+
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
@@ -238,72 +242,83 @@
                 return;
             }
 
-            _checks =
-            [
-                new HealthCheckItem("postgresql",
-                    "Healthy", 12.3,
-                    "PostgreSQL database connection is healthy.",
-                    null),
+            // _checks =
+            // [
+            //     new HealthCheckItem("postgresql",
+            //         "Healthy", 12.3,
+            //         "PostgreSQL database connection is healthy.",
+            //         null),
 
-                new HealthCheckItem("email-queue",
-                    "Healthy", 0.1,
-                    "Email processing queue is within capacity.",
-                    null),
+            //     new HealthCheckItem("email-queue",
+            //         "Healthy", 0.1,
+            //         "Email processing queue is within capacity.",
+            //         null),
 
-                new HealthCheckItem("dead-letter-queue",
-                    "Degraded", 1.8,
-                    "Dead letter queue depth is above warning threshold.",
-                    null),
+            //     new HealthCheckItem("dead-letter-queue",
+            //         "Degraded", 1.8,
+            //         "Dead letter queue depth is above warning threshold.",
+            //         null),
 
-                new HealthCheckItem("pending-deliveries",
-                    "Healthy", 2.1,
-                    "Pending delivery count is within acceptable range.",
-                    null),
+            //     new HealthCheckItem("pending-deliveries",
+            //         "Healthy", 2.1,
+            //         "Pending delivery count is within acceptable range.",
+            //         null),
 
-                new HealthCheckItem("stale-processing",
-                    "Healthy", 0.9,
-                    "No stale claimed deliveries detected.",
-                    null),
+            //     new HealthCheckItem("stale-processing",
+            //         "Healthy", 0.9,
+            //         "No stale claimed deliveries detected.",
+            //         null),
 
-                new HealthCheckItem("EventRaisedWorker",
-                    "Healthy", 0.2,
-                    "Worker is running and processing events.",
-                    null),
+            //     new HealthCheckItem("EventRaisedWorker",
+            //         "Healthy", 0.2,
+            //         "Worker is running and processing events.",
+            //         null),
 
-                new HealthCheckItem("PendingRaisedEventWorker",
-                    "Healthy", 0.1,
-                    "Worker is running.",
-                    null),
+            //     new HealthCheckItem("PendingRaisedEventWorker",
+            //         "Healthy", 0.1,
+            //         "Worker is running.",
+            //         null),
 
-                new HealthCheckItem("DeliveryWorker",
-                    "Healthy", 0.3,
-                    "Worker is running and delivering events.",
-                    null),
+            //     new HealthCheckItem("DeliveryWorker",
+            //         "Healthy", 0.3,
+            //         "Worker is running and delivering events.",
+            //         null),
 
-                new HealthCheckItem("RetryWorker",
-                    "Degraded", 5.2,
-                    "Worker is running but experiencing elevated retry times.",
-                    null),
+            //     new HealthCheckItem("RetryWorker",
+            //         "Degraded", 5.2,
+            //         "Worker is running but experiencing elevated retry times.",
+            //         null),
 
-                new HealthCheckItem("StaleClaimedDeliveryReleaseWorker",
-                    "Healthy", 0.1,
-                    "Worker is running.",
-                    null),
+            //     new HealthCheckItem("StaleClaimedDeliveryReleaseWorker",
+            //         "Healthy", 0.1,
+            //         "Worker is running.",
+            //         null),
 
-                new HealthCheckItem("EmailProcessorWorker",
-                    "Healthy", 0.2,
-                    "Worker is running and processing emails.",
-                    null),
-            ];
+            //     new HealthCheckItem("EmailProcessorWorker",
+            //         "Healthy", 0.2,
+            //         "Worker is running and processing emails.",
+            //         null),
+            // ];
 
-            _overallStatus = _checks.Any(c => c.Status == "Unhealthy")
-                ? "Unhealthy"
-                : _checks.Any(c => c.Status == "Degraded")
-                    ? "Degraded"
-                    : "Healthy";
+            _checks = result.checks.Select(x => new HealthCheckItem(Name: x.name, Status: x.status, DurationMs: x.duration, Description: x.description, Exception: string.Empty)).ToList() ?? [];
 
-            _totalDurationMs = _checks.Sum(c => c.DurationMs);
+            // _overallStatus = _checks.Any(c => c.Status == "Unhealthy")
+            //     ? "Unhealthy"
+            //     : _checks.Any(c => c.Status == "Degraded")
+            //         ? "Degraded"
+            //         : "Healthy";
+
+            _overallStatus = result?.status ?? string.Empty;
+            _totalDurationMs = result.totalDurationMs;
+
+            //_totalDurationMs = _checks.Sum(c => c.DurationMs);
             _lastChecked     = DateTimeOffset.UtcNow;
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex);
+            _errorMessage = ex.Message;
+            return;
         }
         finally
         {

@@ -190,6 +190,10 @@
 .health-check-card {
     border-left: 3px solid var(--color-border);
     transition: border-color var(--transition-base);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    height: 100%;
 }
 
 .health-check-card-degraded {
