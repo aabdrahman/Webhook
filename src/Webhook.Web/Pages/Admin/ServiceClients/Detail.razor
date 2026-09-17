@@ -727,34 +727,27 @@
     {
         if (_selectedCatalog is null) return;
 
+        if (_client is null) return;
+
         _removeCatalogErrorMessage = string.Empty;
         _isRemovingCatalog         = true;
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService
-            //     .RemoveCatalogAsync(_selectedCatalog.Id);
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     _removeCatalogErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
-
             await Task.Delay(600);
+            var result = await unsubscribeFromEventCatalogHandler.HandleAsync(_client.Id, _selectedCatalog.CatalogName);
+            bool success = result.successStatus;
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                _removeCatalogErrorMessage = "Failed to remove catalog. Please try again.";
+                _removeCatalogErrorMessage = $"Failed to remove catalog. {result.responseMessage}";
                 return;
             }
 
             _assignedCatalogs.Remove(_selectedCatalog);
-            toastService.ShowSuccess(
-                $"{_selectedCatalog.CatalogName} removed from this client.");
+            toastService.ShowSuccess($"{_selectedCatalog.CatalogName} removed from this client.");
             CloseModals();
         }
         finally
@@ -768,25 +761,26 @@
         _addingCatalogName = catalogName;
         _isAddingCatalog   = true;
 
+        if(_client is null)
+        {
+            return;
+        }
+
         try
         {
-            // TODO: replace with real service call
-            // var result = await ServiceClientService.AssignCatalogAsync(
-            //     Id, catalogName);
-            //
-            // if (!result.IsSuccessful)
-            // {
-            //     toastService.ShowError($"Failed to add {catalogName}.");
-            //     return;
-            // }
+            
 
             await Task.Delay(600);
+            //var result = await subsc
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await subscribeToEventCatalogHandler.HandleAsync(_client.Id, _addingCatalogName);
+            bool success = result.successStatus;
+
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             if (!success)
             {
-                toastService.ShowError($"Failed to add {catalogName}. Please try again.");
+                toastService.ShowError($"Failed to add {catalogName}. {result.responseMessage}");
                 return;
             }
 
@@ -799,7 +793,7 @@
             });
 
             _availableCatalogs.Remove(catalogName);
-            toastService.ShowSuccess($"{catalogName} assigned to this client.");
+            toastService.ShowSuccess($"{catalogName} assigned to this client. {result.responseMessage}");
         }
         finally
         {

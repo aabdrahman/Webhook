@@ -51,6 +51,8 @@ public static class ApplicationServiceExtensions
 
         //Service Client Event Catalogs
         services.AddScoped<GetServiceClientSubscribedCatalogsHandler>();
+        services.AddScoped<SubscribeToEventCatalogHandler>();
+        services.AddScoped<UnSubscribeFromEventCatalogHandler>();
 
         services.AddTransient<AuthenticationTokenHandler>();
 
