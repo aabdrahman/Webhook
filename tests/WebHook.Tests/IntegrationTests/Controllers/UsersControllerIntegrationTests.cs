@@ -522,9 +522,9 @@ public sealed class UsersControllerIntegrationTests
 
         List<UserDetailsDto> results = new List<UserDetailsDto>()
         {
-            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-60), Name = "John Doe", UserEmailAddress = "test@mail.com", UserName = "testeduser112" },
-            new UserDetailsDto(){ AssignedRole = "User", Id = Guid.NewGuid(), isActive = false, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-30), Name = "John Dane", UserEmailAddress = "test1@mail.com", UserName = "testeduser113" },
-            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-90), Name = "Jane Doe", UserEmailAddress = "test2@mail.com", UserName = "testeduser114" },
+            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-60), FirstName = "John", LastName = "Doe", UserEmailAddress = "test@mail.com", UserName = "testeduser112", CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-120), DeactivationJustification = string.Empty, LockoutEnd = null },
+            new UserDetailsDto(){ AssignedRole = "User", Id = Guid.NewGuid(), isActive = false, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-30), FirstName = "John", LastName = "Dane", UserEmailAddress = "test1@mail.com", UserName = "testeduser113", CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-240), DeactivationJustification = "Deleted", LockoutEnd = DateTimeOffset.UtcNow.AddSeconds(300)  },
+            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-90), FirstName = "Jane", LastName = "Doe", UserEmailAddress = "test2@mail.com", UserName = "testeduser114", CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-150), DeactivationJustification = string.Empty, LockoutEnd = null  },
         };
 
         _factory.UserServiceMock.Setup(x => x.GetAllUsers(It.IsAny<bool>(), It.IsAny<CancellationToken>()))

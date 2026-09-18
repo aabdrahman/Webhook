@@ -27,10 +27,14 @@ public static class UserMapper
             Id = user.Id,
             UserName = user.UserName,
             UserEmailAddress = user.NormalizedEmail,
-            Name = string.Concat(user.FirstName, " ", user.LastName),
+            FirstName = user.FirstName,
+            LastName= user.LastName,
             isActive = user.IsActive,
             LastLoginDate = user.LastLoginDate,
-            AssignedRole = string.Empty
+            AssignedRole = string.Empty,
+            CreatedAt = user.CreatedAt,
+            DeactivationJustification = user.DeactivationJustification,
+            LockoutEnd = user.LockoutEnd
         };
     }
 }

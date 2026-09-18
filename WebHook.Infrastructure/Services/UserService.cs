@@ -336,11 +336,11 @@ public sealed class UserService : IUserService
                 .SqlQuery<UserDetailsDto>
                 (
                     $@"
-                        SELECT ""u"".""Id"", CONCAT(""u"".""FirstName"", ' ', ""u"".""LastName"") AS ""Name"", 
+                        SELECT ""u"".""Id"", ""u"".""CreatedAt"", ""u"".""FirstName"", ""u"".""LastName"", 
 		                        ""r"".""NormalizedName"" AS ""AssignedRole"", 
 		                        ""u"".""NormalizedUserName"" AS ""UserName"",
 		                        ""u"".""NormalizedEmail"" AS ""UserEmailAddress"",
-		                        ""u"".""IsActive"" AS ""isActive"", ""u"".""LastLoginDate""
+		                        ""u"".""IsActive"" AS ""isActive"", ""u"".""LastLoginDate"", ""u"".""DeactivationJustification"", ""u"".""LockoutEnd""
                         FROM public.""AspNetUsers"" AS ""u""
                         INNER JOIN public.""AspNetUserRoles"" AS ""ur""
                         ON ""u"".""Id"" = ""ur"".""UserId""
