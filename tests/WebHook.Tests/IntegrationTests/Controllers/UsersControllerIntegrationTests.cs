@@ -5,6 +5,7 @@ using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.Authentication;
 using WebHook.Core.Interfaces.Services;
 using WebHook.IntegrationTests.Controllers;
+using static MassTransit.ValidationResultExtensions;
 
 namespace WebHook.IntegrationTests.Controllers.Users;
 
@@ -15,7 +16,8 @@ namespace WebHook.IntegrationTests.Controllers.Users;
 /// <list type="bullet">
 ///   <item><description>POST api/Users/register    — Register    [AllowAnonymous]</description></item>
 ///   <item><description>POST api/Users/deactivate  — Deactivate  [Authorize]</description></item>
-///   <item><description>POST api/Users/reactivate  — Reactivate  [Authorize(Roles="Admin")]</description></item>
+///   <item><description>POST api/Users/reactivate  — Reactivate  [Authorize(Roles="Admin,ADMIN")]</description></item>
+///   <item><description>GET api/Users  — Get All Users  [Authorize(Roles="Admin,ADMIN")]</description></item>
 /// </list>
 /// </summary>
 public sealed class UsersControllerIntegrationTests
@@ -467,5 +469,78 @@ public sealed class UsersControllerIntegrationTests
             s => s.ReactivateUserProfileAsync(
                 It.IsAny<ReactivateUserRequestDto>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // =========================================================================
+    // POST api/Users — [Authorize(Roles = "ADMIN,Admin")]
+    // =========================================================================
+    [Fact]
+    public async Task GetAllUsers_NoAuthToken_Returns401()
+    {
+        //Arrange
+        _client.DefaultRequestHeaders.Authorization = null;
+
+        //Act
+        var response = await _client.GetAsync("api/users");
+
+        //Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_NoUserFound_Returns404()
+    {
+        //Arrange
+        _factory.UserServiceMock.Setup(x => x.GetAllUsers(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<IReadOnlyList<UserDetailsDto>>.Failure(null, "No users profiled currently.", HttpStatusCode.NotFound));
+
+        //Act
+        var response = await _client.GetAsync("api/users");
+
+        //Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_ExceptionThrown_Returns500()
+    {
+        //Arrange
+        _factory.UserServiceMock.Setup(x => x.GetAllUsers(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("An unexpected error occurred."));
+
+        //Act
+        var response = await _client.GetAsync("api/users");
+
+        //Assert
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_UsersFound_Returns200OK()
+    {
+        //Arrange
+
+        List<UserDetailsDto> results = new List<UserDetailsDto>()
+        {
+            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-60), Name = "John Doe", UserEmailAddress = "test@mail.com", UserName = "testeduser112" },
+            new UserDetailsDto(){ AssignedRole = "User", Id = Guid.NewGuid(), isActive = false, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-30), Name = "John Dane", UserEmailAddress = "test1@mail.com", UserName = "testeduser113" },
+            new UserDetailsDto(){ AssignedRole = "Admin", Id = Guid.NewGuid(), isActive = true, LastLoginDate = DateTimeOffset.UtcNow.AddSeconds(-90), Name = "Jane Doe", UserEmailAddress = "test2@mail.com", UserName = "testeduser114" },
+        };
+
+        _factory.UserServiceMock.Setup(x => x.GetAllUsers(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GenericResponse<IReadOnlyList<UserDetailsDto>>.Success(results, "Profiled Users Fetched Successfully.", HttpStatusCode.OK));
+
+        //Act
+        var response = await _client.GetAsync("api/users");
+
+        //Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<GenericResponse<IReadOnlyList<UserDetailsDto>>>();
+        Assert.NotNull(body);
+        Assert.True(body.IsSuccessful);
+        Assert.NotNull(body.ResponseData);
+        Assert.Contains("Profiled Users Fetched Successfully", body.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(results.Count, body.ResponseData.Count);
     }
 }

@@ -207,7 +207,7 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,ADMIN")]
     [EnableRateLimiting("per-user-rating")]
     public async Task<IActionResult> Reactivate([FromBody] ReactivateUserRequestDto reactivateUserRequest, CancellationToken ct = default)
     {
@@ -215,6 +215,50 @@ public class UsersController : ControllerBase
         try
         {
             var result = await _userService.ReactivateUserProfileAsync(reactivateUserRequest, ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// This is an admin endpoint that allows authenticated users to spool all profiled users in the system.
+    /// </summary>
+    /// <param name="ct">
+    /// The cancellation token that implies if the operatio should be cancelled.
+    /// </param>
+    /// <returns>
+    /// Returns the response containing the list of users and error if operation failed.
+    /// <respone code="200">Users sfetched successfully and users exists in the system.</respone>
+    /// <respone code="404">No user profiled in the system yet.</respone>
+    /// <respone code="500">Users could not be fetched and an unexpected error occurred while performing operation.</respone>
+    /// <respone code="500">Operation origin rate limit exceeded..</respone>
+    /// </returns>
+    [Authorize(Roles = "ADMIN,Admin")]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
+    [HttpGet]
+    [EnableRateLimiting("per-user-rating")]
+    public async Task<IActionResult> GetAllUsers(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetAllUsers));
+        try
+        {
+            var result = await _userService.GetAllUsers(ct: ct);
+
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)

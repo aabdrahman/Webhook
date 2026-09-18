@@ -1493,4 +1493,64 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         Assert.Equal("An error occurred while deactivating user profile. Kindly retry.", result.ResponseMessage, ignoreCase: true);
         Assert.Equal("Operation Failed.", result.ResponseData, ignoreCase: true);
     }
+
+    //----------------------------
+    // Get Profield Users
+    //----------------------------
+    [Fact]
+    public async Task GetAllUsers_CancellationRequested_Returns500InternalServerError()
+    {
+        //Arrange
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var sut = CreateSut();
+        //Act
+        var result = await sut.GetAllUsers(ct: cts.Token);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.Equal("An error occurred while fetching user details.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_NoProfiledUser_Returns404NotFound()
+    {
+        //Arrange
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetAllUsers();
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("No users profiled currently.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetAllUsers_UsersExist_Returns200OK()
+    {
+        //Arrange
+        var seedUser1 = await SeedUserAsync();
+        var seedUser2 = await SeedUserAsync(emailAddress: "test2@mail.com", username: "testedUser113");
+
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetAllUsers();
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Equal("Profiled Users Fetched Successfully.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(2, result.ResponseData.Count);
+    }
 }

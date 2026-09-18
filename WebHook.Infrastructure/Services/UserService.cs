@@ -326,4 +326,38 @@ public sealed class UserService : IUserService
         }
 
     }
+    public async Task<GenericResponse<IReadOnlyList<UserDetailsDto>>> GetAllUsers(bool includeDeactivated = false, CancellationToken ct = default)
+    {
+        try
+        {
+            _logger.Information("Fetching users profiled.....");
+
+            var result = await _repositoryContext.Database
+                .SqlQuery<UserDetailsDto>
+                (
+                    $@"
+                        SELECT ""u"".""Id"", CONCAT(""u"".""FirstName"", ' ', ""u"".""LastName"") AS ""Name"", 
+		                        ""r"".""NormalizedName"" AS ""AssignedRole"", 
+		                        ""u"".""NormalizedUserName"" AS ""UserName"",
+		                        ""u"".""NormalizedEmail"" AS ""UserEmailAddress"",
+		                        ""u"".""IsActive"" AS ""isActive"", ""u"".""LastLoginDate""
+                        FROM public.""AspNetUsers"" AS ""u""
+                        INNER JOIN public.""AspNetUserRoles"" AS ""ur""
+                        ON ""u"".""Id"" = ""ur"".""UserId""
+                        INNER JOIN public.""AspNetRoles"" AS ""r""
+                        ON ""r"".""Id"" = ""ur"".""RoleId""
+                    "
+                )
+                .ToListAsync(ct);
+
+            return result.Any() ? GenericResponse<IReadOnlyList<UserDetailsDto>>.Success(result, "Profiled Users Fetched Successfully.", HttpStatusCode.OK) :
+                GenericResponse<IReadOnlyList<UserDetailsDto>>.Failure(null, "No users profiled currently.", HttpStatusCode.NotFound);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while fetching profiled users");
+            return GenericResponse<IReadOnlyList<UserDetailsDto>>.Failure(null, "An error occurred while fetching user details.", HttpStatusCode.InternalServerError);
+        }
+       
+    }
 }
