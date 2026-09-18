@@ -55,6 +55,9 @@ public static class ApplicationServiceExtensions
         services.AddScoped<SubscribeToEventCatalogHandler>();
         services.AddScoped<UnSubscribeFromEventCatalogHandler>();
 
+        //Users
+        services.AddScoped<GetAllUsersHandler>();
+
         //Authentication
         services.AddTransient<AuthenticationTokenHandler>();
 
