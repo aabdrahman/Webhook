@@ -1,0 +1,33 @@
+﻿using System.Text.Json;
+using Webhook.Web.Helper;
+using WebHook.Core.DataTransferObjects;
+using WebHook.Core.Entities;
+
+namespace Webhook.Web.Handlers.User;
+
+public class RevokeUserTokensHandler
+{
+    private readonly HttpClient _httpClient;
+    public RevokeUserTokensHandler(IHttpClientFactory httpClientFactory)
+    {
+        _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameSecure);
+    }
+
+    public async Task<ApiResponseDto> HandleAsync(Guid UserId)
+    {
+        try
+        {
+            var httpResponse = await _httpClient.DeleteAsync($"api/OtpOperation/revoke-otp/{UserId}");
+            string responseContent = await httpResponse.Content.ReadAsStringAsync();
+
+            GenericResponse<string> responseBody = JsonSerializer.Deserialize<GenericResponse<string>>(responseContent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??
+                throw new InvalidOperationException("Http Response could not be deserialized.");
+
+            return new ApiResponseDto(responseBody.IsSuccessful, responseBody.ResponseMessage);
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponseDto(false, ex.Message);
+        }
+    }
+}

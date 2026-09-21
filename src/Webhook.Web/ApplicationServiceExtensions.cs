@@ -57,6 +57,10 @@ public static class ApplicationServiceExtensions
 
         //Users
         services.AddScoped<GetAllUsersHandler>();
+        services.AddScoped<RevokeUserTokensHandler>();
+        services.AddScoped<DeactivateUserProfileHandler>();
+        services.AddScoped<ReactivateUserProfileHandler>();
+        services.AddScoped<AssignNewRoleHandler>();
 
         //Authentication
         services.AddTransient<AuthenticationTokenHandler>();

@@ -8,6 +8,8 @@
 @using Webhook.Web.Handlers.Admin
 @using Webhook.Web.Handlers.User
 
+@using WebHook.Core.DataTransferObjects.Authentication
+
 
 @inject GetEventCatalogsHandler getEventCatalogsHandler
 @inject ModifyEventCatalogStatusHandler modifyEventCatalogStatusHandler
@@ -15,5 +17,9 @@
 @inject SubscribeToEventCatalogHandler subscribeToEventCatalogHandler
 @inject UnSubscribeFromEventCatalogHandler unsubscribeFromEventCatalogHandler
 @inject GetAllUsersHandler getAllUsersHandler
+@inject RevokeUserTokensHandler revokeUserTokensHandler
+@inject DeactivateUserProfileHandler deactivateUserProfileHandler
+@inject ReactivateUserProfileHandler reactivateUserProfileHandler
+@inject AssignNewRoleHandler assignNewRoleHandler
 
 @inject HealthCheckStatusHandler healthCheckStatusHandler
