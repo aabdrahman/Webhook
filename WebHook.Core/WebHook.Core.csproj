@@ -11,6 +11,7 @@
 	</ItemGroup>
 
   <ItemGroup>
+    <Folder Include="DataTransferObjects\Deliver\" />
     <Folder Include="EventContracts\Commands\" />
   </ItemGroup>
 

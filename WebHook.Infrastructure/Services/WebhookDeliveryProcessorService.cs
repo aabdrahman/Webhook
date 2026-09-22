@@ -89,7 +89,19 @@ public sealed class WebhookDeliveryProcessorService
 
             Dictionary<Guid, WebhookDeliveryProcessorMetadataDto> deliveryMetadatas = await _repositoryContext.WebhookDeliveries
                                                 .Where(x => deliveryIds.Contains(x.Id))
-                                                .Select(x => new WebhookDeliveryProcessorMetadataDto() { DeliveryId = x.Id, EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey, RaisedEventName = x.webhookEvent.EventType })
+                                                .Select(x => new WebhookDeliveryProcessorMetadataDto()
+                                                {
+                                                    DeliveryId = x.Id,
+                                                    EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey,
+                                                    RaisedEventName = x.webhookEvent.EventType.ToUpper(),
+                                                    ContactEmail = x.WebhookSubscriptionEvent.webhookSubscription.ContactEmail ?? "",
+                                                    ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                    SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
+                                                    AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
+                                                    FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
+                                                    FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
+                                                    EventId = x.WebhookSubscriptionEvent.Id
+                                                })
                                                 .ToDictionaryAsync(x => x.DeliveryId, ct);
             //.ToListAsync(ct);
 

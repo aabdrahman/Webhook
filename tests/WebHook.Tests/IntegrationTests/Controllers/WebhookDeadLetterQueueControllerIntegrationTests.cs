@@ -136,7 +136,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
     {
         // Arrange
         _factory.DeadLetterServiceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(
+            .Setup(s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Failure(null, "Dead letter queue items do not exist.", HttpStatusCode.NotFound));
@@ -165,7 +165,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
         };
 
         _factory.DeadLetterServiceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(
+            .Setup(s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Success(items, "Dead letter queues fetched successfully.", HttpStatusCode.OK));
@@ -192,7 +192,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
         var capturedId = Guid.Empty;
 
         _factory.DeadLetterServiceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(
+            .Setup(s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Callback<Guid, CancellationToken>((id, _) => capturedId = id)
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
@@ -220,7 +220,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
     {
         // Arrange
         _factory.DeadLetterServiceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(
+            .Setup(s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Unexpected fault."));
 
@@ -236,7 +236,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
     {
         // Arrange
         _factory.DeadLetterServiceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(
+            .Setup(s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Failure(null, "Not found.", HttpStatusCode.NotFound));
@@ -246,7 +246,7 @@ public sealed class WebhookDeadLetterQueueControllerIntegrationTests
 
         // Assert
         _factory.DeadLetterServiceMock.Verify(
-            s => s.GetDeliveryDeadKetterAsync(
+            s => s.GetDeliveryDeadLetterAsync(
                 It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }

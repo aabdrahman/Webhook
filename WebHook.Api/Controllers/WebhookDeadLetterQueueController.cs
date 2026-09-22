@@ -68,7 +68,7 @@ public class WebhookDeadLetterQueueController : ControllerBase
         _logger = _logger.ForContext(_methodName, nameof(GetDeadLetterQueue));
         try
         {
-            var result = await _deadLetterQueueService.GetDeliveryDeadKetterAsync(deliveryId, token);
+            var result = await _deadLetterQueueService.GetDeliveryDeadLetterAsync(deliveryId, token);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }

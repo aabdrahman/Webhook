@@ -61,7 +61,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var items = new List<DeadLetterQueueDto> { BuildDlqDto(), BuildDlqDto() };
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Success(items, "Dead letter queues fetched successfully.", HttpStatusCode.OK));
 
@@ -87,7 +87,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var deliveryId = Guid.NewGuid();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Success(new List<DeadLetterQueueDto> { BuildDlqDto() }, "OK", HttpStatusCode.OK));
 
@@ -96,7 +96,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
 
         // Assert — correct delivery ID forwarded to service
         _serviceMock.Verify(
-            s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()),
+            s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -108,7 +108,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var item = BuildDlqDto();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Success(new List<DeadLetterQueueDto> { item }, "OK", HttpStatusCode.OK));
 
@@ -134,7 +134,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var deliveryId = Guid.NewGuid();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Failure(null, "Dead Letter queue items do not exist.", HttpStatusCode.NotFound));
 
@@ -163,7 +163,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var deliveryId = Guid.NewGuid();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Failure(null, "An unexpected error occurred.", HttpStatusCode.InternalServerError));
 
@@ -183,7 +183,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var deliveryId = Guid.NewGuid();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Unexpected fault."));
 
         // Act
@@ -202,7 +202,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         var deliveryId = Guid.NewGuid();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Fault."));
 
         // Act & Assert
@@ -224,7 +224,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
         using var cts = new CancellationTokenSource();
 
         _serviceMock
-            .Setup(s => s.GetDeliveryDeadKetterAsync(deliveryId, cts.Token))
+            .Setup(s => s.GetDeliveryDeadLetterAsync(deliveryId, cts.Token))
             .ReturnsAsync(GenericResponse<IReadOnlyList<DeadLetterQueueDto>>
                 .Success(new List<DeadLetterQueueDto>(), "OK", HttpStatusCode.OK));
 
@@ -233,7 +233,7 @@ public sealed class WebhookDeadLetterQueueControllerTests
 
         // Assert — specific token forwarded
         _serviceMock.Verify(
-            s => s.GetDeliveryDeadKetterAsync(deliveryId, cts.Token),
+            s => s.GetDeliveryDeadLetterAsync(deliveryId, cts.Token),
             Times.Once);
     }
 

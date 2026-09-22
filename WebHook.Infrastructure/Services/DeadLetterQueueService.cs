@@ -101,9 +101,9 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
         }
     }
 
-    public async Task<GenericResponse<IReadOnlyList<DeadLetterQueueDto>>> GetDeliveryDeadKetterAsync(Guid deliveryId, CancellationToken ct = default)
+    public async Task<GenericResponse<IReadOnlyList<DeadLetterQueueDto>>> GetDeliveryDeadLetterAsync(Guid deliveryId, CancellationToken ct = default)
     {
-        _logger = _logger.ForContext(_methodName, nameof(GetDeliveryDeadKetterAsync));
+        _logger = _logger.ForContext(_methodName, nameof(GetDeliveryDeadLetterAsync));
 
         try
         {

@@ -698,7 +698,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var sut = CreateSut(ctx);
 
         // Act
-        var result = await sut.GetDeliveryDeadKetterAsync(Guid.NewGuid());
+        var result = await sut.GetDeliveryDeadLetterAsync(Guid.NewGuid());
 
         // Assert
         Assert.False(result.IsSuccessful);
@@ -724,7 +724,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
 
         // Act
-        var result = await sut.GetDeliveryDeadKetterAsync(delivery.Id);
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
         Assert.True(result.IsSuccessful);
@@ -751,7 +751,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
 
         // Act
-        var result = await sut.GetDeliveryDeadKetterAsync(delivery.Id);
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert — DTO fields mapped correctly
         Assert.NotNull(result.ResponseData);
@@ -778,7 +778,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
 
         // Act
-        var result = await sut.GetDeliveryDeadKetterAsync(delivery.Id);
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
         Assert.True(result.IsSuccessful);
@@ -803,7 +803,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
 
         // Act — request only delivery A's DLQ entries
-        var result = await sut.GetDeliveryDeadKetterAsync(deliveryA.Id);
+        var result = await sut.GetDeliveryDeadLetterAsync(deliveryA.Id);
 
         // Assert — only delivery A's entry returned
         Assert.True(result.IsSuccessful);
@@ -825,7 +825,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.SaveChangesAsync();
 
         // Act
-        var result = await sut.GetDeliveryDeadKetterAsync(delivery.Id);
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
         Assert.Null(result.ResponseData!.First().RetriedAt);
@@ -846,7 +846,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
 
         // Act & Assert
         var ex = await Record.ExceptionAsync(
-            () => sut.GetDeliveryDeadKetterAsync(Guid.NewGuid(), cts.Token));
+            () => sut.GetDeliveryDeadLetterAsync(Guid.NewGuid(), cts.Token));
 
         Assert.Null(ex);
     }

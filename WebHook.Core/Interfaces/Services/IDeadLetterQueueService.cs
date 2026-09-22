@@ -6,5 +6,5 @@ namespace WebHook.Core.Interfaces.Services;
 public interface IDeadLetterQueueService
 {
     Task<GenericResponse<string>> RequestManualRetryAsync(RequestManualRetryDto requestManualRetry, CancellationToken ct = default);
-    Task<GenericResponse<IReadOnlyList<DeadLetterQueueDto>>> GetDeliveryDeadKetterAsync(Guid deliveryId, CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<DeadLetterQueueDto>>> GetDeliveryDeadLetterAsync(Guid deliveryId, CancellationToken ct = default);
 }
