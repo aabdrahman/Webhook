@@ -142,7 +142,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
             if (!signinResult.Succeeded)
             {
-                _logger.Warning("User signin failed - {0}", loginUserDetails.UserNameOrEmailAddress);
+                _logger.Warning("User signin failed - {0}, {1}", loginUserDetails.UserNameOrEmailAddress);
                 return GenericResponse<TokenDto>.Failure(null, "Invalid Credentials.", HttpStatusCode.BadRequest);
             }
 
@@ -663,7 +663,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 IdentityResult removeExistingRolesResult = await _userManager.RemoveFromRolesAsync(userToReassignRole, userCurrentRoles);
                 if (!removeExistingRolesResult.Succeeded)
                 {
-                    _logger.Warning("User: {0} could not be removed from specified roles- {1}", string.Join(", ", userCurrentRoles));
+                    _logger.Warning("User: {0} could not be removed from specified roles- {1}. Errors - {1}", string.Join(", ", userCurrentRoles), removeExistingRolesResult.Errors.Select(x => x.Description));
                     return GenericResponse<string>.Failure("Operation Failed.", "User could not be removed from the existing roles. Kindly retry.", HttpStatusCode.Conflict);
                 }
 
@@ -673,7 +673,7 @@ public sealed class AuthenticationService : IAuthenticationService
             IdentityResult setNewRoleResult = await _userManager.AddToRoleAsync(userToReassignRole, changeUserRoleRequest.NewRoleToAssign);
             if (!setNewRoleResult.Succeeded)
             {
-                _logger.Warning("User - {0} could not be assigned new role - {1}. Errors - {3}", userToReassignRole.NormalizedEmail, changeUserRoleRequest.NewRoleToAssign, setNewRoleResult.Errors.ToList());
+                _logger.Warning("User - {0} could not be assigned new role - {1}. Errors - {3}", userToReassignRole.NormalizedEmail, changeUserRoleRequest.NewRoleToAssign, setNewRoleResult.Errors.Select(x => x.Description).ToList());
                 return GenericResponse<string>.Failure("Operation Failed.", "User could not be assigned new role.", HttpStatusCode.BadRequest);
             }
 

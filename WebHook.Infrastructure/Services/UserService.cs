@@ -86,7 +86,7 @@ public sealed class UserService : IUserService
             //Check if user is created successfully with provided details.
             if (!userCreationResult.Succeeded)
             {
-                var errors = userCreationResult.Errors.ToList();
+                var errors = userCreationResult.Errors.Select(x => x.Description).ToList();
                 _logger.Warning("System could not create user successfully. Errors - {0}", errors);
                 return GenericResponse<string>.Failure("Operation Failed.", "Your profile could not be created. Kindly retry.", HttpStatusCode.BadRequest);
             }
@@ -98,7 +98,7 @@ public sealed class UserService : IUserService
 
                 if (!setRolesResult.Succeeded)
                 {
-                    _logger.Warning("Role could not be added to the created user.", setRolesResult.Errors.ToList());
+                    _logger.Warning("Role could not be added to the created user.", setRolesResult.Errors.Select(x => x.Description).ToList());
                     return GenericResponse<string>.Success("Operation Successful.", "User created.", HttpStatusCode.Created);
                 }
             }
@@ -311,7 +311,7 @@ public sealed class UserService : IUserService
 
             if (!reactivateResult.Succeeded)
             {
-                _logger.Warning("User profile could not be reactivated by the system identity provider. Errors - {0}", reactivateResult.Errors.ToList());
+                _logger.Warning("User profile could not be reactivated by the system identity provider. Errors - {0}", reactivateResult.Errors.Select(x => x.Description).ToList());
                 return GenericResponse<string>.Failure("Operation Failed.", "User profile deactivation failed. Kindly retry.", HttpStatusCode.BadRequest);
             }
 

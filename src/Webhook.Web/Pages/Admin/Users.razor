@@ -292,14 +292,14 @@
             </div>
             <div class="subscription-modal-row">
                 <span class="subscription-modal-label">New Role</span>
-                <Badge Value="@(_selectedUser.Role == "Admin" ? "User" : "Admin")"
+                <Badge Value="@(_selectedUser.Role.Contains("Admin", StringComparison.OrdinalIgnoreCase) ? "User" : "Admin")"
                        Variant="role"
                        ShowDot="false" />
             </div>
         </div>
 
         <Alert Type="warning"
-               Message="@(_selectedUser.Role == "Admin"
+               Message="@(_selectedUser.Role.Contains("Admin", StringComparison.OrdinalIgnoreCase)
                    ? "Demoting this user will remove their admin access immediately."
                    : "Promoting this user will grant them full admin access to all system settings.")" />
 
@@ -628,7 +628,7 @@
 
         try
         {
-            var newRole = _selectedUser.Role == "Admin" ? "User" : "Admin";
+            var newRole = _selectedUser.Role.Contains("Admin", StringComparison.OrdinalIgnoreCase) ? "User" : "Admin";
 
             await Task.Delay(800);
             var result = await assignNewRoleHandler.HandleAsyn(new ChangeUserRoleRequestDto() { NewRoleToAssign = newRole, UserEmailAddress = _selectedUser.Email });
