@@ -4,6 +4,7 @@ using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
 using Webhook.Web.Handlers.Admin;
 using Webhook.Web.Handlers.Authentication;
+using Webhook.Web.Handlers.Delivery;
 using Webhook.Web.Handlers.EventCatalog;
 using Webhook.Web.Handlers.ServiceClient;
 using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog;
@@ -61,6 +62,9 @@ public static class ApplicationServiceExtensions
         services.AddScoped<DeactivateUserProfileHandler>();
         services.AddScoped<ReactivateUserProfileHandler>();
         services.AddScoped<AssignNewRoleHandler>();
+
+        //Delivery
+        services.AddScoped<GetDeliveriesHandler>();
 
         //Authentication
         services.AddTransient<AuthenticationTokenHandler>();
