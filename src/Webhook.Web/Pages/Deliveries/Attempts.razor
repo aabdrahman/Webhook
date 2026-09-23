@@ -1,5 +1,4 @@
 @page "/deliveries/{DeliveryId:guid}/attempts"
-@inject NavigationManager Navigation
 
 <PageTitle>Delivery Attempts — WebhookHub</PageTitle>
 
@@ -9,7 +8,7 @@
 {
     <div class="attempts-header">
         <button class="btn btn-ghost btn-sm"
-                @onclick="NavigateBack">
+                @onclick="@(() => navigationManager.NavigateTo("/deliveries"))">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                  style="width:14px;height:14px;">
@@ -22,16 +21,18 @@
     <PageHeader Title="Delivery Attempts"
                 Description="@($"Delivery ID: {DeliveryId}")" />
 
-    <!-- Delivery summary card -->
+    <!-- Delivery details card -->
     @if (_delivery is not null)
     {
         <div class="card" style="margin-bottom:var(--space-5);">
             <div class="card-header">
-                <h2 class="card-title">Delivery Summary</h2>
+                <h2 class="card-title">Delivery Details</h2>
                 <Badge Value="@_delivery.Status" Variant="delivery" />
             </div>
             <div class="card-body">
-                <div class="attempts-summary-grid">
+
+                <!-- Row 1 — core fields -->
+                <div class="attempts-summary-grid" style="margin-bottom:var(--space-5);">
                     <div class="detail-field">
                         <span class="detail-field-label">Event Type</span>
                         <span class="detail-field-value table-mono text-sm">
@@ -39,15 +40,44 @@
                         </span>
                     </div>
                     <div class="detail-field">
-                        <span class="detail-field-label">Subscription</span>
+                        <span class="detail-field-label">Subscriber</span>
                         <span class="detail-field-value text-sm">
-                            @_delivery.SubscriptionName
+                            @_delivery.SubscriberName
+                        </span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-field-label">Retry Cycle</span>
+                        <span class="detail-field-value text-sm">
+                            @_delivery.RetryCycle
+                        </span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-field-label">Retry Count</span>
+                        <span class="detail-field-value text-sm">
+                            @_delivery.RetryCount
                         </span>
                     </div>
                     <div class="detail-field">
                         <span class="detail-field-label">Total Attempts</span>
                         <span class="detail-field-value text-sm">
-                            @_attempts.Count
+                            @_delivery.TotalAttempts
+                        </span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-field-label">Failed Attempts</span>
+                        <span class="detail-field-value text-sm"
+                              style="color:@(_delivery.TotalFailedAttempts > 0
+                                             ? "var(--color-danger)"
+                                             : "inherit");">
+                            @_delivery.TotalFailedAttempts
+                        </span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-field-label">Avg Duration</span>
+                        <span class="detail-field-value text-sm">
+                            @(_delivery.AverageDuration.HasValue
+                                ? $"{_delivery.AverageDuration:F1} ms"
+                                : "—")
                         </span>
                     </div>
                     <div class="detail-field">
@@ -56,7 +86,54 @@
                             @_delivery.CreatedAt.ToString("MMM dd, yyyy HH:mm:ss")
                         </span>
                     </div>
+                    @if (_delivery.DeliveredAt.HasValue)
+                    {
+                        <div class="detail-field">
+                            <span class="detail-field-label">Delivered At</span>
+                            <span class="detail-field-value text-sm"
+                                  style="color:var(--color-success);">
+                                @_delivery.DeliveredAt.Value.ToString("MMM dd, yyyy HH:mm:ss")
+                            </span>
+                        </div>
+                    }
+                    @if (_delivery.NextRetryAt.HasValue)
+                    {
+                        <div class="detail-field">
+                            <span class="detail-field-label">Next Retry</span>
+                            <span class="detail-field-value text-sm"
+                                  style="color:var(--color-warning);">
+                                @_delivery.NextRetryAt.Value.ToString("MMM dd, yyyy HH:mm:ss")
+                            </span>
+                        </div>
+                    }
                 </div>
+
+                <!-- Callback URL -->
+                @if (!string.IsNullOrWhiteSpace(_delivery.CallBackUrl))
+                {
+                    <div class="detail-field" style="margin-bottom:var(--space-4);">
+                        <span class="detail-field-label">Callback URL</span>
+                        <span class="detail-field-value table-mono text-sm">
+                            @_delivery.CallBackUrl
+                        </span>
+                    </div>
+                }
+
+                <!-- Request payload -->
+                @if (!string.IsNullOrWhiteSpace(_delivery.RequestPayload))
+                {
+                    <div class="detail-field">
+                        <div class="attempts-response-header">
+                            <span class="detail-field-label">Request Payload</span>
+                            <CopyButton Value="@_delivery.RequestPayload"
+                                        ShowField="false"
+                                        Label="Copy payload" />
+                        </div>
+                        <pre class="attempts-response-pre"
+                             style="margin-top:var(--space-2);">@FormatJson(_delivery.RequestPayload)</pre>
+                    </div>
+                }
+
             </div>
         </div>
     }
@@ -71,7 +148,6 @@
     }
     else
     {
-        <!-- Attempt cards -->
         <div class="attempts-list">
             @foreach (var attempt in _attempts.OrderByDescending(a => a.AttemptedAt))
             {
@@ -88,18 +164,19 @@
                                           : "attempts-status-error")">
                                     @attempt.HttpResponseCode
                                 </span>
-                                <span class="text-sm text-secondary">
+                                <span class="text-sm text-muted">
                                     @attempt.Duration ms
                                 </span>
                             </div>
                         </div>
                         <div class="attempts-card-time">
-                            <span class="text-sm text-secondary">
+                            <span class="text-sm text-muted">
                                 @attempt.AttemptedAt.ToString("MMM dd, yyyy HH:mm:ss")
                             </span>
                             <button class="btn btn-ghost btn-sm"
                                     @onclick="() => ToggleExpand(attempt.Id)"
-                                    title="@(_expandedIds.Contains(attempt.Id) ? "Collapse" : "Expand")">
+                                    title="@(_expandedIds.Contains(attempt.Id)
+                                             ? "Collapse" : "Expand")">
                                 <svg viewBox="0 0 24 24" fill="none"
                                      stroke="currentColor" stroke-width="2"
                                      stroke-linecap="round" stroke-linejoin="round"
@@ -124,11 +201,13 @@
                             </div>
                             @if (string.IsNullOrWhiteSpace(attempt.HttpResponse))
                             {
-                                <p class="text-sm text-secondary">No response body.</p>
+                                <p class="text-sm text-muted">No response body.</p>
                             }
                             else
                             {
-                                <pre class="attempts-response-pre">@FormatJson(attempt.HttpResponse)</pre>
+                                <pre class="attempts-response-pre">
+                                    @FormatJson(attempt.HttpResponse)
+                                </pre>
                             }
                         </div>
                     }
@@ -146,11 +225,11 @@
     // State
     // -------------------------------------------------------------------------
 
-    private bool          _isLoading    = true;
-    private string        _errorMessage = string.Empty;
-    private DeliverySummary? _delivery;
-    private List<AttemptItem> _attempts = [];
-    private HashSet<Guid> _expandedIds = [];
+    private bool                       _isLoading    = true;
+    private string                     _errorMessage = string.Empty;
+    private WebhookDeliveryDetailsDto? _delivery;
+    private List<AttemptItem>          _attempts     = [];
+    private HashSet<Guid>              _expandedIds  = [];
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -166,15 +245,19 @@
 
         try
         {
-            // TODO: replace with real service call once endpoint is available
-            // var result = await DeliveryService.GetAttemptsAsync(DeliveryId);
+            // TODO: replace with real service call
+            // var result = await DeliveryService.GetDeliveryDetailsAsync(DeliveryId);
             // if (!result.IsSuccessful)
             // {
             //     _errorMessage = result.ResponseMessage;
             //     return;
             // }
             // _delivery = result.ResponseData.Delivery;
-            // _attempts = result.ResponseData.Attempts.ToList();
+            // _attempts = result.ResponseData.Attempts
+            //     .Select(a => new AttemptItem(
+            //         a.Id, a.HttpResponseCode, a.HttpResponse,
+            //         a.Duration, a.AttemptedAt, a.AttemptedCount))
+            //     .ToList();
 
             await Task.Delay(700);
 
@@ -186,11 +269,23 @@
                 return;
             }
 
-            _delivery = new DeliverySummary(
-                "OrderCreated",
-                "Order Service Sub",
-                "Failed",
-                DateTimeOffset.UtcNow.AddMinutes(-30));
+            _delivery = new WebhookDeliveryDetailsDto
+            {
+                Id                  = DeliveryId,
+                SubscriberName      = "Order Service Sub",
+                EventType           = "OrderCreated",
+                Status              = "Failed",
+                RetryCycle          = 2,
+                RetryCount          = 3,
+                AverageDuration     = 3604.6,
+                TotalAttempts       = 3,
+                TotalFailedAttempts = 3,
+                RequestPayload      = @"{""orderId"":""abc-123"",""amount"":5000,""currency"":""NGN""}",
+                CallBackUrl         = "https://orders.internal/webhook",
+                NextRetryAt         = DateTimeOffset.UtcNow.AddMinutes(15),
+                DeliveredAt         = null,
+                CreatedAt           = DateTimeOffset.UtcNow.AddMinutes(-30)
+            };
 
             _attempts =
             [
@@ -239,30 +334,18 @@
     {
         try
         {
-            var parsed    = System.Text.Json.JsonDocument.Parse(json);
-            return System.Text.Json.JsonSerializer.Serialize(
-                parsed.RootElement,
-                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            var parsed = JsonDocument.Parse(json);
+            return JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
         }
         catch
         {
-            // Not valid JSON — return as-is
             return json;
         }
     }
 
-    private void NavigateBack()
-        => Navigation.NavigateTo("/deliveries");
-
     // -------------------------------------------------------------------------
-    // Local view models
+    // Local view model — attempts only
     // -------------------------------------------------------------------------
-
-    private sealed record DeliverySummary(
-        string         EventType,
-        string         SubscriptionName,
-        string         Status,
-        DateTimeOffset CreatedAt);
 
     private sealed record AttemptItem(
         Guid           Id,

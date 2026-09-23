@@ -198,7 +198,7 @@
     font-family: var(--font-body);
     font-size: var(--text-xs);
     font-weight: var(--weight-semibold);
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: var(--tracking-wider);
 }
