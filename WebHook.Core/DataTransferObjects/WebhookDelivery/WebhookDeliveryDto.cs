@@ -7,7 +7,7 @@ public record class WebhookDeliveryDto
     public string EventType { get; set; }
     public string Status { get; set; }
     public int RetryCycle { get; set; }
-    public double AverageDuration { get; set; } = 0;
+    public double? AverageDuration { get; set; } = 0;
     public int RetryCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

@@ -31,7 +31,7 @@ public static class WebhookDeliveryMapper
             RetryCount = delivery.RetryCount,
             Status = delivery.DeliveryStatus.ToString(),
             AverageDuration = delivery.WebhookDeliveryAttempts.Average(x => x.Duration),
-            SubscriberName = delivery.WebhookSubscriptionEvent.webhookSubscription.Name,
+            SubscriberName = delivery.WebhookSubscriptionEvent.webhookSubscription.Name ?? string.Empty,
             CreatedAt = delivery.CreatedAt,
             CallBackUrl = delivery.CallBackUrl,
             DeliveredAt = delivery.DeliveredAt,

@@ -9,7 +9,7 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
-public class WebhookDeliveryAttemptService : IIWebhookDeliveryAttemptService
+public class WebhookDeliveryAttemptService : IWebhookDeliveryAttemptService
 {
     private readonly RepositoryContext _repositoryContext;
 
@@ -33,7 +33,7 @@ public class WebhookDeliveryAttemptService : IIWebhookDeliveryAttemptService
             if(!deliveryAttempts.Any())
             {
                 _logger.Warning("No delivery attempts yet for delivery - {0}", deliveryId);
-                return GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>.Failure(null, "Webhook delivery attempts not yEt made for the delievry.", HttpStatusCode.NotFound);
+                return GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>.Failure(null, "Webhook delivery attempts not yet made for the delievry.", HttpStatusCode.NotFound);
             }
 
             _logger.Information("");

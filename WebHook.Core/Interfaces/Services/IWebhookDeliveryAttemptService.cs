@@ -3,7 +3,7 @@ using WebHook.Core.DataTransferObjects.WebhookDelivery;
 
 namespace WebHook.Core.Interfaces.Services;
 
-public interface IIWebhookDeliveryAttemptService
+public interface IWebhookDeliveryAttemptService
 {
     Task<GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>> GetDeliveryAttemptsAsync(Guid deliveryId, CancellationToken ct = default);
 }
