@@ -486,11 +486,20 @@
     // Retry modal
     // -------------------------------------------------------------------------
 
-    private void OpenRetryModal(DeliveryItem delivery)
+    private void OpenRetryModal1(DeliveryItem delivery)
     {
         _selectedDelivery  = delivery;
+        navigationManager.NavigateTo($"/dead-letters/{_selectedDelivery.Id}");
         _retryErrorMessage = string.Empty;
         _showRetryModal    = true;
+    }
+
+    private void OpenRetryModal(DeliveryItem delivery)
+    {
+        _selectedDelivery = delivery;
+        navigationManager.NavigateTo($"/dead-letters/{_selectedDelivery.Id}");
+        // _retryErrorMessage = string.Empty;
+        // _showRetryModal = true;
     }
 
     private void CloseModals()
@@ -509,15 +518,8 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await DeliveryService.RetryAsync(_selectedDelivery.Id);
-            // if (!result.IsSuccessful)
-            // {
-            //     _retryErrorMessage = result.ResponseMessage;
-            //     return;
-            // }
-
             await Task.Delay(800);
+            //var result = await requestDeadLetterDeliveryRetryHandler.HandleAsync(_selectedDelivery.Id, new RequestManualRetryDto(){  })
 
             bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 

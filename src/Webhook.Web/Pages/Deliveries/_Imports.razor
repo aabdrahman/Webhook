@@ -1,5 +1,6 @@
 ﻿@using WebHook.Core.Constants
 @using WebHook.Core.DataTransferObjects.WebhookDelivery
+@using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue
 
 @using WebHook.Core.RequestParameter
 
@@ -9,3 +10,6 @@
 @using System.Text.Json
 
 @inject GetDeliveriesHandler getDeliveriesHandler
+@inject RequestDeadLetterDeliveryRetryHandler requestDeadLetterDeliveryRetryHandler
+@inject GetDeliveryDetailsHandler getDeliveryDetailsHandler
+@inject GetDeliveryAttemptsHandler getDeliveryAttemptsHandler

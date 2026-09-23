@@ -65,6 +65,10 @@ public static class ApplicationServiceExtensions
 
         //Delivery
         services.AddScoped<GetDeliveriesHandler>();
+        services.AddScoped<RequestDeadLetterDeliveryRetryHandler>();
+        services.AddScoped<GetDeliveryDeadLettersHandler>();
+        services.AddScoped<GetDeliveryDetailsHandler>();
+        services.AddScoped<GetDeliveryAttemptsHandler>();
 
         //Authentication
         services.AddTransient<AuthenticationTokenHandler>();

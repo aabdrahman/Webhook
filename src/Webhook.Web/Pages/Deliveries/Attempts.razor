@@ -140,10 +140,14 @@
 
     <Alert Message="@_errorMessage" />
 
-    @if (!_attempts.Any() && string.IsNullOrWhiteSpace(_errorMessage))
+    @if (_isLoadingAttempts)
+    {
+        <TableSkeleton Rows="4" Columns="4" />
+    }
+    else if (!_attempts.Any() && string.IsNullOrWhiteSpace(_errorMessage))
     {
         <EmptyState Title="No attempts yet"
-                    Description="No delivery attempts have been made for this delivery."
+                    Description="@(string.Concat("No delivery attempts have been made for this delivery. ", _loadAttempsErrorMessage))"
                     Icon="delivery" />
     }
     else
@@ -230,6 +234,8 @@
     private WebhookDeliveryDetailsDto? _delivery;
     private List<AttemptItem>          _attempts     = [];
     private HashSet<Guid>              _expandedIds  = [];
+    private bool _isLoadingAttempts = false;
+    private string _loadAttempsErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -245,69 +251,89 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await DeliveryService.GetDeliveryDetailsAsync(DeliveryId);
-            // if (!result.IsSuccessful)
-            // {
-            //     _errorMessage = result.ResponseMessage;
-            //     return;
-            // }
-            // _delivery = result.ResponseData.Delivery;
-            // _attempts = result.ResponseData.Attempts
-            //     .Select(a => new AttemptItem(
-            //         a.Id, a.HttpResponseCode, a.HttpResponse,
-            //         a.Duration, a.AttemptedAt, a.AttemptedCount))
-            //     .ToList();
 
             await Task.Delay(700);
-
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
-
+            var result = await getDeliveryDetailsHandler.HandleAsync(deliveryId: DeliveryId);
+            //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            bool success = result.response.successStatus;
             if (!success)
             {
-                _errorMessage = "Failed to load delivery attempts. Please try again.";
+                _errorMessage = $"Failed to load delivery attempts. {result.response.responseMessage}";
                 return;
             }
 
-            _delivery = new WebhookDeliveryDetailsDto
+            if(result.deliveryDetails is null)
             {
-                Id                  = DeliveryId,
-                SubscriberName      = "Order Service Sub",
-                EventType           = "OrderCreated",
-                Status              = "Failed",
-                RetryCycle          = 2,
-                RetryCount          = 3,
-                AverageDuration     = 3604.6,
-                TotalAttempts       = 3,
-                TotalFailedAttempts = 3,
-                RequestPayload      = @"{""orderId"":""abc-123"",""amount"":5000,""currency"":""NGN""}",
-                CallBackUrl         = "https://orders.internal/webhook",
-                NextRetryAt         = DateTimeOffset.UtcNow.AddMinutes(15),
-                DeliveredAt         = null,
-                CreatedAt           = DateTimeOffset.UtcNow.AddMinutes(-30)
-            };
+                _errorMessage = $"Failed to load delivery attempts. {result.response.responseMessage}";
+                return;
+            }
 
-            _attempts =
-            [
-                new AttemptItem(
-                    Guid.NewGuid(), "500",
-                    @"{""error"":""Internal Server Error"",""message"":""Database connection failed.""}",
-                    3012.5, DateTimeOffset.UtcNow.AddMinutes(-30), 1),
+            _delivery = result.deliveryDetails;
 
-                new AttemptItem(
-                    Guid.NewGuid(), "503",
-                    @"{""error"":""Service Unavailable""}",
-                    5001.2, DateTimeOffset.UtcNow.AddMinutes(-20), 2),
+            // _delivery = new WebhookDeliveryDetailsDto
+            // {
+            //     Id                  = DeliveryId,
+            //     SubscriberName      = "Order Service Sub",
+            //     EventType           = "OrderCreated",
+            //     Status              = "Failed",
+            //     RetryCycle          = 2,
+            //     RetryCount          = 3,
+            //     AverageDuration     = 3604.6,
+            //     TotalAttempts       = 3,
+            //     TotalFailedAttempts = 3,
+            //     RequestPayload      = @"{""orderId"":""abc-123"",""amount"":5000,""currency"":""NGN""}",
+            //     CallBackUrl         = "https:orders.internal/webhook",
+            //     NextRetryAt         = DateTimeOffset.UtcNow.AddMinutes(15),
+            //     DeliveredAt         = null,
+            //     CreatedAt           = DateTimeOffset.UtcNow.AddMinutes(-30)
+            // };
 
-                new AttemptItem(
-                    Guid.NewGuid(), "500",
-                    @"{""error"":""Internal Server Error""}",
-                    2800.1, DateTimeOffset.UtcNow.AddMinutes(-10), 3),
-            ];
+
+            if(_delivery is not null)
+            {
+                _isLoadingAttempts = true;
+                _isLoading = false;
+                var getDeliveryAttemptsResult = await getDeliveryAttemptsHandler.HandleAsync(deliveryId: DeliveryId);
+
+                if (!getDeliveryAttemptsResult.response.successStatus)
+                {
+                    _loadAttempsErrorMessage = getDeliveryAttemptsResult.response.responseMessage;
+                    _isLoadingAttempts = false;
+                    return;
+                }
+
+                if (!getDeliveryAttemptsResult.deliveryAttempts.Any())
+                {
+                    _loadAttempsErrorMessage = getDeliveryAttemptsResult.response.responseMessage;
+                    _isLoadingAttempts = false;
+                    return;
+                }
+
+                _attempts = getDeliveryAttemptsResult.deliveryAttempts.Select(x => new AttemptItem(Id: Guid.NewGuid(), HttpResponseCode: x.HttpStatusCode, HttpResponse: x.HttpResponse, Duration: x.HttpDuration, AttemptedAt: x.AttemptedAt, AttemptedCount: 1)).ToList();
+            }
+
+            // _attempts =
+            // [
+            //     new AttemptItem(
+            //         Guid.NewGuid(), "500",
+            //         @"{""error"":""Internal Server Error"",""message"":""Database connection failed.""}",
+            //         3012.5, DateTimeOffset.UtcNow.AddMinutes(-30), 1),
+
+            //     new AttemptItem(
+            //         Guid.NewGuid(), "503",
+            //         @"{""error"":""Service Unavailable""}",
+            //         5001.2, DateTimeOffset.UtcNow.AddMinutes(-20), 2),
+
+            //     new AttemptItem(
+            //         Guid.NewGuid(), "500",
+            //         @"{""error"":""Internal Server Error""}",
+            //         2800.1, DateTimeOffset.UtcNow.AddMinutes(-10), 3),
+            // ];
         }
         finally
         {
             _isLoading = false;
+            _isLoadingAttempts = false;
         }
     }
 
