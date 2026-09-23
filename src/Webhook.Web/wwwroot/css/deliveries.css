@@ -5,7 +5,7 @@
 /* Filter row */
 .deliveries-filters {
     display:               grid;
-    grid-template-columns: 1.5fr 1fr 1fr 1fr auto;
+    grid-template-columns: 1fr 1fr 1.5fr 1fr 1fr auto auto;
     gap:                   var(--space-4);
     align-items:           end;
 }

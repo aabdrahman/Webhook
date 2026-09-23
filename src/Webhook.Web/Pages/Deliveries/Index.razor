@@ -1,7 +1,6 @@
 @page "/deliveries"
 @inject NavigationManager Navigation
 @inject ToastService Toast
-@using Microsoft.AspNetCore.WebUtilities
 
 <PageTitle>Deliveries — WebhookHub</PageTitle>
 
@@ -14,22 +13,26 @@
 
     <!-- Filters -->
     <div class="card" style="margin-bottom:var(--space-5);">
-        <div class="card-body">
+        <div class="card-body" style="display:flex;gap:0.5rem;flex-direction:column;">
             <div class="deliveries-filters">
 
-                <!-- Subscription filter -->
+                <!-- Page Number -->
                 <div class="form-group">
-                    <label class="form-label" for="subFilter">Subscription</label>
-                    <select id="subFilter"
-                            class="form-select"
-                            @bind="_filterSubscriptionId"
-                            @bind:after="ApplyFilters">
-                        <option value="">All subscriptions</option>
-                        @foreach (var sub in _subscriptions)
-                        {
-                            <option value="@sub.Id">@sub.Name</option>
-                        }
-                    </select>
+                    <label class="form-label" for="pagenumber">Page Number</label>
+                    <input id="pagenumber"
+                           type="number"
+                           class="form-input"
+                           @bind="_requestQueryParameter.PageNumber"/>
+                </div>
+
+                <!-- Page Size -->
+                <div class="form-group">
+                    <label class="form-label" for="pagesize">Page Size</label>
+                    <input id="pagesize"
+                           type="number"
+                           min="1"
+                           class="form-input"
+                           @bind="_requestQueryParameter.PageSize"/>
                 </div>
 
                 <!-- Status filter -->
@@ -37,14 +40,12 @@
                     <label class="form-label" for="statusFilter">Status</label>
                     <select id="statusFilter"
                             class="form-select"
-                            @bind="_filterStatus"
-                            @bind:after="ApplyFilters">
+                            @bind="_requestQueryParameter.DeliveryStatus">
                         <option value="">All statuses</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Failed">Failed</option>
-                        <option value="Processing">Processing</option>
-                        <option value="DeadLetter">Dead Letter</option>
+                        @foreach (var item in Enum.GetValues<WebhookDeliveryStatus>())
+                        {
+                            <option value="@item">@item</option>
+                        }
                     </select>
                 </div>
 
@@ -54,8 +55,11 @@
                     <input id="dateFrom"
                            type="date"
                            class="form-input"
-                           @bind="_filterDateFrom"
-                           @bind:after="ApplyFilters" />
+                           @bind="_requestQueryParameter.StartDate"/>
+                    @if (!string.IsNullOrWhiteSpace(_dateFromError))
+                    {
+                        <span class="form-error">@_dateFromError</span>
+                    }
                 </div>
 
                 <!-- Date to -->
@@ -64,8 +68,20 @@
                     <input id="dateTo"
                            type="date"
                            class="form-input"
-                           @bind="_filterDateTo"
-                           @bind:after="ApplyFilters" />
+                           @bind="_requestQueryParameter.EndDate"/>
+                    @if (!string.IsNullOrWhiteSpace(_dateToError))
+                    {
+                        <span class="form-error">@_dateToError</span>
+                    }
+                </div>
+
+                <!-- Apply filters -->
+                <div class="form-group" style="justify-content:center;align-items:center;">
+                    <label class="form-label" style="visibility:hidden;">apply</label>
+                    <button class="btn btn-primary btn-sm"
+                            @onclick="ApplyFilters">
+                        Apply filters
+                    </button>
                 </div>
 
                 <!-- Clear filters -->
@@ -76,8 +92,8 @@
                         Clear filters
                     </button>
                 </div>
-
             </div>
+            <Alert Message="@_filterErrorMessage" />
         </div>
     </div>
 
@@ -160,41 +176,43 @@
                 </div>
 
                 <!-- Pagination — commented out until ready -->
-                @*
-                <div class="deliveries-pagination">
-                    <span class="text-sm text-muted">
-                        Page @_currentPage of @_totalPages
-                    </span>
-                    <div class="pagination">
-                        <button class="pagination-btn"
-                                disabled="@(_currentPage == 1)"
-                                @onclick="PreviousPage">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                 style="width:14px;height:14px;">
-                                <polyline points="15 18 9 12 15 6" />
-                            </svg>
-                        </button>
-                        @for (int p = 1; p <= _totalPages; p++)
-                        {
-                            int page = p;
-                            <button class="pagination-btn @(_currentPage == page ? "active" : "")"
-                                    @onclick="() => GoToPage(page)">
-                                @page
+                @if(_responseMetaData is not null)
+                {
+                    <div class="deliveries-pagination">
+                        <span class="text-sm text-muted">
+                            Page @_currentPage of @_totalPages
+                        </span>
+                        <div class="pagination">
+                            <button class="pagination-btn"
+                                    disabled="@(!_responseMetaData.hasPrevious)"
+                                    @onclick="PreviousPage">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     style="width:14px;height:14px;">
+                                    <polyline points="15 18 9 12 15 6" />
+                                </svg>
                             </button>
-                        }
-                        <button class="pagination-btn"
-                                disabled="@(_currentPage == _totalPages)"
-                                @onclick="NextPage">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                 style="width:14px;height:14px;">
-                                <polyline points="9 18 15 12 9 6" />
-                            </svg>
-                        </button>
+                            @for (int p = 1; p <= _responseMetaData.totalPages; p++)
+                            {
+                                int currPage = p;
+                                <button class="pagination-btn @(_currentPage == currPage ? "active" : "")"
+                                        @onclick="() => GoToPage(currPage)">
+                                    @currPage
+                                </button>
+                            }
+                            <button class="pagination-btn"
+                                    disabled="@(!_responseMetaData.hasNext)"
+                                    @onclick="NextPage">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                     style="width:14px;height:14px;">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                *@
+                }
+                
             </div>
         </div>
     }
@@ -253,12 +271,19 @@
     private bool   _isLoading   = true;
     private bool   _isFiltering = false;
     private string _errorMessage = string.Empty;
+    private WebhookDeliveryQueryRequestParameter _requestQueryParameter = new();
+    private Guid? _subscriptionId = null;
+    private RequestMetaData? _responseMetaData = null;
+
 
     // Filters
     private string   _filterSubscriptionId = string.Empty;
     private string   _filterStatus         = string.Empty;
     private DateTime? _filterDateFrom      = null;
     private DateTime? _filterDateTo        = null;
+    private string _dateFromError = string.Empty;
+    private string _dateToError = string.Empty;
+    private string _filterErrorMessage = string.Empty;
 
     // Data
     private List<DeliveryItem>       _deliveries    = [];
@@ -289,6 +314,12 @@
             && !string.IsNullOrWhiteSpace(subId))
         {
             _filterSubscriptionId = subId.ToString();
+            if(Guid.TryParse(subId, out var subscriptionId))
+            {
+                _subscriptionId = subscriptionId;
+                _requestQueryParameter.SubscriptionId = subscriptionId;
+            }
+
         }
 
         await LoadSubscriptionsAsync();
@@ -310,7 +341,7 @@
             new(Guid.NewGuid().ToString(), "Order Service Sub"),
             new(Guid.NewGuid().ToString(), "CRM Sub"),
             new(Guid.NewGuid().ToString(), "Notification Sub"),
-        ];
+    ];
     }
 
     private async Task LoadDeliveriesAsync()
@@ -347,6 +378,7 @@
             if (!success)
             {
                 _errorMessage = "Failed to load deliveries. Please try again.";
+                _deliveries = [];
                 return;
             }
 
@@ -357,7 +389,7 @@
                 new(Guid.NewGuid(), "OrderCancelled",  "Order Service Sub", "DeadLetter", 0,    5, DateTimeOffset.UtcNow.AddMinutes(-20)),
                 new(Guid.NewGuid(), "UserRegistered",  "Notification Sub",  "Pending",    0,    0, DateTimeOffset.UtcNow.AddMinutes(-1)),
                 new(Guid.NewGuid(), "OrderCreated",    "Order Service Sub", "Delivered",  201,  0, DateTimeOffset.UtcNow.AddMinutes(-35)),
-            ];
+    ];
         }
         finally
         {
@@ -372,8 +404,33 @@
     private async Task ApplyFilters()
     {
         _isFiltering  = true;
-        _currentPage  = 1;
+        //_currentPage  = 1;
         _errorMessage = string.Empty;
+        _filterErrorMessage = string.Empty;
+
+        if(_requestQueryParameter.StartDate > _requestQueryParameter.EndDate)
+        {
+            _filterErrorMessage = "Start Date cannot be earlier than the end date.";
+            return;
+        }
+
+        if(_requestQueryParameter.PageSize > 100)
+        {
+            _filterErrorMessage = $"The page size cannot exceed 100.";
+            return;
+        }
+
+        if(_requestQueryParameter.PageNumber < 1)
+        {
+            _filterErrorMessage = "Page Number cannot be less than 1.";
+            return;
+        }
+
+        if (_requestQueryParameter.PageSize < 1)
+        {
+            _filterErrorMessage = "Page Size cannot be less than 1.";
+            return;
+        }
 
         try
         {
@@ -387,10 +444,18 @@
 
     private async Task ClearFilters()
     {
+        _filterErrorMessage = string.Empty;
         _filterSubscriptionId = string.Empty;
         _filterStatus         = string.Empty;
         _filterDateFrom       = null;
         _filterDateTo         = null;
+        _requestQueryParameter = new();
+
+
+        if(_subscriptionId.HasValue)
+        {
+            _requestQueryParameter.SubscriptionId = _subscriptionId;
+        }
         await ApplyFilters();
     }
 
@@ -407,13 +472,19 @@
     private async Task PreviousPage()
     {
         if (_currentPage > 1)
-            await GoToPage(_currentPage - 1);
+        {
+            _requestQueryParameter.PageNumber = _currentPage - 1;
+        }
+        await GoToPage(_currentPage - 1);
     }
 
     private async Task NextPage()
     {
         if (_currentPage < _totalPages)
-            await GoToPage(_currentPage + 1);
+        {
+            _requestQueryParameter.PageNumber = _currentPage + 1;
+        }
+        await GoToPage(_currentPage + 1);
     }
 
     // -------------------------------------------------------------------------
