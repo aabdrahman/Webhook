@@ -259,7 +259,7 @@
 
         try
         {
-            await Task.Delay(1000);
+            await Task.Delay(100);
             var loginResult = await loginHandler.HandleAsync(_model, rememberMe: _rememeberMe);
 
             _errorMessage = loginResult.successStatus ? string.Empty : loginResult.responseMessage;
@@ -277,8 +277,25 @@
             }
 
             await ((UserJwtAuthenticationStateProvider)authenticationStateProvider).NotifyUserLogin();
-            // Navigate to returnUrl or dashboard on success
-            navigationManager.NavigateTo(GetReturnUrl());
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated ?? false)
+            {
+                // Navigate to returnUrl or dashboard on success
+                var userRole = authState.User.FindFirstValue(ClaimTypes.Role);
+                if (string.IsNullOrEmpty(userRole))
+                {
+                    _errorMessage = "An error occured while signing in.";
+                    return;
+                }
+                bool isAdmin = string.Equals("Admin", userRole, StringComparison.OrdinalIgnoreCase);
+                navigationManager.NavigateTo(GetReturnUrl(isAdmin));
+            }
+            else
+            {
+                _errorMessage = "An error occured while signing in.";
+                return;
+            }
+
         }
         finally
         {
@@ -286,18 +303,17 @@
         }
     }
 
-    private string GetReturnUrl()
+    private string GetReturnUrl(bool isAdmin = false)
     {
         var uri = new Uri(navigationManager.Uri);
         var query = QueryHelpers.ParseQuery(uri.Query);
 
-        if (query.TryGetValue("returnUrl", out var returnUrl)
-            && !string.IsNullOrWhiteSpace(returnUrl))
+        if (query.TryGetValue("returnUrl", out var returnUrl) && !string.IsNullOrWhiteSpace(returnUrl))
         {
             return Uri.UnescapeDataString(returnUrl!);
         }
 
-        return "/dashboard";
+        return isAdmin ? "/admin/dashboard" : "/dashboard";
     }
 
     private async Task HidePasswordOnBlur()

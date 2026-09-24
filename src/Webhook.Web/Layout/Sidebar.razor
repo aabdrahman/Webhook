@@ -20,16 +20,36 @@
         <div>
             <p class="sidebar-section-label">Main</p>
             <div class="sidebar-section-items">
-                <NavLink class="nav-item" href="/dashboard" Match="NavLinkMatch.All">
-                    <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="7" height="7" rx="1" />
-                        <rect x="14" y="3" width="7" height="7" rx="1" />
-                        <rect x="3" y="14" width="7" height="7" rx="1" />
-                        <rect x="14" y="14" width="7" height="7" rx="1" />
-                    </svg>
-                    Dashboard
-                </NavLink>
+                @if(string.Equals(UserRole, "Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                   
+
+                    <NavLink class="nav-item" href="/admin/dashboard" Match="NavLinkMatch.All">
+                        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="3" width="7" height="7" rx="1" />
+                            <rect x="3" y="14" width="7" height="7" rx="1" />
+                            <rect x="14" y="14" width="7" height="7" rx="1" />
+                        </svg>
+                        Admin Dashboard
+                    </NavLink>
+                }
+                else
+                {
+                    <NavLink class="nav-item" href="/dashboard" Match="NavLinkMatch.All">
+                        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" rx="1" />
+                            <rect x="14" y="3" width="7" height="7" rx="1" />
+                            <rect x="3" y="14" width="7" height="7" rx="1" />
+                            <rect x="14" y="14" width="7" height="7" rx="1" />
+                        </svg>
+                        Dashboard
+                    </NavLink>
+                }
+
 
                 <NavLink class="nav-item" href="/subscriptions">
                     <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
@@ -67,7 +87,7 @@
                     <p class="sidebar-section-label">Admin</p>
                     <div class="sidebar-section-items">
 
-                        <NavLink class="nav-item" href="/admin/dashboard">
+                        @* <NavLink class="nav-item" href="/admin/dashboard">
                             <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"
                                  stroke="currentColor" stroke-width="2"
                                  stroke-linecap="round" stroke-linejoin="round">
@@ -77,7 +97,7 @@
                                 <rect x="14" y="14" width="7" height="7" rx="1" />
                             </svg>
                             Admin Dashboard
-                        </NavLink>
+                        </NavLink> *@
 
                         <NavLink class="nav-item" href="/admin/event-catalog">
                             <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none"

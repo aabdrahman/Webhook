@@ -114,7 +114,7 @@
                 <div class="card-header">
                     <h2 class="card-title">Recent Deliveries</h2>
                     <a href="/deliveries?subscriptionId=@Id"
-                       class="btn btn-ghost btn-sm">
+                       class="btn btn-ghost btn-sm" disabled="@(!_recentDeliveries.Any())" >
                         View all
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -131,7 +131,7 @@
                     else if (!_recentDeliveries.Any())
                     {
                         <EmptyState Title="No deliveries yet"
-                                    Description="Deliveries will appear here once events are published."
+                                    Description="@(string.IsNullOrEmpty(_loadDeliveriesErrorMessage) ? "Deliveries will appear here once events are published." : _loadDeliveriesErrorMessage)"
                                     Icon="delivery" />
                     }
                     else
@@ -356,11 +356,11 @@
 
     @code {
 
-    [Parameter] public Guid Id { get; set; }
+        [Parameter] public Guid Id { get; set; }
 
     // -------------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------------
+        // State
+        // -------------------------------------------------------------------------
 
     private bool                   _isLoading          = true;
     private bool                   _isLoadingDeliveries = true;
@@ -368,6 +368,7 @@
     private string                 _errorMessage       = string.Empty;
     private bool                   _showSecretKey      = false;
     private WebhookSubscriptionDto? _subscription;
+    private string _loadDeliveriesErrorMessage = string.Empty;
 
     // Recent deliveries
     private List<DeliveryItem> _recentDeliveries = [];
@@ -409,7 +410,11 @@
     protected override async Task OnParametersSetAsync()
     {
         await LoadSubscriptionAsync();
-        await LoadRecentDeliveriesAsync();
+        if(_subscription is not null)
+        {
+            await LoadRecentDeliveriesAsync();
+        }
+        
     }
 
     private async Task LoadSubscriptionAsync()
@@ -461,18 +466,31 @@
 
         try
         {
-            // TODO: replace with real service call
-            // var result = await DeliveryService.GetBySubscriptionAsync(Id, limit: 5);
-            // _recentDeliveries = result.ResponseData?.ToList() ?? [];
 
             await Task.Delay(400);
 
-            _recentDeliveries =
-            [
-                new("OrderCreated",   "Delivered", 142,  DateTimeOffset.UtcNow.AddMinutes(-2)),
-                new("OrderCancelled", "Failed",    3012, DateTimeOffset.UtcNow.AddMinutes(-8)),
-                new("OrderCreated",   "Delivered", 201,  DateTimeOffset.UtcNow.AddMinutes(-15)),
-    ];
+            var result = await getDeliveriesHandler.HandleAsync(new WebHook.Core.DataTransferObjects.WebhookDelivery.WebhookDeliveryQueryRequestParameter() { SubscriptionId = Id, PageSize = 5, StartDate = DateOnly.FromDateTime((_subscription!.CreatedDate.DateTime)) });
+
+            if (!result.details.IsSuccessful)
+            {
+                _loadDeliveriesErrorMessage = result.details.ResponseMessage;
+                return;
+            }
+
+            if(result.details.ResponseData is null)
+            {
+                _loadDeliveriesErrorMessage = result.details.ResponseMessage;
+                return;
+            }
+
+            _recentDeliveries = result.details.ResponseData.Select(x => new DeliveryItem(EventType: x.EventType, Status: x.Status, DurationMs: x.AverageDuration.HasValue ? x.AverageDuration.Value : 0, CreatedAt: x.CreatedAt)).ToList();
+
+            // _recentDeliveries =
+            // [
+            //     new("OrderCreated",   "Delivered", 142,  DateTimeOffset.UtcNow.AddMinutes(-2)),
+            //     new("OrderCancelled", "Failed",    3012, DateTimeOffset.UtcNow.AddMinutes(-8)),
+            //     new("OrderCreated",   "Delivered", 201,  DateTimeOffset.UtcNow.AddMinutes(-15)),
+            // ];
         }
         finally
         {
@@ -714,6 +732,6 @@
     private sealed record DeliveryItem(
         string         EventType,
         string         Status,
-        int            DurationMs,
+        double            DurationMs,
         DateTimeOffset CreatedAt);
 }

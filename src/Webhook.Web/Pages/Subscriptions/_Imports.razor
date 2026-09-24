@@ -3,6 +3,7 @@
 @using WebHook.Core.DataTransferObjects.WebhookSubscriptionEvent
 @using Webhook.Web.Handlers.EventCatalog
 @using Webhook.Web.Handlers.Subscription
+@using Webhook.Web.Handlers.Delivery
 
 
 @inject GetSubscriptionsHandler getSubscriptionsHandler
@@ -13,3 +14,5 @@
 @inject ReactivateSubscriptionHandler reactivateSubscriptionHandler
 @inject AddEventToSubscriptionHandler addEventToSubscriptionHandler
 @inject UnsubscribeFromEventHandler unsubscribeFromEventHandler
+
+@inject GetDeliveriesHandler getDeliveriesHandler
