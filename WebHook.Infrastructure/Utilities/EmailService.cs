@@ -2,6 +2,7 @@
 using Serilog;
 using System.Net;
 using System.Net.Mail;
+using System.Threading.Channels;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
@@ -11,10 +12,12 @@ namespace WebHook.Infrastructure.Utilities;
 public class EmailService : IEmailService
 {
     private readonly EmailSenderEmailSmtpSettingsConfiguration _settings;
+    private readonly Channel<EmailSenderDto> _emailSenderChannel;
 
-    public EmailService(IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration> optionsMonitor)
+    public EmailService(IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration> optionsMonitor, Channel<EmailSenderDto> emailSenderChannel)
     {
         _settings = optionsMonitor.CurrentValue;
+        _emailSenderChannel = emailSenderChannel;
         _logger = Log.ForContext("ClassName", nameof(EmailService));
     }
 
@@ -69,6 +72,28 @@ public class EmailService : IEmailService
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while sending mail.");
+            return false;
+        }
+    }
+
+    public async Task<bool> QueueEmailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext("MethodName", nameof(QueueEmailAsync));
+        try
+        {
+            _logger.Information("Queueing mail with details - {0}", emailSenderItem);
+            if(await _emailSenderChannel.Writer.WaitToWriteAsync(ct))
+            {
+                await _emailSenderChannel.Writer.WriteAsync(emailSenderItem);
+                
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while queeuing email. Email may be lost forever.");
             return false;
         }
     }

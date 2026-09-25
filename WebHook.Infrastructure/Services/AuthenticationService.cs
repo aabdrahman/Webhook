@@ -322,11 +322,12 @@ public sealed class AuthenticationService : IAuthenticationService
             if (!string.IsNullOrEmpty(emailContent))
             {
                 EmailSenderDto emailSenderItem = new EmailSenderDto(MailContent: emailContent, Subject: subject, MailRecipients: [requestingUser.NormalizedEmail!], IsHtml: true);
-                queueEmailResult = await _emailService.SendMailAsync(emailSenderItem, ct);
+                //queueEmailResult = await _emailService.SendMailAsync(emailSenderItem, ct);
+                queueEmailResult = await _emailService.QueueEmailAsync(emailSenderItem, ct);
             }
 
 
-            _logger.Information("User OTP requested successfully. Requested OTP - {0}. Queue Email response: {1}. Email COntent Generated - {2}", generatedOTP, queueEmailResult, !string.IsNullOrEmpty(emailContent));
+            _logger.Information("User OTP requested successfully. Requested OTP - {0}. Queue Email response: {1}. Email Content Generated - {2}", generatedOTP, queueEmailResult, !string.IsNullOrEmpty(emailContent));
             return GenericResponse<string>.Success($"{requestingUser.NormalizedEmail}", "OTP sent successfully.", HttpStatusCode.OK);
 
         }
