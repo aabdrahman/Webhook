@@ -15,7 +15,7 @@ namespace WebHook.Api.Controllers;
 /// </summary>
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "ADMIN,Admin")]
+[Authorize(Roles = "ADMIN,Admin,USER,User")]
 public class WebhookDeliveriesController : ControllerBase
 {
     private readonly IWebhookDeliveryService _webhookDeliveryService;

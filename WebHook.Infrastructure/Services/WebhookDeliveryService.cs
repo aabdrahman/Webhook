@@ -4,6 +4,7 @@ using System.Net;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Core.Mapper;
 using WebHook.Core.RequestParameter;
@@ -14,10 +15,12 @@ namespace WebHook.Infrastructure.Services;
 public class WebhookDeliveryService : IWebhookDeliveryService
 {
     private readonly RepositoryContext _repositoryContext;
+    private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
-    public WebhookDeliveryService(RepositoryContext repositoryContext)
+    public WebhookDeliveryService(RepositoryContext repositoryContext, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
+        _authenticatedUserDetails = authenticatedUserDetails;
     }
 
     private const string _methodName = "MethodName";
@@ -34,6 +37,17 @@ public class WebhookDeliveryService : IWebhookDeliveryService
             DateTimeOffset endDate = webhookDeliveryQueryRequest.EndDate.ToDateTime(TimeOnly.MinValue);
 
             IQueryable<WebhookDelivery> fetchDeliveriesQuery = _repositoryContext.WebhookDeliveries.Where(x => x.CreatedAt >= startDate && x.CreatedAt <= x.CreatedAt);
+
+            if(!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                if(!Guid.TryParse(_authenticatedUserDetails.userId, out Guid authUserId))
+                {
+                    _logger.Warning("The authenticated user details could not be parsed as guid - {0}, UserEamil: {1}", _authenticatedUserDetails.userId, _authenticatedUserDetails.emailAddress);
+                    return GenericResponse<PagedListItem<WebhookDeliveryDto>>.Failure(null, "An error occurred while performing operation", HttpStatusCode.BadRequest);
+                }
+
+                fetchDeliveriesQuery = fetchDeliveriesQuery.Where(x => x.WebhookSubscriptionEvent.webhookSubscription.CreatedByUserId == authUserId);
+            }
 
             if(webhookDeliveryQueryRequest.DeliveryStatus is not null)
             {
