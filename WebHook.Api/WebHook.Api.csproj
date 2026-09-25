@@ -9,8 +9,12 @@
 	  
   </PropertyGroup>
 
+	<PropertyGroup>
+		<EnableDefaultContentItems>false</EnableDefaultContentItems>
+	</PropertyGroup>
+
 	<ItemGroup>
-		<Content Include="EmailNotificationTemplates\**\*.html">
+		<Content Include="wwwroot\StaticFiles\EmailNotificationTemplates\**\*.html">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
 		</Content>
@@ -48,6 +52,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebHook.Infrastructure\WebHook.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\DeadLetterNotification.html" />
+    <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\OtpNotification.html" />
+    <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\SendOtpNotification.html" />
+    <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\SlowEndpointNotification.html" />
   </ItemGroup>
 
 </Project>

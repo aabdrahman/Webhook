@@ -1,0 +1,91 @@
+@*
+    ProgressBar — animated progress bar component
+
+    Parameters:
+    - Value:        current value (required)
+    - Max:          maximum value — defaults to 100
+    - Variant:      "primary" | "success" | "warning" | "danger" | "info" (default: "primary")
+    - AutoVariant:  automatically switches to warning then danger as value decreases (default: false)
+    - WarningAt:    percentage threshold to switch to warning colour (default: 40)
+    - DangerAt:     percentage threshold to switch to danger colour (default: 20)
+    - ShowLabel:    shows the value/max label below the bar (default: false)
+    - Label:        custom label text — overrides the default value/max display
+    - Height:       bar height in px (default: 4)
+    - Animated:     smooth CSS transition on value change (default: true)
+
+    Usage:
+        Basic:
+        <ProgressBar Value="@_timer" Max="75" />
+
+        Auto colour change as value decreases:
+        <ProgressBar Value="@_timer" Max="75" AutoVariant="true" />
+
+        With label:
+        <ProgressBar Value="@_timer" Max="75"
+                     ShowLabel="true"
+                     Label="@($"Resend in {_timer}s")" />
+
+        Upload progress:
+        <ProgressBar Value="@_uploadProgress" Max="100"
+                     Variant="success"
+                     ShowLabel="true"
+                     Height="8" />
+
+        Thin accent bar:
+        <ProgressBar Value="@_step" Max="4"
+                     Variant="primary"
+                     Height="2" />
+*@
+
+<div class="progress-bar-wrapper">
+    <div class="progress-bar-track"
+         style="height:@(Height)px;"
+         role="progressbar"
+         aria-valuenow="@Value"
+         aria-valuemin="0"
+         aria-valuemax="@Max">
+        <div class="progress-bar-fill @ResolvedVariantClass @(Animated ? "progress-bar-animated" : "")" style="width:@(PercentageString);"></div>
+    </div>
+    @if (ShowLabel)
+    {
+        <span class="progress-bar-label">
+            @ResolvedLabel
+        </span>
+    }
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public double Value { get; set; }
+
+    [Parameter] public double Max        { get; set; } = 100;
+    [Parameter] public string Variant    { get; set; } = "primary";
+    [Parameter] public bool   AutoVariant { get; set; } = false;
+    [Parameter] public double WarningAt  { get; set; } = 40;
+    [Parameter] public double DangerAt   { get; set; } = 20;
+    [Parameter] public bool   ShowLabel  { get; set; } = false;
+    [Parameter] public string Label      { get; set; } = string.Empty;
+    [Parameter] public int    Height     { get; set; } = 4;
+    [Parameter] public bool   Animated   { get; set; } = true;
+
+    private double Percentage => Max <= 0 ? 0 : Math.Clamp((Value / Max) * 100, 0, 100);
+
+    private string PercentageString => $"{Percentage:F2}%";
+
+    private string ResolvedVariantClass
+    {
+        get
+        {
+            if (!AutoVariant) return $"progress-bar-{Variant}";
+
+            return Percentage <= DangerAt
+                ? "progress-bar-danger"
+                : Percentage <= WarningAt
+                    ? "progress-bar-warning"
+                    : $"progress-bar-{Variant}";
+        }
+    }
+
+    private string ResolvedLabel => !string.IsNullOrWhiteSpace(Label) ? Label : $"{Value} / {Max}";
+}

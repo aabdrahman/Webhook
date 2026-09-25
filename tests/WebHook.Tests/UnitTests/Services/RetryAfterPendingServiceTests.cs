@@ -43,6 +43,7 @@ public sealed class RetryAfterPendingServiceTests
     private List<WebhookSubscription> _webhookSubscriptions;
     private List<WebHookEventCatalog> _webHookEventCatalogs;
     private readonly Mock<IWebHostEnvironment> _environmentMock;
+    private readonly Mock<Microsoft.AspNetCore.Hosting.IHostingEnvironment> _hostingEnvironmentMock;
     private readonly string _tempDirectory;
     private readonly string _templateDirectory;
     private List<string> _encryptedSecrets = [];
@@ -70,8 +71,11 @@ public sealed class RetryAfterPendingServiceTests
 
         // Mock IWebHostEnvironment to point ContentRootPath at our temp dir
         _environmentMock = new Mock<IWebHostEnvironment>();
+        _hostingEnvironmentMock = new Mock<Microsoft.AspNetCore.Hosting.IHostingEnvironment>();
         _environmentMock
             .Setup(e => e.ContentRootPath)
+            .Returns(_tempDirectory);
+        _hostingEnvironmentMock.Setup(x => x.ContentRootPath)
             .Returns(_tempDirectory);
     }
 
@@ -184,7 +188,7 @@ public sealed class RetryAfterPendingServiceTests
         var retryAfterService = _serviceProvider
             .GetRequiredService<WebhookDeliveryRetryAfterService>();
 
-        var emailHelper = new EmailContentFormatterHelper(_environmentMock.Object);
+        var emailHelper = new EmailContentFormatterHelper(_environmentMock.Object, _hostingEnvironmentMock.Object);
 
         return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(),
                                             _serviceProvider.GetRequiredService<ISignatureService>(), emailHelper, //_serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), 

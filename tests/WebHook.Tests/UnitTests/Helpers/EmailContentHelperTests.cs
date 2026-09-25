@@ -21,6 +21,7 @@ public sealed class EmailContentFormatterHelperTests : IDisposable
     private readonly string _tempDirectory;
     private readonly string _templateDirectory;
     private readonly Mock<IWebHostEnvironment> _environmentMock;
+    private readonly Mock<IHostingEnvironment> _hostingEnvironmentMock;
     private readonly EmailContentFormatterHelper _sut;
 
     public EmailContentFormatterHelperTests()
@@ -35,11 +36,15 @@ public sealed class EmailContentFormatterHelperTests : IDisposable
 
         // Mock IWebHostEnvironment to point ContentRootPath at our temp dir
         _environmentMock = new Mock<IWebHostEnvironment>();
+
         _environmentMock
             .Setup(e => e.ContentRootPath)
             .Returns(_tempDirectory);
 
-        _sut = new EmailContentFormatterHelper(_environmentMock.Object);
+        _hostingEnvironmentMock = new Mock<IHostingEnvironment>();
+        _hostingEnvironmentMock.Setup(x => x.ContentRootPath).Returns(_tempDirectory);
+
+        _sut = new EmailContentFormatterHelper(_environmentMock.Object, _hostingEnvironmentMock.Object);
     }
 
     public void Dispose()
@@ -255,9 +260,10 @@ public sealed class EmailContentFormatterHelperTests : IDisposable
         Directory.CreateDirectory(emptyRoot);
 
         var envMock = new Mock<IWebHostEnvironment>();
+        var hostingMock = new Mock<IHostingEnvironment>();
         envMock.Setup(e => e.ContentRootPath).Returns(emptyRoot);
-
-        var sut = new EmailContentFormatterHelper(envMock.Object);
+        hostingMock.Setup(x => x.ContentRootPath).Returns(emptyRoot);
+        var sut = new EmailContentFormatterHelper(envMock.Object, hostingMock.Object);
 
         try
         {

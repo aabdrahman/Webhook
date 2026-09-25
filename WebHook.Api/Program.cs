@@ -104,11 +104,13 @@ app.UseReDoc(opts =>
     opts.RoutePrefix = "webhookapi/api-docs";
 });
 
-app.UseStaticFiles(new StaticFileOptions()
-{
-    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "StaticFiles")),
-    RequestPath = "/StaticFiles"
-});
+//app.UseStaticFiles(new StaticFileOptions()
+//{
+//    FileProvider = new PhysicalFileProvider(Path.Combine(app.Environment.ContentRootPath, "StaticFiles")),
+//    RequestPath = "/StaticFiles"
+//});
+
+app.UseStaticFiles();
 
 app.UseExceptionHandler(opts =>
 {

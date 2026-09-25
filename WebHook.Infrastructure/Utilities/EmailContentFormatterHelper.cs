@@ -7,11 +7,14 @@ namespace WebHook.Infrastructure.Utilities;
 public class EmailContentFormatterHelper
 {
     private readonly IWebHostEnvironment _environment;
+    private readonly IHostingEnvironment _hostingEnvironment;
 
-    public EmailContentFormatterHelper(IWebHostEnvironment environment)
+    public EmailContentFormatterHelper(IWebHostEnvironment environment, IHostingEnvironment hostingEnvironment)
     {
         _environment = environment;
+        _hostingEnvironment = hostingEnvironment;
         _logger = Log.ForContext("ClassName", nameof(EmailContentFormatterHelper));
+        
     }
 
     private ILogger _logger;
@@ -41,13 +44,13 @@ public class EmailContentFormatterHelper
                 return string.Empty;
             }
 
-            var staticFilePath = _environment.ContentRootPath;
+            var staticFilePath = _hostingEnvironment.ContentRootPath;
 
-            var templateFilepath = Path.Combine(staticFilePath, "EmailNotificationTemplates", emailTemplateFilename);
+            var templateFilepath = Path.Combine(staticFilePath, "wwwroot", "StaticFiles", "EmailNotificationTemplates", emailTemplateFilename);
 
             if (!File.Exists(templateFilepath))
             {
-                _logger.Warning("The notification type email template file does not exist - {0}. File name - {1}", emailType, emailTemplateFilename);
+                _logger.Warning("The notification type email template file does not exist - {0}. File name - {1}, at path - {2}", emailType, emailTemplateFilename, templateFilepath);
                 return string.Empty;
             }
 

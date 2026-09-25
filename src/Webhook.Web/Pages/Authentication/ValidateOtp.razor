@@ -44,9 +44,13 @@
                Visible="@(!string.IsNullOrWhiteSpace(_verifyMessage))" />
 
         <!-- Resend response alert -->
-        <Alert Type="@(_resendSuccess ? "success" : "info")"
-               Message="@_resendMessage"
-               Visible="@(!string.IsNullOrWhiteSpace(_resendMessage))" />
+        @if(_timer > 60)
+        {
+            <Alert Type="@(_resendSuccess ? "success" : "info")"
+                   Message="@_resendMessage"
+                   Visible="@(!string.IsNullOrWhiteSpace(_resendMessage))" />
+        }
+        
 
         <div class="auth-form" style="align-items:center;">
 
@@ -81,6 +85,26 @@
             <div class="otp-countdown @(_timer <= 10 ? "expiring" : "")">
                 @if (_resendDisabled)
                 {
+                    <div class="otp-countdown-wrapper">
+                        <ProgressBar Value="@_timer"
+                                     Max="75"
+                                     AutoVariant="true"
+                                     WarningAt="30"
+                                     DangerAt="15"
+                                     ShowLabel="true"
+                                     Label="@($"Resend code in {_timer}s")" />
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-ghost btn-sm"
+                            @onclick="ResendCode"
+                            disabled="@_isBusy">
+                        Resend code
+                    </button>
+                }
+                @* @if (_resendDisabled)
+                {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10" />
@@ -95,7 +119,7 @@
                             disabled="@_isBusy">
                         Resend code
                     </button>
-                }
+                } *@
             </div>
 
         </div>
@@ -302,27 +326,61 @@
         _resendDisabled = true;
         _timer          = 75;
 
+        var requestedUser = await localStorageService.GetItemAsync<string>(ApplicationClientHelper.OtpRequestedUser);
+
+        if (string.IsNullOrEmpty(requestedUser))
+        {
+            _resendSuccess = false;
+            _resendMessage = "An error occurred while requesting new otp. Kindly initiate request all over again.";
+            _resendDisabled = false;
+            Console.WriteLine("An error occurred because the reuqesting user could not be feetched from the cache.");
+            return;
+        }
+
+        string actualPurpose = _purpose.Equals("changepassword", StringComparison.OrdinalIgnoreCase) ? "passwordreset" : _purpose;
+
+        if (!Enum.TryParse<OtpPurpose>(actualPurpose, ignoreCase: true, out var purposeConverted))
+        {
+            _resendSuccess = false;
+            _resendMessage = "An error occurred while requesting new otp. Kindly initiate request all over again.";
+            _resendDisabled = false;
+            Console.WriteLine("An error occurred because proper purpose could not be parsed.");
+            return;
+        }
+
         Array.Clear(_otpValues);
         StateHasChanged();
 
-        if (OnResendOtp is not null)
-        {
-            var error = await OnResendOtp();
+        var result = await requestOtpHandler.HandleAsync(new RequestOtpDto() { UserNameOrEmailAddress = requestedUser, Purpose = purposeConverted });
 
-            if (!string.IsNullOrWhiteSpace(error))
-            {
-                _resendSuccess = false;
-                _resendMessage = error;
-                _resendDisabled = false;
-                return;
-            }
+        if (!result.successStatus)
+        {
+            _resendSuccess = false;
+            _resendMessage = $"OTP Reuest operation could not be performed. {result.responseMessage}";
+            _resendDisabled = false;
+            return;
         }
 
-        _resendSuccess = true;
-        _resendMessage = "A new code has been sent to your email.";
+        // if (OnResendOtp is not null)
+        // {
+        //     var error = await OnResendOtp();
 
-        await StartCountdownAsync();
+        //     if (!string.IsNullOrWhiteSpace(error))
+        //     {
+        //         _resendSuccess = false;
+        //         _resendMessage = error;
+        //         _resendDisabled = false;
+        //         return;
+        //     }
+        // }
+
+        await Task.Delay(1000);
+        _resendMessage = "A new code has been sent to your email.";
+        _resendSuccess = true;
+
+        
         await _inputRefs[0].FocusAsync();
+        await StartCountdownAsync();
     }
 
     // -------------------------------------------------------------------------

@@ -12,9 +12,9 @@
 
 /* Container — centred content width */
 .landing-container {
-    max-width:      1100px;
+    max-width:      1500px;
     margin:         0 auto;
-    padding:        0 var(--space-6);
+    padding:        0 var(--space-3);
     width:          100%;
 }
 
@@ -31,9 +31,9 @@
 }
 
 .landing-nav-inner {
-    max-width:       1100px;
+    max-width:       1500px;
     margin:          0 auto;
-    padding:         var(--space-4) var(--space-6);
+    padding:         var(--space-2) var(--space-3);
     display:         flex;
     align-items:     center;
     justify-content: space-between;
@@ -61,7 +61,7 @@
    Hero
    ============================================================================= */
 .landing-hero {
-    padding:    calc(var(--space-12) * 2) 0 var(--space-12);
+    padding:    calc(var(--space-8) * 2) 0 var(--space-8);
     text-align: center;
 }
 

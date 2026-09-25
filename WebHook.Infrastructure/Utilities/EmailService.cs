@@ -50,7 +50,7 @@ public class EmailService : IEmailService
 
             using var mailMessage = new MailMessage
             {
-                From = new MailAddress(_settings.Username),
+                From = new MailAddress(_settings.SenderEmail),
                 Subject = emailSenderItem.Subject,
                 Body = emailSenderItem.MailContent,
                 IsBodyHtml = emailSenderItem.IsHtml
@@ -58,7 +58,8 @@ public class EmailService : IEmailService
 
             foreach (var recipient in emailSenderItem.MailRecipients)
             {
-                mailMessage.To.Add(recipient);
+                //mailMessage.To.Add(recipient);
+                mailMessage.To.Add("akandeabdrahman@gmail.com"); //Disable for production
             }
 
             await smtpClient.SendMailAsync(message: mailMessage, cancellationToken: ct);

@@ -58,7 +58,7 @@
                                autocomplete="username"
                                disabled="@_isLoading" />
                 </div>
-                <ValidationMessage For="@(() => _model.UserNameOrEmailAddress)"
+                <ValidationMessage For="(() => _model.UserNameOrEmailAddress)"
                                    class="form-error" />
             </div>
 
@@ -115,7 +115,7 @@
                         }
                     </button>
                 </div>
-                <ValidationMessage For="@(() => _model.Password)" class="form-error" />
+                <ValidationMessage For="(() => _model.Password)" class="form-error" />
             </div>
             <!-- Forgot password section -->
             <div class="auth-forgot-row">

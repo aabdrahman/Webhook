@@ -48,6 +48,7 @@
     font-size:       var(--text-sm);
     color:           var(--color-text-muted);
     margin-top:      var(--space-4);
+    width: 100%;
 }
 
 .otp-countdown.expiring {
@@ -244,5 +245,9 @@
 .otp-input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.otp-countdown-wrapper {
+    width: 100%;
 }
  

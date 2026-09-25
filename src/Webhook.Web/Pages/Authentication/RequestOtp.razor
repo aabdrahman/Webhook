@@ -69,7 +69,7 @@
                                autocomplete="username"
                                disabled="@_isLoading" />
                 </div>
-                <ValidationMessage For="@(() => _model.UserNameOrEmailAddress)"
+                <ValidationMessage For="(() => _model.UserNameOrEmailAddress)"
                                    class="form-error" />
                 <span class="form-help">
                     We will send a one-time password to the email address
@@ -160,6 +160,13 @@
                 "Back to sign in",
                 OtpPurpose.PasswordReset),
 
+            "resetpassword" => (
+                "Forgot your password?",
+                "Enter your email or username and we will send you a one-time password to reset it.",
+                "/login",
+                "Back to sign in",
+                OtpPurpose.PasswordReset),
+
             "deactivateprofile" => (
                 "Verify your identity",
                 "To deactivate your account we need to verify your identity. Enter your email or username below.",
@@ -204,6 +211,7 @@
             }
 
             _successMessage = "A one-time password has been sent to your email address. Please check your inbox and spam folder.";
+            _isLoading = false;
             StateHasChanged(); //This forces the page to show the success message before navigating away after some time. Otherwise, the user won't see the message because the page will navigate away immediately.
 
             // Give user time to read the message
