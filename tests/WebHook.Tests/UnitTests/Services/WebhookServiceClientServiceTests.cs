@@ -208,7 +208,7 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
                 BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "order-service-prod", clientName: "Order Service"),
                 BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service")
             };
-            var deactivatedClient = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service");
+            var deactivatedClient = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "cust-service-prod", clientName: "Customer Service");
             deactivatedClient.IsActive = false;
             deactivatedClient.DeactivatedAt = DateTimeOffset.UtcNow.AddSeconds(-90);
             deactivatedClient.DeactivatedBy = Guid.NewGuid().ToString("N");
@@ -246,7 +246,7 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
                 BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "order-service-prod", clientName: "Order Service"),
                 BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service")
             };
-            var deactivatedClient = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service");
+            var deactivatedClient = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count)).ToArray(), clientId: "cust-service-prod", clientName: "Customer Service");
             deactivatedClient.IsActive = false;
             deactivatedClient.DeactivatedAt = DateTimeOffset.UtcNow.AddSeconds(-90);
             deactivatedClient.DeactivatedBy = Guid.NewGuid().ToString("N");
@@ -295,7 +295,7 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
     }
 
     [Fact]
-    public async Task GetByClientIdAsync_ClientIdExists_Returns404NotFound()
+    public async Task GetByClientIdAsync_ClientIdExists_200ok()
     {
         //Arrange
         var catalogIds = _createdEventCatalogs.Select(x => x.Id).ToList();
@@ -325,7 +325,7 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
     }
 
     [Fact]
-    public async Task GetByClientIdAsync_DeactivatedClient_Returns404NotFound()
+    public async Task GetByClientIdAsync_DeactivatedClient_Returns200OK()
     {
         //Arrange
         var catalogIds = _createdEventCatalogs.Select(x => x.Id).ToList();
@@ -350,11 +350,12 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
 
         //Assert
         Assert.NotNull(result);
-        Assert.False(result.IsSuccessful);
-        Assert.Null(result.ResponseData);
-        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
-        Assert.StartsWith("Service client with provided id does not exist or has been deactivated ", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(clientId, result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(result.ResponseData.ClientId, clientId);
+
+        Assert.Equal("Client fetched successfully.", result.ResponseMessage, ignoreCase: true);
     }
 
     [Fact]

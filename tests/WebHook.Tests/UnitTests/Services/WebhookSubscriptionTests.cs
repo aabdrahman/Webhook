@@ -384,8 +384,10 @@ public class WebhookSubscriptionTests : IDisposable
         Assert.True(deleteResult.IsSuccessful);
         Assert.Equal(HttpStatusCode.OK, deleteResult.HttpStatusCode);
 
-        Assert.False(fetchRecordResult.IsSuccessful);
-        Assert.Equal(HttpStatusCode.NotFound, fetchRecordResult.HttpStatusCode);
+        Assert.True(fetchRecordResult.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, fetchRecordResult.HttpStatusCode);
+        Assert.NotNull(fetchRecordResult.ResponseData);
+        Assert.False(fetchRecordResult.ResponseData.IsActive);
     }
 
     [Fact]
@@ -418,8 +420,10 @@ public class WebhookSubscriptionTests : IDisposable
         Assert.True(deleteResult.IsSuccessful);
         Assert.Equal(HttpStatusCode.OK, deleteResult.HttpStatusCode);
 
-        Assert.False(fetchRecordResult.IsSuccessful);
-        Assert.Equal(HttpStatusCode.NotFound, fetchRecordResult.HttpStatusCode);
+        Assert.True(fetchRecordResult.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, fetchRecordResult.HttpStatusCode);
+        Assert.NotNull(fetchRecordResult.ResponseData);
+        Assert.False(fetchRecordResult.ResponseData.IsActive);
     }
 
     [Fact]

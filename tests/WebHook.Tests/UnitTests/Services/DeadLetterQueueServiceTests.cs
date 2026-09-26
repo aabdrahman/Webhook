@@ -119,7 +119,8 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         Status = status,
         PayLoad = payload,
         Source = "CustomerService",
-        CreatedAt = DateTimeOffset.UtcNow
+        CreatedAt = DateTimeOffset.UtcNow,
+        CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
     };
 
     private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
@@ -793,7 +794,7 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
         var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
-        var deliveryA = BuildDelivery();
+        WebhookDelivery deliveryA = BuildDelivery();
         var deliveryB = BuildDelivery();
         var entryA = BuildDlqEntry(deliveryA.Id);
         var entryB = BuildDlqEntry(deliveryB.Id);

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Moq;
 using Serilog;
+using System.Threading.Channels;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Infrastructure.Utilities;
@@ -26,6 +27,7 @@ public sealed class EmailServiceTests : IDisposable
 
     private readonly Mock<IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration>> _optionsMock;
     private readonly EmailSenderEmailSmtpSettingsConfiguration _settings;
+    private Channel<EmailSenderDto> _emailSenderChannel;
 
     // Environment variable key used by the service
     private const string SmtpPasswordEnvVar = "SmtpClientPassword";

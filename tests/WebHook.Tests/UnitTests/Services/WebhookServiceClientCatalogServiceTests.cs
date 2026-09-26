@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System;
@@ -565,14 +566,16 @@ public class WebhookServiceClientCatalogServiceTests : IClassFixture<PostgreSqlF
         using (var scope = _serviceProvider.CreateScope())
         {
             var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-            var clientEntity = BuildServiceClientEntity(subscribedCatalogs: catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count-1)).ToArray(), clientId: "customer-service-prod", clientName: "Customer Service");
+            Guid[] operationCatalogs = catalogIds.OrderBy(x => Guid.NewGuid()).Take(Random.Shared.Next(1, catalogIds.Count - 1)).ToArray();
+            var clientEntity = BuildServiceClientEntity(subscribedCatalogs: operationCatalogs, clientId: "customer-service-prod", clientName: "Customer Service");
 
             await arrangeCtx.WebhookServiceClients.AddAsync(clientEntity);
             await arrangeCtx.SaveChangesAsync();
 
             clientId = clientEntity.Id;
-            var notSelectedCatalog = _eventCatalogs.Where(x => !clientEntity.EventCatalogs.Select(x => x.Id).ToList().Contains(x.Id)).Select(x => x.Id).ToList();
-            selectedName = _eventCatalogs.Where(x => notSelectedCatalog.Contains(x.Id)).First().NormalizedEventName;
+            var notAddedCatalogs = _eventCatalogs.Where(x => !operationCatalogs.ToList().Contains(x.Id)).ToList();
+            //var notSelectedCatalog = _eventCatalogs.Where(x => !clientEntity.EventCatalogs.Select(x => x.Id).ToList().Contains(x.Id)).Select(x => x.Id).ToList();
+            selectedName = notAddedCatalogs.First().NormalizedEventName;
         }
 
         var sut = CreateSut();

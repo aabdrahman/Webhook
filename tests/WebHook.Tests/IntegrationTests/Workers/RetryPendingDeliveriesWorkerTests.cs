@@ -12,9 +12,12 @@ using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -72,9 +75,21 @@ public sealed class RetryPendingDeliveriesWorkerTests
         //Channel
         services.AddSingleton(_ =>
         {
-            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
             {
+                SingleReader = true,
+                SingleWriter = false
 
+            });
+        });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
         });
 
@@ -94,7 +109,16 @@ public sealed class RetryPendingDeliveriesWorkerTests
             ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
         };
 
+        var hostingenvironment = new TestHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
 
         // Short tick interval so tests do not wait 60 seconds
         services.Configure<RetryDeliveresAfterFailedConfiguration>(opt =>
@@ -200,7 +224,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
             Status = status,
             PayLoad = payload,
             Source = "CustomerService",
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
         };
 
     private WebHookEventCatalog BuildCatalog(List<string> subscribedFields, string eventName = "CustomerCreated") => new()
@@ -707,11 +732,24 @@ public sealed class RetryPendingDeliveriesWorkerTests
                 .ConfigurePrimaryHttpMessageHandler(() => _httpHandler);
 
         //Channel
+        //Channel
         services.AddSingleton(_ =>
         {
-            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
             {
+                SingleReader = true,
+                SingleWriter = false
 
+            });
+        });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
             });
         });
 
@@ -722,6 +760,8 @@ public sealed class RetryPendingDeliveriesWorkerTests
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
         services.AddSingleton<EmailContentFormatterHelper>();
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        
         var environment = new TestWebHostEnvironment
         {
             EnvironmentName = Environments.Development,
@@ -730,7 +770,16 @@ public sealed class RetryPendingDeliveriesWorkerTests
             ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
         };
 
+        var hostingenvironment = new TestHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
 
         if (workerConfig is null)
         {
@@ -788,6 +837,24 @@ internal sealed class TestableRetryPendingDeliveriesWorker : RetryPendingDeliver
 }
 
 public sealed class TestWebHostEnvironment : IWebHostEnvironment
+{
+    public string ApplicationName { get; set; } = string.Empty;
+
+    public string EnvironmentName { get; set; } = Environments.Development;
+
+    public string WebRootPath { get; set; } = string.Empty;
+
+    public IFileProvider WebRootFileProvider { get; set; }
+        = new NullFileProvider();
+
+    public string ContentRootPath { get; set; }
+        = AppContext.BaseDirectory;
+
+    public IFileProvider ContentRootFileProvider { get; set; }
+        = new PhysicalFileProvider(AppContext.BaseDirectory);
+}
+
+public sealed class TestHostEnvironment : Microsoft.AspNetCore.Hosting.IHostingEnvironment
 {
     public string ApplicationName { get; set; } = string.Empty;
 

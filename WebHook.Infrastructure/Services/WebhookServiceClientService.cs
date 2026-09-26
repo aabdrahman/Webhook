@@ -121,7 +121,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
             }
 
             _logger.Information("Onboarded client with id: {0} fetched successfully - {1}", clientId, onboardedClient);
-            return GenericResponse<WebhookServiceClientDto>.Success(onboardedClient, "Client fetched successfully", HttpStatusCode.OK);
+            return GenericResponse<WebhookServiceClientDto>.Success(onboardedClient, "Client fetched successfully.", HttpStatusCode.OK);
         }
         catch (Exception ex)
         {

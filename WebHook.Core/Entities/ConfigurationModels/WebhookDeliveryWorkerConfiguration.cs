@@ -16,4 +16,8 @@ public class WebhookDeliveryWorkerConfiguration
     /// This is the duration at which a delivery item is locked for in case exception occurs during delivery processing
     /// </summary>
     public double DeliveryLockDuration { get; set; }
+    /// <summary>
+    /// The duration threshold for when the system should escalate to contact email if the http call to callback url exceeds the value
+    /// </summary>
+    public long ThresholdDuration { get; set; }
 }

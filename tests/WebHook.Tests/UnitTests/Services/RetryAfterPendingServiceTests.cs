@@ -10,8 +10,11 @@ using System.Threading.Channels;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -48,6 +51,7 @@ public sealed class RetryAfterPendingServiceTests
     private readonly string _templateDirectory;
     private List<string> _encryptedSecrets = [];
     private Channel<EmailSenderDto> _emailSenderChannel = null!;
+    private Mock<IApplicationPublisher> _applicationPublisherMock = new Mock<IApplicationPublisher>();
 
     public RetryAfterPendingServiceTests(PostgreSqlFixture fixture)
     {
@@ -57,8 +61,8 @@ public sealed class RetryAfterPendingServiceTests
 
         // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
         _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        _templateDirectory = Path.Combine(_tempDirectory, "EmailNotificationTemplates");
-
+        //_templateDirectory = Path.Combine(_tempDirectory, "EmailNotificationTemplates");
+        _templateDirectory = Path.Combine(_tempDirectory, "wwwroot", "StaticFiles", "EmailNotificationTemplates");
         Directory.CreateDirectory(_templateDirectory);
 
         File.WriteAllText(
@@ -105,12 +109,24 @@ public sealed class RetryAfterPendingServiceTests
 
             });
         });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EventRaised>(new BoundedChannelOptions(1000)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
+
         //services.AddSingleton(_emailSenderChannel);
         //services.AddSingleton<Channel<EmailSenderDto>>(freshChannel);
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
         services.AddSingleton<EmailContentFormatterHelper>();
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         var environment = new TestWebHostEnvironment
         {
@@ -120,7 +136,16 @@ public sealed class RetryAfterPendingServiceTests
             ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
         };
 
+        var hostingenvironment = new TestHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -180,7 +205,7 @@ public sealed class RetryAfterPendingServiceTests
     // Helpers
     // -------------------------------------------------------------------------
 
-    private RetryAfterPendingService CreateSut(RepositoryContext ctx, MockHttpMessageHandler mockHttpMessageHandler = null)
+    private RetryAfterPendingService CreateSut(RepositoryContext ctx, MockHttpMessageHandler mockHttpMessageHandler = null, IApplicationPublisher applicationPublisher = null)
     {
         var httpClientFactory = _serviceProvider
             .GetRequiredService<IHttpClientFactory>();
@@ -192,7 +217,7 @@ public sealed class RetryAfterPendingServiceTests
 
         return new RetryAfterPendingService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<IEncryptionService>(),
                                             _serviceProvider.GetRequiredService<ISignatureService>(), emailHelper, //_serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), 
-                                            _serviceProvider.GetRequiredService<Channel<EmailSenderDto>>()
+                                            applicationPublisher ?? _serviceProvider.GetRequiredService<IApplicationPublisher>()
                                             //Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions())
                                             //_emailSenderChannel
                                             );
@@ -251,7 +276,8 @@ public sealed class RetryAfterPendingServiceTests
         Status = status,
         PayLoad = payload,
         Source = "CustomerService",
-        CreatedAt = DateTimeOffset.UtcNow
+        CreatedAt = DateTimeOffset.UtcNow,
+        CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
     };
 
     private static WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()
@@ -1063,7 +1089,7 @@ public sealed class RetryAfterPendingServiceTests
         var sut = CreateSut(ctx, _httpHandler);
 
         //Act
-        await sut.RunRetryAfterFirstAttemptAsync(thresholdDuration: 5);
+        await sut.RunRetryAfterFirstAttemptAsync(thresholdDuration: 2);
 
         //Assert
         using var assertScope = _serviceProvider.CreateScope();

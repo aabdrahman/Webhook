@@ -1,12 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
+using Moq;
 using System.Net;
-using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
@@ -20,7 +19,9 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public WebhookDeliveryServiceTests(PostgreSqlFixture postgreSqlFixture)
     {
         _postgreSqlFixture = postgreSqlFixture;
+        _authenticatedUserMock = new Mock<IAuthenticatedUserDetails>();
     }
+    private Mock<IAuthenticatedUserDetails> _authenticatedUserMock;
     private ServiceProvider _serviceProvider;
     private List<WebHookEventCatalog> _webHookEventCatalogs = [];
     private List<WebhookSubscription> _webhookSubscriptions = [];
@@ -42,6 +43,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             opts.UseNpgsql(_postgreSqlFixture.ConnectionString).EnableDetailedErrors();
         });
 
+        
         services.AddScoped<IWebhookDeliveryService, WebhookDeliveryService>();
 
         _serviceProvider = services.BuildServiceProvider();
@@ -211,9 +213,9 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     //    };
     //}
 
-    private WebhookDeliveryService CreateSut()
+    private WebhookDeliveryService CreateSut(IAuthenticatedUserDetails authenticatedUserDetails)
     {
-        return new WebhookDeliveryService(_serviceProvider.GetRequiredService<RepositoryContext>());
+        return new WebhookDeliveryService(_serviceProvider.GetRequiredService<RepositoryContext>(), authenticatedUserDetails);
     }
 
     [Fact]
@@ -223,7 +225,9 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(Guid.NewGuid(), cts.Token);
@@ -239,8 +243,10 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task GetDeliveryDetailsAsync_DeliveryIdNotExists_Returns404NotFound()
     {
         //Arrange
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
         Guid deliveryId = Guid.NewGuid();
-        var sut = CreateSut();
+        var sut = CreateSut(_authenticatedUserMock.Object);
+
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
@@ -269,7 +275,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
 
             deliveryId = deliveryToCreate.Id;
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
@@ -286,6 +293,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     public async Task GetDeliveryDetailsAsync_InvalidDeliveryId_Returns404NotFound()
     {
         //Arrange
+
         Guid deliveryId = Guid.NewGuid();
         using (var scope = _serviceProvider.CreateScope())
         {
@@ -296,7 +304,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
@@ -316,8 +325,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         //Arrange
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter(), cts.Token);
@@ -344,7 +353,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter(), CancellationToken.None);
@@ -372,7 +382,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter() { DeliveryStatus = WebhookDeliveryStatus.Pending }, CancellationToken.None);
@@ -401,7 +412,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter() { StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)) }, CancellationToken.None);
@@ -431,7 +443,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        var sut = CreateSut();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
         var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter() { PageSize = 1, PageNumber = 2 }, CancellationToken.None);

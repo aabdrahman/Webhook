@@ -18,8 +18,10 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
     {
         _scopeFactory = scopeFactory;
         _optionsMonitor = optionsMonitor;
-        _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryProcessorWorker));
         _workerLivenessTracker = workerLivenessTracker;
+
+        _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryProcessorWorker));
+        
         //_timeout = TimeSpan.FromSeconds(optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds);
     }
 
@@ -54,12 +56,11 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
                 _workerLivenessTracker.UpdateHeartBeat();
                 using var scope = _scopeFactory.CreateScope();
 
-                var deliveryProcessor =
-                    scope.ServiceProvider.GetRequiredService<WebhookDeliveryProcessorService>();
+                var deliveryProcessor = scope.ServiceProvider.GetRequiredService<WebhookDeliveryProcessorService>();
 
                 var processorConfig = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<WebhookDeliveryWorkerConfiguration>>();
 
-                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess: processorConfig.CurrentValue.TotalBatchSize, ct: stoppingToken, lockDuration: processorConfig.CurrentValue.DeliveryLockDuration, workerId: workerId.ToString());
+                await deliveryProcessor.ProcessPendingDeliveriesAsync(totalToProcess: processorConfig.CurrentValue.TotalBatchSize, ct: stoppingToken, lockDuration: processorConfig.CurrentValue.DeliveryLockDuration, workerId: workerId.ToString(), thresholdDuration: processorConfig.CurrentValue.ThresholdDuration);
 
                 _logger.Information("Webhook delivery processing completed.");
             }
@@ -69,8 +70,7 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.Error(ex,
-                    "An unexpected error occurred while processing webhook deliveries.");
+                _logger.Error(ex, "An unexpected error occurred while processing webhook deliveries.");
             }
         }
 

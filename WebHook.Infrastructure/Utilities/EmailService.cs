@@ -12,12 +12,10 @@ namespace WebHook.Infrastructure.Utilities;
 public class EmailService : IEmailService
 {
     private readonly EmailSenderEmailSmtpSettingsConfiguration _settings;
-    private readonly Channel<EmailSenderDto> _emailSenderChannel;
 
-    public EmailService(IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration> optionsMonitor, Channel<EmailSenderDto> emailSenderChannel)
+    public EmailService(IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration> optionsMonitor)
     {
         _settings = optionsMonitor.CurrentValue;
-        _emailSenderChannel = emailSenderChannel;
         _logger = Log.ForContext("ClassName", nameof(EmailService));
     }
 
@@ -76,25 +74,26 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task<bool> QueueEmailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default)
-    {
-        _logger = _logger.ForContext("MethodName", nameof(QueueEmailAsync));
-        try
-        {
-            _logger.Information("Queueing mail with details - {0}", emailSenderItem);
-            if(await _emailSenderChannel.Writer.WaitToWriteAsync(ct))
-            {
-                await _emailSenderChannel.Writer.WriteAsync(emailSenderItem);
+    //This was disabled in order to centralize channel publishing in a single class - IApplicationpublisher
+    //public async Task<bool> QueueEmailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default)
+    //{
+    //    _logger = _logger.ForContext("MethodName", nameof(QueueEmailAsync));
+    //    try
+    //    {
+    //        _logger.Information("Queueing mail with details - {0}", emailSenderItem);
+    //        if(await _emailSenderChannel.Writer.WaitToWriteAsync(ct))
+    //        {
+    //            await _emailSenderChannel.Writer.WriteAsync(emailSenderItem);
                 
-                return true;
-            }
+    //            return true;
+    //        }
 
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "An error occurred while queeuing email. Email may be lost forever.");
-            return false;
-        }
-    }
+    //        return false;
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _logger.Error(ex, "An error occurred while queeuing email. Email may be lost forever.");
+    //        return false;
+    //    }
+    //}
 }

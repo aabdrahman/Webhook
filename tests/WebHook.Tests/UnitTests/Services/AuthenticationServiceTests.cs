@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using MassTransit;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -19,13 +20,16 @@ using System.Text.Json;
 using System.Threading.Channels;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.Authentication;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -48,6 +52,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     private readonly Mock<IDataProtectionProvider> _dataProtectionProviderMock;
     private readonly Mock<ICacheService> _cacheServiceMock;
     private readonly Mock<IDataProtector> _dataProtectorMock;
+    private Mock<IApplicationPublisher> _applicationPublisherMock;
     private readonly string _tempDirectory;
     private readonly string _templateDirectory;
 
@@ -75,6 +80,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         _dataProtectionProviderMock = new Mock<IDataProtectionProvider>();
         _dataProtectorMock = new Mock<IDataProtector>();
         _cacheServiceMock = new Mock<ICacheService>();
+        _applicationPublisherMock = new Mock<IApplicationPublisher>();
 
         // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
         _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
@@ -112,6 +118,16 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             });
         });
 
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
+
         var environment = new TestWebHostEnvironment
         {
             EnvironmentName = Environments.Development,
@@ -120,7 +136,16 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
         };
 
+        var hostingenvironment = new TestHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
         services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
         services.AddDataProtection(opts =>
         {
@@ -187,6 +212,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         services.AddScoped<EmailContentFormatterHelper>();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<ICacheService, CacheService>();
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -239,7 +265,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
     private TokenDto BuildTokenEntity(string accessToken = "", string refreshToken = "") => new TokenDto(accessToken: accessToken, refreshToken: refreshToken);
 
     private Infrastructure.Services.AuthenticationService CreateSut(IOtpGenerator otpGenerator = null, IApplicationHasher applicationHasher = null, 
-            IAuthenticatedUserDetails authenticatedUserDetails = null, IDataProtectionProvider dataProtectionProvider = null, ICacheService cacheService = null)
+            IAuthenticatedUserDetails authenticatedUserDetails = null, IDataProtectionProvider dataProtectionProvider = null, ICacheService cacheService = null, IApplicationPublisher applicationPublisher = null)
     {
         var scope = _serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
@@ -248,9 +274,10 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
             sp.GetRequiredService<UserManager<User>>(), ctx,
             sp.GetRequiredService<IOptionsMonitor<JwtSettingsConfiguration>>(), sp.GetRequiredService<SignInManager<User>>(),
             otpGenerator ?? sp.GetRequiredService<IOtpGenerator>(), sp.GetRequiredService<IOptionsMonitor<OtpSettingsConfiguration>>(), sp.GetRequiredService<IOptionsMonitor<TokenValidationConfiguration>>(),
-            applicationHasher ?? sp.GetRequiredService<IApplicationHasher>(), sp.GetRequiredService<IEmailService>(), 
+            applicationHasher ?? sp.GetRequiredService<IApplicationHasher>(),
             sp.GetRequiredService<EmailContentFormatterHelper>(), authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object, 
-            dataProtectionProvider ?? sp.GetRequiredService<IDataProtectionProvider>(), cacheService ?? sp.GetRequiredService<ICacheService>(), sp.GetRequiredService<RoleManager<Role>>()
+            dataProtectionProvider ?? sp.GetRequiredService<IDataProtectionProvider>(), cacheService ?? sp.GetRequiredService<ICacheService>(), 
+            sp.GetRequiredService<RoleManager<Role>>(), applicationPublisher ?? sp.GetRequiredService<IApplicationPublisher>()
             );
     }
 
@@ -732,7 +759,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.NotNull(result);
         Assert.NotNull(result.ResponseData);
         Assert.True(result.IsSuccessful);
-        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal(seedResult.email, result.ResponseData, ignoreCase: true);
         Assert.Equal("OTP sent successfully.", result.ResponseMessage, ignoreCase: true);
 
         using var assertScope = _serviceProvider.CreateScope();
@@ -764,7 +791,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         Assert.NotNull(result);
         Assert.NotNull(result.ResponseData);
         Assert.True(result.IsSuccessful);
-        Assert.Equal("Operation Successful.", result.ResponseData, ignoreCase: true);
+        Assert.Equal(seedResult.email, result.ResponseData, ignoreCase: true);
         Assert.Equal("OTP sent successfully.", result.ResponseMessage, ignoreCase: true);
 
         using var assertScope = _serviceProvider.CreateScope();

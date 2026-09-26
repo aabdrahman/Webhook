@@ -9,14 +9,19 @@ using Microsoft.Extensions.Options;
 using Moq;
 using System.Net;
 using System.Security.Cryptography;
+using System.Threading.Channels;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.Authentication;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -84,7 +89,35 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
             opts.MaximumOtpLength = 12;
         });
 
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EventRaised>(new UnboundedChannelOptions()
+            {
+                SingleReader = true,
+                SingleWriter = false
+
+            });
+        });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
+
         var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        var hostingenvironment = new TestHostEnvironment
         {
             EnvironmentName = Environments.Development,
             ApplicationName = typeof(Program).Assembly.GetName().Name,
@@ -95,9 +128,10 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         services.AddMemoryCache();
 
         services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
         services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
         services.AddScoped<ICacheService, CacheService>();
-
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         services.AddLogging();
         services.AddHttpContextAccessor();

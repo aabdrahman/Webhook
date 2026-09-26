@@ -17,6 +17,7 @@ using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.OtpOperation;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
@@ -34,19 +35,19 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IOptionsMonitor<OtpSettingsConfiguration> _otpettingsOptionsMonitor;
     private readonly IOptionsMonitor<TokenValidationConfiguration> _tokenValidationOptionsMonitor;
     private readonly IApplicationHasher _applicationHasher;
-    private readonly IEmailService _emailService;
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
     private readonly IDataProtector _dataProtector;
     private readonly ICacheService _cacheService;
     private readonly RoleManager<Role> _roleManager;
+    private readonly IApplicationPublisher _applicationPublisher;
 
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
                                 IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IApplicationHasher applicationHasher,
-                                IEmailService emailService, EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails,
-                                IDataProtectionProvider dataProtectionProvider, ICacheService cacheService, RoleManager<Role> roleManager)
+                                EmailContentFormatterHelper emailContentFormatterHelper, IAuthenticatedUserDetails authenticatedUserDetails,
+                                IDataProtectionProvider dataProtectionProvider, ICacheService cacheService, RoleManager<Role> roleManager, IApplicationPublisher applicationPublisher)
     {
         _userManager = userManager;
         _repositoryContext = repositoryContext;
@@ -56,12 +57,12 @@ public sealed class AuthenticationService : IAuthenticationService
         _otpettingsOptionsMonitor = otpettingsOptionsMonitor;
         _tokenValidationOptionsMonitor = tokenValidationOptionsMonitor;
         _applicationHasher = applicationHasher;
-        _emailService = emailService;
         _emailContentFormatterHelper = emailContentFormatterHelper;
         _authenticatedUserDetails = authenticatedUserDetails;
         _dataProtector = dataProtectionProvider.CreateProtector("Webhook.Otp.OtpVerificationSigning");
         _cacheService = cacheService;
         _roleManager = roleManager;
+        _applicationPublisher = applicationPublisher;
 
         _logger = Log.ForContext(_className, nameof(AuthenticationService));
     }
@@ -323,7 +324,8 @@ public sealed class AuthenticationService : IAuthenticationService
             {
                 EmailSenderDto emailSenderItem = new EmailSenderDto(MailContent: emailContent, Subject: subject, MailRecipients: [requestingUser.NormalizedEmail!], IsHtml: true);
                 //queueEmailResult = await _emailService.SendMailAsync(emailSenderItem, ct);
-                queueEmailResult = await _emailService.QueueEmailAsync(emailSenderItem, ct);
+                queueEmailResult = await _applicationPublisher.QueueEmailEvent(emailSenderItem, ct);
+                //queueEmailResult = await _emailService.QueueEmailAsync(emailSenderItem, ct);
             }
 
 

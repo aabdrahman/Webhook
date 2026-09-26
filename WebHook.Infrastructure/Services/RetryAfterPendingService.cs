@@ -7,6 +7,7 @@ using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Utilities;
@@ -21,11 +22,11 @@ public sealed class RetryAfterPendingService
     private readonly IEncryptionService _encryptionService;
     private readonly ISignatureService _signatureService;
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
-    private readonly Channel<EmailSenderDto> _emailSenderChannel;
+    private readonly IApplicationPublisher _applicationPublisher;
 
     public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory,
                                     WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService,
-                                    ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper, Channel<EmailSenderDto> emailSenderChannel)
+                                    ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper, IApplicationPublisher applicationPublisher)
     {
         _repositoryContext = repositoryContext;
         _httpClientFactory = httpClientFactory;
@@ -33,7 +34,7 @@ public sealed class RetryAfterPendingService
         _encryptionService = encryptionService;
         _signatureService = signatureService;
         _emailContentFormatterHelper = emailContentFormatterHelper;
-        _emailSenderChannel = emailSenderChannel;
+        _applicationPublisher = applicationPublisher;
 
         _logger = Log.ForContext("ClassName", nameof(RetryAfterPendingService));
     }
@@ -72,10 +73,11 @@ public sealed class RetryAfterPendingService
             }
 
             //Loop through and set the status to processing and also the lockeduntil and lockedBy
+            DateTimeOffset attemptTimestamp = DateTimeOffset.UtcNow;
             foreach (WebhookDelivery deliveryAttempt in deliveriesToReattmpt)
             {
                 deliveryAttempt.DeliveryStatus = WebhookDeliveryStatus.Processing;
-                deliveryAttempt.LockedUntil = DateTimeOffset.UtcNow.AddSeconds(lockDuration);
+                deliveryAttempt.LockedUntil = attemptTimestamp.AddSeconds(lockDuration);
                 deliveryAttempt.LockedBy = workerId;
             }
 
@@ -107,7 +109,7 @@ public sealed class RetryAfterPendingService
                                                             ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
                                                             SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
                                                             AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
-                                                            FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
+                                                            FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault()!.AttemptedAt,
                                                             FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
                                                             EventId = x.WebhookSubscriptionEvent.Id
                                                         })
@@ -287,7 +289,8 @@ public sealed class RetryAfterPendingService
                         }
 
                         //Begin formatting the email to queue for processing.
-                        await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback URL Disabled Due to Repeated Delivery Failures", MailRecipients: [deliveryMetadata.ContactEmail]));
+                        await _applicationPublisher.QueueEmailEvent(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback URL Disabled Due to Repeated Delivery Failures", MailRecipients: [deliveryMetadata!.ContactEmail]));
+                        //await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback URL Disabled Due to Repeated Delivery Failures", MailRecipients: [deliveryMetadata.ContactEmail]));
                     }
 
                     //Escalation when the HTTP call exceeds the threshold duration.
@@ -295,7 +298,7 @@ public sealed class RetryAfterPendingService
                     {
                         if (string.IsNullOrEmpty(deliveryMetadata.ContactEmail))
                         {
-                            _logger.Warning("No contact email is profiled for the 4subscription - {0} to escaltae delivery - {1}", deliveryMetadata.SubscriptionName, deliveryMetadata.DeliveryId);
+                            _logger.Warning("No contact email is profiled for the 4subscription - {0} to escalate delivery - {1}", deliveryMetadata.SubscriptionName, deliveryMetadata.DeliveryId);
                             continue;
                         }
 
@@ -326,7 +329,8 @@ public sealed class RetryAfterPendingService
                         }
 
                         //Begin formatting the email to queue for processing.
-                        await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
+                        await _applicationPublisher.QueueEmailEvent(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
+                        //await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
                     }
                 }
                 catch (Exception ex)

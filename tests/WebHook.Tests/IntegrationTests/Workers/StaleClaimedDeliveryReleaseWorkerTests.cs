@@ -141,7 +141,8 @@ public class StaleClaimedDeliveryReleaseWorkerTests : IClassFixture<PostgreSqlFi
         Status = status,
         PayLoad = payload,
         Source = "CustomerService",
-        CreatedAt = DateTimeOffset.UtcNow
+        CreatedAt = DateTimeOffset.UtcNow,
+        CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
     };
 
     private TestableStaleClaimedDeliverReleaseWorker CreateWorker() =>

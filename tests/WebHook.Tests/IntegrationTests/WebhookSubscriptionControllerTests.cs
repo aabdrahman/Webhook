@@ -296,7 +296,7 @@ public class WebhookSubscriptionControllerTests
 
         _webhookSubscriptionServiceMock
             .Setup(ws => ws.GetUserSubscriptionsAsync(It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .Callback<CancellationToken>(ct => passed = ct)
+            .Callback<bool, CancellationToken>((b, ct) => passed = ct)
             .ReturnsAsync(GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>
                 .Failure(null, "Not found.", HttpStatusCode.NotFound));
 

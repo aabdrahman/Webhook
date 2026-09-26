@@ -30,7 +30,7 @@ public sealed class EmailContentFormatterHelperTests : IDisposable
 
         // Create a real temp directory so File.Exists and File.ReadAllTextAsync work
         _tempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        _templateDirectory = Path.Combine(_tempDirectory, "EmailNotificationTemplates");
+        _templateDirectory = Path.Combine(_tempDirectory, "wwwroot", "StaticFiles", "EmailNotificationTemplates");
 
         Directory.CreateDirectory(_templateDirectory);
 
@@ -335,7 +335,7 @@ public sealed class EmailContentFormatterHelperTests : IDisposable
             Params(("ContactName", "John")));
 
         // Assert — ContentRootPath was accessed to build the file path
-        _environmentMock.Verify(e => e.ContentRootPath, Times.AtLeastOnce);
+        _hostingEnvironmentMock.Verify(e => e.ContentRootPath, Times.AtLeastOnce);
     }
 
     // -------------------------------------------------------------------------

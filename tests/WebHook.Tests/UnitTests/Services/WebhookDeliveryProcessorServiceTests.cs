@@ -1,12 +1,20 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Serilog;
 using System.Net;
+using System.Threading.Channels;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Events;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
+using WebHook.Infrastructure.EventPublishers;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -58,9 +66,49 @@ public sealed class WebhookDeliveryProcessorServiceTests
         services.AddDbContext<RepositoryContext>(opt =>
             opt.UseNpgsql(_fixture.ConnectionString));
 
+        //Channel
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateUnbounded<EmailSenderDto>(new UnboundedChannelOptions()
+            {
+
+            });
+        });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<EventRaised>(new BoundedChannelOptions(1000)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
+
+        var environment = new TestWebHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        var hostingenvironment = new TestHostEnvironment
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(Program).Assembly.GetName().Name,
+            ContentRootPath = AppContext.BaseDirectory,
+            ContentRootFileProvider = new PhysicalFileProvider(AppContext.BaseDirectory)
+        };
+
+        services.AddSingleton<IWebHostEnvironment>(environment);
+        services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
+
         //Add the signature and encrptor services.
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
+        services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddSingleton<EmailContentFormatterHelper>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -124,7 +172,8 @@ public sealed class WebhookDeliveryProcessorServiceTests
     {
         var httpClientFactory = new MockHttpClientFactory(httpHandler);
         var retryAfterService = new WebhookDeliveryRetryAfterService();
-        return new WebhookDeliveryProcessorService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<IEncryptionService>());
+        return new WebhookDeliveryProcessorService(ctx, httpClientFactory, retryAfterService, _serviceProvider.GetRequiredService<ISignatureService>(), _serviceProvider.GetRequiredService<IEncryptionService>(), 
+            _serviceProvider.GetRequiredService<EmailContentFormatterHelper>(), _serviceProvider.GetRequiredService<IApplicationPublisher>());
     }
 
     private static WebhookEvent BuildWebhookEvent(
@@ -138,7 +187,8 @@ public sealed class WebhookDeliveryProcessorServiceTests
         Status = status,
         PayLoad = payload,
         Source = "CustomerService",
-        CreatedAt = DateTimeOffset.UtcNow
+        CreatedAt = DateTimeOffset.UtcNow,
+        CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
     };
 
     private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")

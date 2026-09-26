@@ -171,7 +171,8 @@ public class StaleClaimedDeliveryReleaseServiceTests : IClassFixture<PostgreSqlF
             Status = status,
             PayLoad = payload,
             Source = "CustomerService",
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            CorrelationId = Guid.CreateVersion7(DateTimeOffset.UtcNow)
         };
 
     private static WebHookEventCatalog BuildCatalogEntity(List<string> availableFields, string name = "CustomerCreated") => new WebHookEventCatalog()

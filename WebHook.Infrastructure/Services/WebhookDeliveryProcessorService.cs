@@ -3,8 +3,10 @@ using Serilog;
 using System.Diagnostics;
 using System.Text;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Utilities;
@@ -18,21 +20,25 @@ public sealed class WebhookDeliveryProcessorService
     private readonly WebhookDeliveryRetryAfterService _retryAfterService;
     private readonly ISignatureService _signatureService;
     private readonly IEncryptionService _encryptionService;
+    private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
+    private readonly IApplicationPublisher _applicationPublisher;
 
-    public WebhookDeliveryProcessorService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, ISignatureService signatureService, IEncryptionService encryptionService)
+    public WebhookDeliveryProcessorService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, ISignatureService signatureService, IEncryptionService encryptionService, EmailContentFormatterHelper emailContentFormatterHelper, IApplicationPublisher applicationPublisher)
     {
         _repositoryContext = repositoryContext;
         _httpClientFactory = httpClientFactory;
         _retryAfterService = retryAfterService;
         _signatureService = signatureService;
         _encryptionService = encryptionService;
+        _emailContentFormatterHelper = emailContentFormatterHelper;
+        _applicationPublisher = applicationPublisher;
     }
 
     private ILogger _logger = Log.ForContext(_className, nameof(WebhookDeliveryProcessorService));
     private const string _methodName = "MethodName";
     private const string _className = "ClassName";
 
-    public async Task ProcessPendingDeliveriesAsync(int totalToProcess = 10, double lockDuration = 30, string workerId = "", CancellationToken ct = default)
+    public async Task ProcessPendingDeliveriesAsync(int totalToProcess = 10, double lockDuration = 30, string workerId = "", long thresholdDuration = 1500, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ProcessPendingDeliveriesAsync));
 
@@ -84,7 +90,7 @@ public sealed class WebhookDeliveryProcessorService
                 return;
             }
 
-            //Get the header properties from the databse for teh fetched deliveries.
+            //Get the header properties from the database for the fetched deliveries.
             var deliveryIds = deliveriesToProcess.Select(x => x.Id).ToList();
 
             Dictionary<Guid, WebhookDeliveryProcessorMetadataDto> deliveryMetadatas = await _repositoryContext.WebhookDeliveries
@@ -98,7 +104,7 @@ public sealed class WebhookDeliveryProcessorService
                                                     ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
                                                     SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
                                                     AverageResponseTime = x.WebhookDeliveryAttempts.Average(x => x.Duration),
-                                                    FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault().AttemptedAt,
+                                                    FirstAttemptedAt = x.WebhookDeliveryAttempts.FirstOrDefault()!.AttemptedAt,
                                                     FirstAttemptedResponseCode = x.WebhookDeliveryAttempts.First().HttpResponseCode,
                                                     EventId = x.WebhookSubscriptionEvent.Id
                                                 })
@@ -133,9 +139,11 @@ public sealed class WebhookDeliveryProcessorService
                     continue;
                 }
 
+                //Scoped variables that specifies to the current http call.
                 string urlToCall = delivery.CallBackUrl;
                 string payload = delivery.RequestPayload;
 
+                //Local variable scoped to teh delivery for utitlity operations.
                 using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 string responseContent = string.Empty;
                 string httpResponseCode = string.Empty;
@@ -209,11 +217,52 @@ public sealed class WebhookDeliveryProcessorService
                     }
                 );
 
-                //Begin databse operation to save the details of the delivery and delivery attempt.
+                //Begin database operation to save the details of the delivery and delivery attempt.
                 try
                 {
                     _logger.Information("Saving webhook delivery attempt and webhook delivery changes to the database....");
                     await _repositoryContext.SaveChangesAsync(requestCts.Token);
+
+                    //After save changes, begin the possible escalatio for a slow http call.
+                    if (stopWatch.Elapsed.TotalMilliseconds > thresholdDuration && delivery.DeliveryStatus != WebhookDeliveryStatus.DeadLetter)
+                    {
+                        if (string.IsNullOrEmpty(deliveryMetadata.ContactEmail))
+                        {
+                            _logger.Warning("No contact email is profiled for the 4subscription - {0} to escalate delivery - {1}", deliveryMetadata.SubscriptionName, deliveryMetadata.DeliveryId);
+                            continue;
+                        }
+
+                        DateTimeOffset notificationTimestamp = DateTimeOffset.UtcNow;
+                        Dictionary<string, string> mailContentParameters = new Dictionary<string, string>()
+                        {
+                            { "ContactName", deliveryMetadata.ContactName },
+                            { "ContactEmail",deliveryMetadata.ContactEmail },
+                            { "SubscriptionName", deliveryMetadata.SubscriptionName },
+                            { "CallbackUrl", delivery.CallBackUrl },
+                            { "DeliveryId", delivery.Id.ToString() },
+                            { "EventType", deliveryMetadata.RaisedEventName },
+                            { "ResponseTimeMs", stopWatch.Elapsed.TotalMilliseconds.ToString("N2") },
+                            { "AverageResponseTime", deliveryMetadata.AverageResponseTime.HasValue ? deliveryMetadata.AverageResponseTime.Value.ToString("N2") : (0.00).ToString("N2") },
+                            { "ThresholdMs", thresholdDuration.ToString("N2") },
+                            { "HttpStatusCode", httpResponseCode },
+                            { "DetectedAt", attemptedTime.ToString("R") },
+                            { "NotificationTimestamp", notificationTimestamp.ToString("R") },
+                            { "DeliveryHistoryUrl", "" },
+                            { "SubscriptionManagementUrl", "" }
+                        };
+
+                        string? mailContentToSend = await _emailContentFormatterHelper.GetEmailContentAsync(NotificationType.SlowEndpointNotification, mailContentParameters);
+
+                        if (string.IsNullOrWhiteSpace(mailContentToSend))
+                        {
+                            _logger.Warning("Mail content for the escalation could not be fetched for delivery - {0}. Mail send abolished....", delivery.Id);
+                            continue;
+                        }
+
+                        //Begin formatting the email to queue for processing. We use the application publisher as a sinle source for channel publishing.
+                        await _applicationPublisher.QueueEmailEvent(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
+                        //await _emailSenderChannel.Writer.WriteAsync(new EmailSenderDto(MailContent: mailContentToSend, Subject: "Webhook Callback Response Time Exceeded", MailRecipients: [deliveryMetadata.ContactEmail]));
+                    }
 
                     if (delivery.DeliveryStatus == WebhookDeliveryStatus.Delivered)
                         _logger.Information("Webhook delivered successfully - {0}", delivery.Id);

@@ -65,7 +65,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
             _logger.Information("Subscribe to catalog request - {0},{1}", serviceClientId, catalogName);
 
             //Check if the event caatlog already exists for catalog
-            WebhookServiceClientEventCatalog? existingCatalog = await _repositoryContext.WebhookServiceClientEventCatalogs.IgnoreQueryFilters().SingleOrDefaultAsync(x => x.ServiceClientId == serviceClientId && x.eventCatalog.NormalizedEventName == catalogName.ToUpper(), ct);
+            WebhookServiceClientEventCatalog? existingCatalog = await _repositoryContext.WebhookServiceClientEventCatalogs.IgnoreQueryFilters().SingleOrDefaultAsync(x => x.ServiceClientId == serviceClientId && x.eventCatalog.NormalizedEventName == catalogName.ToUpper() && x.serviceClient.IsActive, ct);
 
             //Check if there is an existing catalog with provided details.
             if (existingCatalog is not null)
@@ -76,11 +76,16 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
                     existingCatalog.DeactivatedAt = null;
                     existingCatalog.DeactivatedBy = string.Empty;
                 }
-                else if (!existingCatalog.DeactivatedAt.HasValue)
+                else
                 {
                     _logger.Information("Service Client already subscribed to the catalog - {0}, {1}", serviceClientId, catalogName);
                     return GenericResponse<string>.Failure("Operation Failed.", $"Catalog has already been subscribed to: {catalogName}", HttpStatusCode.Conflict);
                 }
+                //else if (!existingCatalog.DeactivatedAt.HasValue)
+                //{
+                //    _logger.Information("Service Client already subscribed to the catalog - {0}, {1}", serviceClientId, catalogName);
+                //    return GenericResponse<string>.Failure("Operation Failed.", $"Catalog has already been subscribed to: {catalogName}", HttpStatusCode.Conflict);
+                //}
 
                 //Update and maintain details to the database
                 await _repositoryContext.SaveChangesAsync(ct);
