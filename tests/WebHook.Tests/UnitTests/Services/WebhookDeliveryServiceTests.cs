@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit.Courier.Contracts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System.Net;
@@ -33,6 +34,9 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await _serviceProvider.DisposeAsync();
         }
     }
+    private Guid defaultUserId = Guid.NewGuid();
+    private string defaultUserEmail = string.Empty;
+    private string defaultUsername = string.Empty;
 
     public async Task InitializeAsync()
     {
@@ -90,6 +94,11 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         await ctx.WebhookSubscriptions.AddRangeAsync(_webhookSubscriptions);
         await ctx.WebhookEvents.AddRangeAsync(_webhookEvents);
         await ctx.SaveChangesAsync();
+
+        var seedResult = await TestDataSeeder.SeedUserAsync(context: ctx, userRole: "Admin");
+        defaultUserId = seedResult.Id;
+        defaultUserEmail = seedResult.Email;
+        defaultUsername = seedResult.UserName;
     }
 
     //-----------------------------
@@ -320,11 +329,12 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveriesAsync_CancellationRequested_Retunrs500INternalServerError()
+    public async Task GetDeliveriesAsync_CancellationRequested_Retunrs500InternalServerError()
     {
         //Arrange
         using var cts = new CancellationTokenSource();
         cts.Cancel();
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin".ToString());
         _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
         var sut = CreateSut(_authenticatedUserMock.Object);
 
@@ -340,7 +350,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveriesAsync_DeliveriesExistsWithDefaultFilter_Returns200OK()
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithDefaultFilter_Admin_Returns200OK()
     {
         //Arrange
 
@@ -353,7 +363,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin".ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(defaultUserId.ToString());
         var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
@@ -368,7 +379,95 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveriesAsync_DeliveriesExistsWithStatusFilter_Returns200OK()
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithDefaultFilter_NotAdmin_Returns200OK()
+    {
+        //Arrange
+        Guid userId = Guid.NewGuid();
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+            //Seed User
+            var seedUserResult = await TestDataSeeder.SeedUserAsync(arrangeCtx, email: "testuser2@test.com", userName: "testuser2");
+            
+
+            var deliveryToCreate = BuildDeliveryEntity();
+
+            var selectedSubscription = _webhookSubscriptions.OrderBy(x => x.Id).First();
+
+            selectedSubscription.CreatedByUserId = seedUserResult.Id;
+            var deliverySubscriptionEvent = selectedSubscription.WebhookEvents.First().Id;
+
+            arrangeCtx.WebhookSubscriptions.Update(selectedSubscription);
+            await arrangeCtx.AddAsync(deliveryToCreate);
+            await arrangeCtx.SaveChangesAsync();
+
+            userId = seedUserResult.Id;
+
+        }
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("User".ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(userId.ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
+
+        //Act
+        var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter(), CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData.metaData);
+        Assert.Single(result.ResponseData);
+        Assert.Equal(1, result.ResponseData.metaData.totalCount);
+    }
+
+    [Fact]
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithDefaultFilter_NotAdmin_NoLinkedSubscription_Returns200OK()
+    {
+        //Arrange
+        Guid userId = Guid.NewGuid();
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+
+            //Seed User
+            var seedUserResult = await TestDataSeeder.SeedUserAsync(arrangeCtx, email: "testuser2@test.com", userName: "testuser2");
+
+
+            var deliveryToCreate = BuildDeliveryEntity();
+
+            var selectedSubscription = _webhookSubscriptions.OrderBy(x => x.Id).First();
+
+            selectedSubscription.CreatedByUserId = seedUserResult.Id;
+            var deliverySubscriptionEvent = selectedSubscription.WebhookEvents.First().Id;
+
+            arrangeCtx.WebhookSubscriptions.Update(selectedSubscription);
+            await arrangeCtx.AddAsync(deliveryToCreate);
+            await arrangeCtx.SaveChangesAsync();
+
+            //userId = seedUserResult.Id;
+
+        }
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("User".ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(userId.ToString());
+        var sut = CreateSut(_authenticatedUserMock.Object);
+
+        //Act
+        var result = await sut.GetDeliveriesAsync(new WebhookDeliveryQueryRequestParameter(), CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.NotNull(result.ResponseData.metaData);
+        Assert.Empty(result.ResponseData);
+        Assert.Equal(0, result.ResponseData.metaData.totalCount);
+    }
+
+    [Fact]
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithStatusFilter_Admin_Returns200OK()
     {
         //Arrange
 
@@ -382,7 +481,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin".ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(defaultUserId.ToString());
         var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
@@ -398,7 +498,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveriesAsync_DeliveriesExistsWithDateFilter_Returns200OK()
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithDateFilter_Admin_Returns200OK()
     {
         //Arrange
 
@@ -412,7 +512,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(defaultUserId.ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin".ToString());
         var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act
@@ -428,7 +529,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveriesAsync_DeliveriesExistsWithPageSize_Returns200OK()
+    public async Task GetDeliveriesAsync_DeliveriesExistsWithPageSize_Admin_Returns200OK()
     {
         //Arrange
 
@@ -443,7 +544,8 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
             await arrangeCtx.SaveChangesAsync();
 
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin".ToString());
+        _authenticatedUserMock.Setup(x => x.userId).Returns(defaultUserId.ToString());
         var sut = CreateSut(_authenticatedUserMock.Object);
 
         //Act

@@ -941,18 +941,18 @@ public static class TestDataSeeder
     public static async Task<(Guid Id, string Email, string UserName)> SeedUserAsync(
         RepositoryContext context,
         string email = "testuser@test.com",
-        string userName = "testuser")
+        string userName = "testuser", string userRole = "USER")
     {
         // Ensure the USER role exists — insert only if absent
-        var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == "USER");
+        var role = await context.Roles.FirstOrDefaultAsync(r => r.NormalizedName == userRole.ToUpper());
         if (role is null)
         {
             role = new Role
             {
                 Id = Guid.NewGuid(),
-                Name = "USER",
-                NormalizedName = "USER",
-                Description = "Standard user role.",
+                Name = userRole,
+                NormalizedName = userRole.ToUpper(),
+                Description = $"Standard {userRole.ToLower()} role.",
                 IsActive = true,
                 CreatedAt = DateTimeOffset.UtcNow,
                 ConcurrencyStamp = Guid.NewGuid().ToString()
