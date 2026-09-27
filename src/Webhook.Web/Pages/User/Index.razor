@@ -93,50 +93,122 @@
                     <h2 class="card-title">Account Info</h2>
                     <Badge Value="@_role" Variant="role" ShowDot="false" />
                 </div>
-                <div class="card-body">
-                    <div class="detail-fields">
+                @if(_userDetails is not null)
+                {
+                    <div class="card-body">
+                        <div class="detail-fields">
 
-                        <div class="detail-field">
-                            <span class="detail-field-label">Email</span>
-                            <span class="detail-field-value text-sm">
-                                @_email
-                            </span>
-                            <span class="form-help">
-                                Email cannot be changed directly.
-                                Contact an administrator.
-                            </span>
-                        </div>
+                            <div class="detail-field">
+                                <span class="detail-field-label">Email</span>
+                                <span class="detail-field-value text-sm">
+                                    @_userDetails.UserEmailAddress
+                                </span>
+                                <span class="form-help">
+                                    Email cannot be changed directly.
+                                    Contact an administrator.
+                                </span>
+                            </div>
 
-                        <div class="detail-field">
-                            <span class="detail-field-label">Role</span>
-                            <Badge Value="@_role" Variant="role" ShowDot="false" />
-                        </div>
+                            <div class="detail-field">
+                                <span class="detail-field-label">Role</span>
+                                <Badge Value="@_role" Variant="role" ShowDot="false" />
+                            </div>
 
-                        <div class="detail-field">
-                            <span class="detail-field-label">Member since</span>
-                            <span class="detail-field-value text-sm">
-                                @_createdAt.ToString("MMM dd, yyyy")
-                            </span>
-                        </div>
+                            <div class="detail-field">
+                                <span class="detail-field-label">Member since</span>
+                                <span class="detail-field-value text-sm">
+                                    @_userDetails.CreatedAt.ToString("MMM dd, yyyy")
+                                </span>
+                            </div>
 
-                        <div class="detail-field">
-                            <span class="detail-field-label">Last login</span>
-                            <span class="detail-field-value text-sm">
-                                @(_lastLogin.HasValue
-                                    ? _lastLogin.Value.ToString("MMM dd, yyyy HH:mm")
-                                    : "Never")
-                            </span>
-                        </div>
+                            <div class="detail-field">
+                                <span class="detail-field-label">Last login</span>
+                                <span class="detail-field-value text-sm">
+                                    @(_userDetails.LastLoginDate.HasValue
+                                        ? _userDetails.LastLoginDate.Value.ToLocalTime().ToString("MMM dd, yyyy HH:mm")
+                                        : "Never")
+                                </span>
+                            </div>
 
-                        <div class="detail-field" style="margin-top:var(--space-4);">
-                            <a href="/request-otp?purpose=ChangePassword&returnUrl=/change-password"
+                            <div class="detail-field" style="margin-top:var(--space-4);">
+                                @* <a href="/request-otp?purpose=ChangePassword&returnUrl=/change-password"
                                class="btn btn-outline btn-sm">
                                 Change Password
-                            </a>
-                        </div>
+                            </a> *@
+                                <a href="/change-password"
+                                   class="btn btn-outline btn-sm">
+                                    Change Password
+                                </a>
+                            </div>
 
+                        </div>
                     </div>
-                </div>
+                }
+                else if (!string.IsNullOrEmpty(_getUserDetailsErrorMesage))
+                {
+                    <div class="detail-error-state">
+                        <div class="card">
+                            <div class="card-body" style="text-align:center;
+                                            padding:var(--space-12) var(--space-6);">
+
+                                <!-- Icon -->
+                                <div style="display:flex;justify-content:center;
+                                            margin-bottom:var(--space-5);">
+                                    <div style="width:56px;height:56px;
+                                                border-radius:var(--radius-full);
+                                                background:var(--color-danger-muted);
+                                                display:flex;align-items:center;
+                                                justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round"
+                                                style="width:24px;height:24px;
+                                                    color:var(--color-danger);">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <line x1="12" y1="8"  x2="12" y2="12" />
+                                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <!-- Message -->
+                                <h3 style="font-family:var(--font-heading);
+                                            font-size:var(--text-lg);
+                                            color:var(--color-text-primary);
+                                            margin-bottom:var(--space-2);">
+                                    Unable to load user details
+                                </h3>
+                                <p style="font-family:var(--font-body);
+                                            font-size:var(--text-sm);
+                                            color:var(--color-text-muted);
+                                            margin-bottom:var(--space-6);
+                                            max-width:360px;
+                                            margin-left:auto;
+                                            margin-right:auto;">
+                                    @(string.IsNullOrWhiteSpace(_getUserDetailsErrorMesage)
+                                        ? "Something went wrong while fetching user details. Please try again."
+                                        : _errorMessage)
+                                </p>
+
+                                <!-- Actions -->
+                                <div style="display:flex;align-items:center;
+                                            justify-content:center;gap:var(--space-3);">
+                                    <LoadingButton Text="Try Again"
+                                                    LoadingText="Retrying..."
+                                                    IsLoading="@_isRetrying"
+                                                    Variant="primary"
+                                                    OnClick="RetryLoad" />
+                                    <button class="btn btn-ghost"
+                                            @onclick="NavigateBack">
+                                        Go Back
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+    </div>
+                }
+                
             </div>
         </div>
 
@@ -160,6 +232,9 @@
     private DateTimeOffset  _createdAt = DateTimeOffset.UtcNow;
     private DateTimeOffset? _lastLogin;
 
+    private UserDetailsDto _userDetails = null;
+    private string _getUserDetailsErrorMesage = string.Empty;
+    private bool _isRetrying;
     private readonly ProfileModel _model = new();
 
     // -------------------------------------------------------------------------
@@ -191,12 +266,26 @@
             // _lastLogin       = result.ResponseData.LastLoginDate;
 
             await Task.Delay(600);
+            var result = await getUserDetailsHandler.HandleAsync();
+            if (!result.response.successStatus)
+            {
+                _getUserDetailsErrorMesage = result.response.responseMessage;
+                return;
+            }
 
-            _model.FirstName = "Abdrahman";
-            _model.LastName  = "Ibrahim";
-            _model.UserName  = "abdrahman";
-            _createdAt       = DateTimeOffset.UtcNow.AddDays(-60);
-            _lastLogin       = DateTimeOffset.UtcNow.AddHours(-2);
+            if(result.userDetails is null)
+            {
+                _getUserDetailsErrorMesage = result.response.responseMessage;
+                return;
+            }
+
+            _userDetails = result.userDetails;
+
+            _model.FirstName = _userDetails.FirstName;
+            _model.LastName  = _userDetails.LastName;
+            _model.UserName  = _userDetails.UserName;
+            _createdAt = _userDetails.CreatedAt;
+            _lastLogin       = _userDetails.LastLoginDate;
         }
         finally
         {
@@ -208,6 +297,20 @@
     // Handlers
     // -------------------------------------------------------------------------
 
+    private void NavigateBack()
+    {
+        //isAdmin ? "/admin/dashboard" : "/dashboard";
+        if(string.Equals(_role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            navigationManager.NavigateTo("/admin/dashboard");
+        }
+        else
+        {
+            navigationManager.NavigateTo("/dashboard");
+        }
+
+    }
+
     private async Task HandleSave()
     {
         _errorMessage  = string.Empty;
@@ -216,6 +319,13 @@
 
         try
         {
+
+            if (true)
+            {
+                _errorMessage = "This is an upcoming feature.";
+                return;
+            }
+
             // TODO: replace with real service call
             // var result = await UserService.UpdateProfileAsync(new UpdateProfileDto
             // {
@@ -247,6 +357,40 @@
             _isSaving = false;
         }
     }
+
+    private async Task RetryLoad()
+    {
+        _isRetrying = true;
+        try
+        {
+            await Task.Delay(600);
+            var result = await getUserDetailsHandler.HandleAsync();
+            if (!result.response.successStatus)
+            {
+                _getUserDetailsErrorMesage = result.response.responseMessage;
+                return;
+            }
+
+            if (result.userDetails is null)
+            {
+                _getUserDetailsErrorMesage = result.response.responseMessage;
+                return;
+            }
+
+            _userDetails = result.userDetails;
+
+            _model.FirstName = _userDetails.FirstName;
+            _model.LastName = _userDetails.LastName;
+            _model.UserName = _userDetails.UserName;
+            _createdAt = _userDetails.CreatedAt;
+            _lastLogin = _userDetails.LastLoginDate;
+        }
+        finally
+        {
+            _isRetrying = false; 
+        }
+    }
+
 
     // -------------------------------------------------------------------------
     // Local model

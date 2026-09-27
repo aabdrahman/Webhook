@@ -9,4 +9,5 @@ public interface IUserService
     Task<GenericResponse<string>> DeactivateUserProfileAsync(UserDeactivationRequestDto userDeactivationRequest, CancellationToken ct = default);
     Task<GenericResponse<string>> ReactivateUserProfileAsync(ReactivateUserRequestDto reactivateUser, CancellationToken ct = default);
     Task<GenericResponse<IReadOnlyList<UserDetailsDto>>> GetAllUsers(bool includeDeactivated = false, CancellationToken ct = default);
+    Task<GenericResponse<UserDetailsDto>> GetUserDetailsAsync(CancellationToken ct = default);
 }

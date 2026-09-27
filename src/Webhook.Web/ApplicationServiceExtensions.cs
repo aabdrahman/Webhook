@@ -62,6 +62,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<DeactivateUserProfileHandler>();
         services.AddScoped<ReactivateUserProfileHandler>();
         services.AddScoped<AssignNewRoleHandler>();
+        services.AddScoped<GetUserDetailsHandler>();
 
         //Delivery
         services.AddScoped<GetDeliveriesHandler>();

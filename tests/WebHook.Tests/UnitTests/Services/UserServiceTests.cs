@@ -1553,4 +1553,93 @@ public class UserServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         Assert.Equal("Profiled Users Fetched Successfully.", result.ResponseMessage, ignoreCase: true);
         Assert.Equal(2, result.ResponseData.Count);
     }
+
+    //-------------------------------------------------
+    //GetUserDetailsAsync
+    //-------------------------------------------------
+    [Fact]
+    public async Task GetUserDetailsAsync_CancellationRequested_Returns500InternalServerError()
+    {
+        //Arrange
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetUserDetailsAsync(ct: cts.Token);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.Equal("An error occurred while fetching user details.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetUserDetailsAsync_InvalidUserId_Returns400BadRequest()
+    {
+        //Arrange
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns("383e3u21-83ueqw".ToString());
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetUserDetailsAsync(ct: CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("An error occurred while fetching user details.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetUserDetailsAsync_ValidUserId_Returns200OK()
+    {
+        //Arrange
+
+        var seedUser = await SeedUserAsync();
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(seedUser.userId.ToString());
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetUserDetailsAsync(CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Equal("User details fetched successfully.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(seedUser.userId, result.ResponseData.Id.ToString("N"));
+        Assert.Equal(seedUser.email, result.ResponseData.UserEmailAddress, ignoreCase: true);
+        Assert.Equal(seedUser.userName, result.ResponseData.UserName, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetUserDetailsAsync_ValidUserId_NotExists_Returns200OK()
+    {
+        //Arrange
+
+        var seedUser = await SeedUserAsync();
+
+        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetUserDetailsAsync(CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Equal("User with details could not be fetced successfully.", result.ResponseMessage, ignoreCase: true);
+        
+    }
 }

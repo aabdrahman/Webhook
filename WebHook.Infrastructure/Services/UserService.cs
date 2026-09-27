@@ -360,4 +360,49 @@ public sealed class UserService : IUserService
         }
        
     }
+
+    public async Task<GenericResponse<UserDetailsDto>> GetUserDetailsAsync(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetUserDetailsAsync));
+        try
+        {
+            _logger.Information("Fetching authenticated user details.....");
+
+            if(!Guid.TryParse(_authenticatedUserDetails.userId, out var userId))
+            {
+                _logger.Warning("The authenticated user details could not be parsed appropriately - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<UserDetailsDto>.Failure(null, "An error occurred while fetching user details.", HttpStatusCode.BadRequest);
+            }
+
+            var result = await _repositoryContext.Database
+                .SqlQueryRaw<UserDetailsDto>
+                (
+                    @"
+                        SELECT ""u"".""Id"", ""u"".""CreatedAt"", ""u"".""FirstName"", ""u"".""LastName"", 
+		                        ""r"".""NormalizedName"" AS ""AssignedRole"", 
+		                        ""u"".""NormalizedUserName"" AS ""UserName"",
+		                        ""u"".""NormalizedEmail"" AS ""UserEmailAddress"",
+		                        ""u"".""IsActive"" AS ""isActive"", ""u"".""LastLoginDate"", ""u"".""DeactivationJustification"", ""u"".""LockoutEnd""
+                        FROM public.""AspNetUsers"" AS ""u""
+                        INNER JOIN public.""AspNetUserRoles"" AS ""ur""
+                        ON ""u"".""Id"" = ""ur"".""UserId""
+                        INNER JOIN public.""AspNetRoles"" AS ""r""
+                        ON ""r"".""Id"" = ""ur"".""RoleId""
+                        WHERE ""u"".""Id"" = {0}
+                    ", userId
+                )
+                .FirstOrDefaultAsync(ct);
+
+            return result is null ?
+                GenericResponse<UserDetailsDto>.Failure(null, $"User with details could not be fetced successfully.", HttpStatusCode.NotFound) :
+                GenericResponse<UserDetailsDto>.Success(result, "User details fetched successfully.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occcurred while fetching user details.");
+            return GenericResponse<UserDetailsDto>.Failure(null, "An error occurred while fetching user details.", HttpStatusCode.InternalServerError);
+        }
+
+    }
 }

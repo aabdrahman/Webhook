@@ -239,12 +239,14 @@ public class UsersController : ControllerBase
     /// The cancellation token that implies if the operatio should be cancelled.
     /// </param>
     /// <returns>
-    /// Returns the response containing the list of users and error if operation failed.
-    /// <respone code="200">Users sfetched successfully and users exists in the system.</respone>
-    /// <respone code="404">No user profiled in the system yet.</respone>
-    /// <respone code="500">Users could not be fetched and an unexpected error occurred while performing operation.</respone>
-    /// <respone code="500">Operation origin rate limit exceeded..</respone>
+    /// The http response with details
     /// </returns>
+    /// Returns the response containing the list of users and error if operation failed.
+    /// <response code="200">Users fetched successfully and users exists in the system.</response>
+    /// <response code="404">No user profiled in the system yet.</response>
+    /// <response code="500">Users could not be fetched and an unexpected error occurred while performing operation.</response>
+    /// <response code="409">Operation origin rate limit exceeded..</response>
+
     [Authorize(Roles = "ADMIN,Admin")]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status404NotFound)]
@@ -258,6 +260,50 @@ public class UsersController : ControllerBase
         try
         {
             var result = await _userService.GetAllUsers(ct: ct);
+
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// The endpoint fetches the details of the authenticated user.
+    /// </summary>
+    /// <param name="ct">
+    /// The cancellation token that implies if the operatio should be cancelled.
+    /// </param>
+    /// <returns>
+    /// The http response with details
+    /// </returns>
+    /// <response code="200">Authenticated user details fetched successfully.</response>
+    /// <response code="401">User not authenticated.</response>
+    /// <response code="404">No user profiled in the system yet.</response>
+    /// <response code="500">Users could not be fetched and an unexpected error occurred while performing operation.</response>
+    /// <response code="429">Operation origin rate limit exceeded.</response>
+    [Authorize]
+    [HttpGet("get-user-details")]
+    [ProducesResponseType(typeof(GenericResponse<UserDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<UserDetailsDto>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(GenericResponse<UserDetailsDto>), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> GetUserDetails(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetUserDetails));
+        try
+        {
+            var result = await _userService.GetUserDetailsAsync(ct);
 
             return StatusCode((int)result.HttpStatusCode, result);
         }
