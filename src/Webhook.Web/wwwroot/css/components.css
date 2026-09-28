@@ -1410,4 +1410,77 @@ input[type="number"] {
 .progress-bar-label.progress-bar-danger {
     color: var(--color-danger);
 }*/
- 
+
+
+.date-range-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.date-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg, #0F1117); 
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.date-input-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.date-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--secondary);
+    white-space: nowrap;
+}
+
+.date-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 130px;
+    color-scheme: dark; /* flips the native date picker chrome */
+}
+
+.date-sep {
+    color: var(--border);
+    user-select: none;
+}
+
+.date-range-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.dashboard-greeting {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.dashboard-greeting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    width: 100%;
+}

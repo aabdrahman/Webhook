@@ -1,7 +1,7 @@
 /* =============================================================================
    Dashboard page styles
-   ============================================================================= */
-
+   ============================================================================= 
+*/
 .dashboard-greeting {
     display:         flex;
     align-items:     flex-start;
@@ -16,6 +16,8 @@
     align-items: center;
     gap:         var(--space-3);
     flex-shrink: 0;
+    justify-content: flex-end;
+
 }
 
 /* Primary metrics grid — 4 columns */

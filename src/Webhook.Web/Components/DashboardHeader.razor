@@ -1,0 +1,144 @@
+<div class="dashboard-greeting">
+
+    @* ── Row 1: Title + Description ── *@
+    <div>
+        <h1 class="page-title">@Title</h1>
+        <p class="page-header-description">@Description</p>
+    </div>
+
+    @* ── Row 2: Date filter (left) | Buttons (right) ── *@
+    <div class="dashboard-greeting-row">
+
+        <div class="date-range-filter">
+            <div class="date-range-inputs">
+                <div class="date-input-group">
+                    <label class="date-label" for="dh-start">From</label>
+                    <input id="dh-start"
+                           type="date"
+                           class="date-input"
+                           @bind="_startDate"
+                           @bind:event="oninput"
+                           max="@_today" />
+                </div>
+                <span class="date-sep">—</span>
+                <div class="date-input-group">
+                    <label class="date-label" for="dh-end">To</label>
+                    <input id="dh-end"
+                           type="date"
+                           class="date-input"
+                           @bind="_endDate"
+                           @bind:event="oninput"
+                           min="@(_startDate?.ToString("yyyy-MM-dd"))"
+                           max="@_today" />
+                </div>
+            </div>
+
+            <div class="date-range-actions">
+                <button class="btn btn-primary btn-sm"
+                        @onclick="ApplyFilter"
+                        disabled="@(!CanApply)">
+                    Apply
+                </button>
+
+                @if (_filterActive)
+                {
+                    <button class="btn btn-ghost btn-sm" @onclick="ClearFilter">
+                        Clear Filter
+                    </button>
+                }
+            </div>
+        </div>
+
+        <div class="dashboard-greeting-actions">
+            @if (AdditionalActions is not null)
+            {
+                @AdditionalActions
+            }
+
+            @if (OnRefresh.HasDelegate)
+            {
+                <button class="btn btn-secondary btn-sm"
+                        @onclick="OnRefresh"
+                        disabled="@IsRefreshing">
+                    @if (IsRefreshing)
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             class="icon-spin">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                        <span>Refreshing...</span>
+                    }
+                    else
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                            <path d="M21 3v5h-5" />
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                            <path d="M8 16H3v5" />
+                        </svg>
+                        <span>Refresh</span>
+                    }
+                </button>
+            }
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title       { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+
+    [Parameter] public bool          IsRefreshing    { get; set; }
+    [Parameter] public EventCallback OnRefresh       { get; set; }
+
+    [Parameter] public EventCallback<DateRangeFilter> OnFilterApplied { get; set; }
+    [Parameter] public EventCallback                  OnFilterCleared { get; set; }
+
+    [Parameter] public RenderFragment? AdditionalActions { get; set; }
+
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private bool      _filterActive;
+
+    private string _today => DateTime.Today.ToString("yyyy-MM-dd");
+
+    private bool CanApply =>
+        _startDate.HasValue &&
+        _endDate.HasValue &&
+        _startDate.Value.Date <= _endDate.Value.Date;
+
+    private async Task ApplyFilter()
+    {
+        if (!CanApply) return;
+        _filterActive = true;
+        await OnFilterApplied.InvokeAsync(new DateRangeFilter
+        {
+            StartDate = _startDate!.Value.Date,
+            EndDate   = _endDate!.Value.Date
+        });
+    }
+
+    private async Task ClearFilter()
+    {
+        _startDate    = null;
+        _endDate      = null;
+        _filterActive = false;
+        await OnFilterCleared.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Carries the selected start and end dates from <see cref="DashboardHeader"/>
+    /// to the parent dashboard component.
+    /// </summary>
+    public sealed record DateRangeFilter
+    {
+        public DateTime StartDate { get; init; }
+        public DateTime EndDate { get; init; }
+    }
+}

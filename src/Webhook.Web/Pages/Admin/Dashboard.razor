@@ -7,8 +7,37 @@
 
 @if (!_isLoading)
 {
+
+    <DashboardHeader Title="System Overview"
+                     Description="Real-time view of the WebhookHub delivery pipeline."
+                     IsRefreshing="_isRefreshing"
+                     OnRefresh="RefreshDashboard"
+                     OnFilterApplied="HandleFilterApplied"
+                     OnFilterCleared="HandleFilterCleared">
+        <AdditionalActions>
+            <a href="/admin/health" class="btn btn-secondary btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                Health Checks
+            </a>
+            @* <button class="btn btn-secondary btn-sm" @onclick="RefreshDashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     style="width:14px;height:14px;">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10
+                    M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                Refresh
+            </button> *@
+        </AdditionalActions>
+    </DashboardHeader>
     <!-- Greeting -->
-    <div class="dashboard-greeting">
+    @* <div class="dashboard-greeting">
         <div>
             <h1 class="page-title">System Overview</h1>
             <p class="page-header-description">
@@ -36,7 +65,7 @@
                 Refresh
             </button>
         </div>
-    </div>
+    </div> *@
 
     <!-- Row 1 — System entity counts -->
     <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
@@ -376,6 +405,7 @@
     private List<ClientActivityItem> _clientActivity = [];
     private List<FailingSubItem>     _topFailures    = [];
     private List<SystemEventItem>    _recentEvents   = [];
+    private bool _isRefreshing;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -453,7 +483,7 @@
             new("RetryWorker",                       "Degraded"),
             new("StaleClaimedDeliveryReleaseWorker", "Healthy"),
             new("EmailProcessorWorker",              "Healthy"),
-        ];
+    ];
 
         _healthChecks =
         [
@@ -462,7 +492,7 @@
             new("dead-letter-queue",  "Degraded",  1.8),
             new("pending-deliveries", "Healthy",   2.1),
             new("stale-processing",   "Healthy",   0.9),
-        ];
+    ];
 
         _overallHealth = _healthChecks.Any(h => h.Status == "Unhealthy")
             ? "Unhealthy"
@@ -489,7 +519,7 @@
             new("order-service-prod",   "Order Management Service", 312),
             new("payment-gateway-prod", "Payment Gateway",          198),
             new("notification-prod",    "Notification Service",     87),
-        ];
+    ];
 
         _isLoadingClients = false;
         StateHasChanged();
@@ -509,7 +539,7 @@
             new("Order Service Sub",   "https://orders.internal/webhook", 24),
             new("CRM Sub",             "https://crm.internal/hooks",      16),
             new("Notification Sub",    "https://notify.internal/events",  8),
-        ];
+    ];
 
         _isLoadingFailures = false;
         StateHasChanged();
@@ -531,7 +561,7 @@
             new("OrderCancelled",  "order-service-prod",   Guid.NewGuid(), 9,  DateTimeOffset.UtcNow.AddMinutes(-7)),
             new("UserRegistered",  "notification-prod",    Guid.NewGuid(), 2,  DateTimeOffset.UtcNow.AddMinutes(-12)),
             new("OrderCreated",    "order-service-prod",   Guid.NewGuid(), 9,  DateTimeOffset.UtcNow.AddMinutes(-18)),
-        ];
+    ];
 
         _isLoadingEvents = false;
         StateHasChanged();
@@ -567,4 +597,14 @@
         Guid           CorrelationId,
         int            DeliveryCount,
         DateTimeOffset PublishedAt);
+
+    private void HandleFilterApplied(DashboardHeader.DateRangeFilter args)
+    {
+        throw new NotImplementedException();
+    }
+
+    private void HandleFilterCleared()
+    {
+        throw new NotImplementedException();
+    }
 }

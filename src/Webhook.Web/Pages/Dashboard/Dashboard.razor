@@ -1,5 +1,5 @@
 @page "/dashboard"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "USER,User")]
 
 <PageTitle>Dashboard — WebhookHub</PageTitle>
 
@@ -7,8 +7,15 @@
 
 @if (!_isLoading)
 {
+   
+    <DashboardHeader Title="@($"{_greeting}, {_firstName}")"
+                     Description="Here is an overview of your webhook activity."
+                     IsRefreshing="_isRefreshing"
+                     OnRefresh="RefreshDashboard"
+                     OnFilterApplied="HandleFilterApplied"
+                     OnFilterCleared="HandleFilterCleared" />
     <!-- Greeting -->
-    <div class="dashboard-greeting">
+    @* <div class="dashboard-greeting">
         <div>
             <h1 class="page-title">@_greeting, @_firstName</h1>
             <p class="page-header-description">
@@ -28,7 +35,7 @@
                 Refresh
             </button>
         </div>
-    </div>
+    </div> *@
 
     <!-- Row 1 — Primary metrics -->
     <div class="dashboard-metrics-grid">
@@ -115,7 +122,7 @@
                     {
                         <div class="dashboard-worker-item">
                             <StatusDot Status="@worker.Status"
-                                       Pulse="@(worker.Status == "Healthy")" />
+                                       Pulse="@(worker.Status.Equals("Healthy", StringComparison.OrdinalIgnoreCase))" />
                             <span class="text-sm">@worker.Name</span>
                         </div>
                     }
@@ -284,6 +291,7 @@
     private List<WorkerStatusItem>       _workers                 = [];
     private List<RecentDeliveryItem>     _recentDeliveries        = [];
     private List<FailingSubscriptionItem> _topFailingSubscriptions = [];
+    private bool _isRefreshing;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -380,7 +388,7 @@
             new("RetryWorker",                      "Degraded"),
             new("StaleClaimedDeliveryReleaseWorker","Healthy"),
             new("EmailProcessorWorker",             "Healthy"),
-        ];
+    ];
 
         _isLoadingWorkers = false;
         StateHasChanged();
@@ -401,7 +409,7 @@
             new("OrderCancelled",  "Order Service Sub",   "Failed",      3012,DateTimeOffset.UtcNow.AddMinutes(-8)),
             new("OrderCreated",    "Notification Sub",    "Delivered",   201, DateTimeOffset.UtcNow.AddMinutes(-12)),
             new("UserRegistered",  "CRM Sub",             "DeadLetter",  0,   DateTimeOffset.UtcNow.AddMinutes(-20)),
-        ];
+    ];
 
         _isLoadingDeliveries = false;
         StateHasChanged();
@@ -420,7 +428,7 @@
             new("Order Service Sub",   "https://orders.internal/webhook",   14, 2),
             new("CRM Sub",             "https://crm.internal/hooks",        8,  1),
             new("Notification Sub",    "https://notify.internal/events",    3,  0),
-        ];
+    ];
 
         _isLoadingFailures = false;
         StateHasChanged();
@@ -447,4 +455,14 @@
         string CallbackUrl,
         int    FailedCount,
         int    DeadLetterCount);
+
+    private Task HandleFilterApplied(DashboardHeader.DateRangeFilter args)
+    {
+        throw new NotImplementedException();
+    }
+
+    private Task HandleFilterCleared()
+    {
+        throw new NotImplementedException();
+    }
 }
