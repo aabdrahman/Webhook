@@ -7,8 +7,10 @@
 @using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog
 @using Webhook.Web.Handlers.Admin
 @using Webhook.Web.Handlers.User
+@using Webhook.Web.Handlers.ReportingAnalytics
 
 @using WebHook.Core.DataTransferObjects.Authentication
+@using WebHook.Core.Entities.CustomEntities
 
 
 @inject GetEventCatalogsHandler getEventCatalogsHandler
@@ -23,3 +25,5 @@
 @inject AssignNewRoleHandler assignNewRoleHandler
 
 @inject HealthCheckStatusHandler healthCheckStatusHandler
+
+@inject GetMostRecentEventsHandler getMostRecentEventsHandler

@@ -6,6 +6,7 @@ using Webhook.Web.Handlers.Admin;
 using Webhook.Web.Handlers.Authentication;
 using Webhook.Web.Handlers.Delivery;
 using Webhook.Web.Handlers.EventCatalog;
+using Webhook.Web.Handlers.ReportingAnalytics;
 using Webhook.Web.Handlers.ServiceClient;
 using Webhook.Web.Handlers.ServiceClient.ServiceClientEventCatalog;
 using Webhook.Web.Handlers.Subscription;
@@ -79,6 +80,9 @@ public static class ApplicationServiceExtensions
 
         //Utilities
         services.AddSingleton<ToastService>();
+
+        //Reporting Analytics
+        services.AddScoped<GetMostRecentEventsHandler>();
     }
 
     internal static void AddApplicationAuthenticationStateProvider(this IServiceCollection services)

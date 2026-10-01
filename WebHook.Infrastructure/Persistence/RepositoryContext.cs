@@ -40,6 +40,6 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
 
         modelBuilder.ApplyConfigurationsFromAssembly(assembly: Assembly.GetExecutingAssembly());
 
-        modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView("vw_GetMostRecentEvents");
+        modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView("vw_GetMostRecentEvents".ToLower());
     }
 }
