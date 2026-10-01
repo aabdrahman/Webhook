@@ -99,7 +99,7 @@
                         : check.Status.Contains("Degraded", StringComparison.OrdinalIgnoreCase)
                             ? "health-check-card-degraded"
                             : "health-check-card-healthy")">
-                    <div class="card-body">
+                    <div class="card-body" style="display:flex;flex-direction:column;justify-content:space-between;">
                         <div class="health-check-header">
                             <StatusDot Status="@check.Status"
                                        Pulse="@(check.Status.Contains("Healthy", StringComparison.OrdinalIgnoreCase))" />

@@ -192,7 +192,7 @@ public sealed class WebhookEventService : IWebhookEventService
                                                         new ErrorDetail { ErrorMessage = ex.Message, ErrorTitle = ex.GetType().Name, ErrorDescription = ex.InnerException?.Message ?? "" });
             }
 
-            //Vlaidating the client id and client key from the extracted details is not necessary because we have a filter that validates it already
+            //Validating the client id and client key from the extracted details is not necessary because we have a filter that validates it already
             //So, what we will validate is ensure that the clientId is profiled with the event it is trying to post.
             bool isEventProfiled = await _repositoryContext.WebhookServiceClientEventCatalogs
                                                 .AnyAsync(x => x.serviceClient.ClientId == _authenticatedUserDetails.ClientId!.ToLower() && x.eventCatalog.NormalizedEventName == createWebhookEvent.EventType.ToUpper());
