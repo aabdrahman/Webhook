@@ -3,6 +3,7 @@
     when no route matches the current URL.
 *@
 
+
 <PageTitle>Not Found — WebhookHub</PageTitle>
 
 <div class="error-page">
@@ -40,7 +41,42 @@
 
 @code {
 
-    private void GoHome() => navigationManager.NavigateTo("/dashboard");
+    private async Task GoHome()
+    {
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated ?? false)
+        {
+            // Navigate to returnUrl or dashboard on success
+            var userRole = authState.User.FindFirstValue(ClaimTypes.Role);
+            if (string.IsNullOrEmpty(userRole))
+            {
+                Console.WriteLine("User role is null or empty. Navigating to user dashboard.");
+                navigationManager.NavigateTo("/");
+                return;
+            }
+            bool isAdmin = string.Equals("Admin", userRole, StringComparison.OrdinalIgnoreCase);
+
+            if (isAdmin)
+            {
+                Console.WriteLine("User role is not null and empty. Navigating to admin dashboard.");
+                navigationManager.NavigateTo("/admin/dashboard");
+                return;
+            }
+
+            Console.WriteLine("User role is not null and empty and not Admin. Navigating to user dashboard.");
+            navigationManager.NavigateTo("/dashboard");
+            return;
+        }
+        else
+        {
+            Console.WriteLine("User not authenticated. Navigating to user dashboard.");
+            navigationManager.NavigateTo("/dashboard");
+            return;
+        }
+        Console.WriteLine("Not authenticated. Navigating to home page.");
+        navigationManager.NavigateTo("/");
+        return;
+    }
 
     private void GoBack()  => navigationManager.NavigateTo("javascript:history.back()");
 }

@@ -11,14 +11,17 @@
             <AuthorizeRouteView RouteData="@routeData"
                                 DefaultLayout="@typeof(MainLayout)">
                 <NotAuthorized>
-                    @if (!context.User.Identity?.IsAuthenticated ?? true)
-                    {
-                        <RedirectToLogin />
-                    }
-                    else
-                    {
-                        <UnauthorizedPage />
-                    }
+                    <LayoutView Layout="@typeof(AuthLayout)">
+                        @if (!context.User.Identity?.IsAuthenticated ?? true)
+                        {
+                            <RedirectToLogin />
+                        }
+                        else
+                        {
+                            
+                            <UnauthorizedPage />
+                        }
+                    </LayoutView>
                 </NotAuthorized>
                 <Authorizing>
                     <AppLoadingScreen />
@@ -27,7 +30,7 @@
         </Found>
         <NotFound>
             <PageTitle>Not Found — WebhookHub</PageTitle>
-            <LayoutView Layout="@typeof(MainLayout)">
+            <LayoutView Layout="@typeof(AuthLayout)">
                 <NotFoundPage />
             </LayoutView>
         </NotFound>

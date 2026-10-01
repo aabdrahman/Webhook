@@ -36,7 +36,7 @@ public class WebhookDeliveryService : IWebhookDeliveryService
             DateTimeOffset startDate = webhookDeliveryQueryRequest.StartDate.ToDateTime(TimeOnly.MinValue);
             DateTimeOffset endDate = webhookDeliveryQueryRequest.EndDate.ToDateTime(TimeOnly.MinValue);
 
-            IQueryable<WebhookDelivery> fetchDeliveriesQuery = _repositoryContext.WebhookDeliveries.Where(x => x.CreatedAt >= startDate && x.CreatedAt <= x.CreatedAt);
+            IQueryable<WebhookDelivery> fetchDeliveriesQuery = _repositoryContext.WebhookDeliveries.OrderByDescending(x => x.CreatedAt).Where(x => x.CreatedAt >= startDate && x.CreatedAt <= x.CreatedAt);
 
             if(!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
             {

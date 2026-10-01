@@ -19,7 +19,7 @@ public class WebhookDeliveryAttemptService : IWebhookDeliveryAttemptService
     }
 
     private const string _methodName = "MethodName";
-    private ILogger _logger = Log.ForContext("ClasName", nameof(WebhookDeliveryAttemptService));
+    private ILogger _logger = Log.ForContext("ClassName", nameof(WebhookDeliveryAttemptService));
 
     public async Task<GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>> GetDeliveryAttemptsAsync(Guid deliveryId, CancellationToken ct = default)
     {
@@ -28,7 +28,7 @@ public class WebhookDeliveryAttemptService : IWebhookDeliveryAttemptService
         {
             _logger.Information("Fetching delivery attempts for - {0}", deliveryId);
 
-            List<WebhookDeliveryAttemptDto> deliveryAttempts = await _repositoryContext.WebhookDeliveryAttempts.Where(x => x.WebhookDeliveryId == deliveryId).Select(WebhookDeliveryAttemptMapper.ToDtoExpression()).ToListAsync(ct);
+            List<WebhookDeliveryAttemptDto> deliveryAttempts = await _repositoryContext.WebhookDeliveryAttempts.OrderByDescending(x => x.AttemptedAt).Where(x => x.WebhookDeliveryId == deliveryId).Select(WebhookDeliveryAttemptMapper.ToDtoExpression()).ToListAsync(ct);
 
             if(!deliveryAttempts.Any())
             {
@@ -36,7 +36,7 @@ public class WebhookDeliveryAttemptService : IWebhookDeliveryAttemptService
                 return GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>.Failure(null, "Webhook delivery attempts not yet made for the delievry.", HttpStatusCode.NotFound);
             }
 
-            _logger.Information("");
+            _logger.Information("Delivery attempts fetched successfully - {0}", deliveryAttempts);
             return GenericResponse<IReadOnlyList<WebhookDeliveryAttemptDto>>.Success(deliveryAttempts, "Webhook delivery attempts fetched successfully.", HttpStatusCode.OK);
         }
         catch (Exception ex)
