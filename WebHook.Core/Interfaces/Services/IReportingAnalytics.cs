@@ -1,0 +1,12 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using WebHook.Core.DataTransferObjects;
+using WebHook.Core.Entities.CustomEntities;
+
+namespace WebHook.Core.Interfaces.Services;
+
+public interface IReportingAnalyticsService
+{
+    Task<GenericResponse<IReadOnlyList<TopFiveEventAnalyticsEntity>>> GetMostRecentEventsAsync(CancellationToken ct = default);
+}

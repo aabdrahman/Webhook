@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 using WebHook.Core.Entities;
+using WebHook.Core.Entities.CustomEntities;
 using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Data_Persistence;
@@ -19,6 +20,7 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<WebhookServiceClient> WebhookServiceClients { get; set; }
     public DbSet<WebhookServiceClientEventCatalog> WebhookServiceClientEventCatalogs { get; set; }
+    public DbSet<TopFiveEventAnalyticsEntity> TopFiveEventAnalyticsEntities { get; set; }
 
     public RepositoryContext(DbContextOptions<RepositoryContext> options) : base(options)
     {
@@ -37,5 +39,7 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(assembly: Assembly.GetExecutingAssembly());
+
+        modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView("vw_GetMostRecentEvents");
     }
 }

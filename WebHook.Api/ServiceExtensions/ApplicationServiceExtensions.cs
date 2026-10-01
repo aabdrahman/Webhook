@@ -262,6 +262,8 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<CustomAuthenticationFilter>();
         services.AddScoped<ClientValidationFilter>();
 
+        services.AddScoped<IReportingAnalyticsService, ReportingAnalyticsService>();
+
         services.AddSingleton(new WorkerLivenessTracker(TimeSpan.FromSeconds(45)));
 
         services.AddScoped<RequestOtpEmailExtractionMiddleware>();

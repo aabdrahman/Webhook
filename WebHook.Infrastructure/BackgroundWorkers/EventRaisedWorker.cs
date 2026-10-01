@@ -60,10 +60,10 @@ public class EventRaisedWorker : BackgroundService
 
                     ).FirstOrDefaultAsync();
 
-                    //If ecent item is null, maybe the status has changed or its been updated by another worker, then, we return and continue with other raised events in the channel
+                    //If event item is null, maybe the status has changed or its been updated by another worker, then, we return and continue with other raised events in the channel
                     if (eventItem is null)
                     {
-                        _logger.Information("Created Event with Id - {0} cannot be feched. Possibly currently processing", item.createdEventId);
+                        _logger.Information("Created Event with Id - {0} cannot be fetched. Possibly currently processing", item.createdEventId);
                         await transaction.RollbackAsync(stoppingToken);
                         continue;
                     }
@@ -86,7 +86,7 @@ public class EventRaisedWorker : BackgroundService
                                                                     })
                                                                     .ToListAsync(stoppingToken);
 
-                    //Validates if there is any subscriber to teh raised event.
+                    //Validates if there is any subscriber to the raised event.
                     if (subscribers.Any())
                     {
                         await repositoryContext.WebhookDeliveries.AddRangeAsync(subscribers, stoppingToken);
@@ -108,7 +108,7 @@ public class EventRaisedWorker : BackgroundService
                     {
                         await repositoryContext.SaveChangesAsync(stoppingToken);
                         await transaction.CommitAsync(stoppingToken);
-                        _logger.Information("Event raised successfully processed - {0}", item.createdEventId);
+                        _logger.Information("Event raised successfully processed for delivery - {0}", item.createdEventId);
                     }
                     catch (Exception ex)
                     {
