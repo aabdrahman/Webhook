@@ -310,4 +310,37 @@ public class ReportingAnalyticsTests : IClassFixture<PostgreSqlFixture>, IAsyncL
         Assert.Null(result.ErrorDetail);
         Assert.NotNull(result.ResponseData);
     }
+
+    [Fact]
+    public async Task GetTopFailingSubscriptionsAsync_CancellationRequested_Returns500InternalServerError()
+    {
+        //Arrange
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var sut = CreateSut();
+        //Act
+        var result = await sut.GetTopFailingSubscriptionsAsync(cts.Token);
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ErrorDetail);
+        Assert.Equal("An error occurred while fetching top failing subscriptions.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+    }
+
+    [Fact]
+    public async Task GetTopFailingSubscriptionsAsync_RecordExists_Returns200OK()
+    {
+        //Arrange
+        var sut = CreateSut();
+        //Act
+        var result = await sut.GetTopFailingSubscriptionsAsync(CancellationToken.None);
+        //Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Null(result.ErrorDetail);
+        Assert.NotNull(result.ResponseData);
+    }
 }

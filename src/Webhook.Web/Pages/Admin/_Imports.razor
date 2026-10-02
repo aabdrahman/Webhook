@@ -8,6 +8,7 @@
 @using Webhook.Web.Handlers.Admin
 @using Webhook.Web.Handlers.User
 @using Webhook.Web.Handlers.ReportingAnalytics
+@using WebHook.Core.DataTransferObjects.ReportingAnalytics
 
 @using WebHook.Core.DataTransferObjects.Authentication
 @using WebHook.Core.Entities.CustomEntities
@@ -28,3 +29,4 @@
 
 @inject GetEventCatalogAnalyticsHandler getEventCatalogAnalyticsHandler
 @inject GetMostRecentEventsHandler getMostRecentEventsHandler
+@inject GetTopFailingSubscriptionsHandler getTopFailingSubscriptionsHandler

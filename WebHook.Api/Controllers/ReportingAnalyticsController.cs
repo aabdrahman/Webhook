@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using WebHook.Core.DataTransferObjects;
+using WebHook.Core.DataTransferObjects.ReportingAnalytics;
 using WebHook.Core.Entities.CustomEntities;
 using WebHook.Core.Interfaces.Services;
 
@@ -20,6 +21,10 @@ namespace WebHook.Api.Controllers;
 public class ReportingAnalyticsController : ControllerBase
 {
     private readonly IReportingAnalyticsService _reportingAnalyticsService;
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="reportingAnalyticsService"></param>
     public ReportingAnalyticsController(IReportingAnalyticsService reportingAnalyticsService)
     {
         _reportingAnalyticsService = reportingAnalyticsService;
@@ -120,6 +125,49 @@ public class ReportingAnalyticsController : ControllerBase
         try
         {
             var response = await _reportingAnalyticsService.GetTopActiveEventCatalogsAsync(ct);
+            return StatusCode((int)response.HttpStatusCode, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// Retrieves analytics for the top failing webhook subscriptions,
+    /// ranked by total delivery failures.
+    /// </summary>
+    /// <remarks>
+    /// Returns subscriptions with the highest failure counts, including
+    /// aggregated metrics such as total attempts, failed deliveries, and
+    /// the most recent failure timestamp. Useful for identifying unhealthy
+    /// subscriptions that may require attention or remediation.
+    /// </remarks>
+    /// <param name="ct">Cancellation token for the async operation.</param>
+    /// <returns>
+    /// <list type="bullet">
+    ///   <item><description><b>200 OK</b> — Top failing subscriptions retrieved successfully.</description></item>
+    ///   <item><description><b>500 Internal Server Error</b> — An unexpected error occurred.</description></item>
+    /// </list>
+    /// </returns>
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopFailingSubscriptionDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [HttpGet("get-top-failing-subscriptions")]
+    public async Task<IActionResult> GetTopFailingSubscriptionsAsync(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetTopFailingSubscriptionsAsync));
+        try
+        {
+            var response = await _reportingAnalyticsService.GetTopFailingSubscriptionsAsync(ct);
             return StatusCode((int)response.HttpStatusCode, response);
         }
         catch (Exception ex)

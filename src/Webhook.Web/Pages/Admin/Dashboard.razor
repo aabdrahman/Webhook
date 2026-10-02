@@ -291,7 +291,7 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Top Failing Subscriptions</h2>
-                <a href="/deliveries?status=Failed" class="btn btn-ghost btn-sm">
+                <a href="/deliveries" class="btn btn-ghost btn-sm">
                     View all
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -308,7 +308,7 @@
                 else if (!_topFailures.Any())
                 {
                     <EmptyState Title="No failing subscriptions"
-                                Description="All subscriptions are delivering successfully."
+                                Description="@(string.IsNullOrEmpty(_loadTopFailingSubscriptionErrorMessage) ? "All subscriptions are delivering successfully." : _loadTopFailingSubscriptionErrorMessage)"
                                 Icon="delivery" />
                 }
                 else
@@ -436,6 +436,7 @@
     private bool _isRefreshing;
     private string _loadRecentEventErrorMessage = string.Empty;
     private string _loadEventCatalogAnalyticsErrorMessage = string.Empty;
+    private string _loadTopFailingSubscriptionErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -571,15 +572,25 @@
 
         await Task.Delay(600);
 
-        // TODO: replace with real service call
-        // var result = await AdminService.GetTopFailingSubscriptionsAsync();
+        var result = await getTopFailingSubscriptionsHandler.HandleAsync();
 
-        _topFailures =
-        [
-            new("Order Service Sub",   "https://orders.internal/webhook", 24),
-            new("CRM Sub",             "https://crm.internal/hooks",      16),
-            new("Notification Sub",    "https://notify.internal/events",  8),
-    ];
+        if (!result.response.successStatus)
+        {
+            _loadEventCatalogAnalyticsErrorMessage = result.response.responseMessage;
+            _isLoadingFailures = false;
+            _topFailures = [];
+            StateHasChanged();
+            return;
+        }
+
+        _topFailures = result.subscriptions.Select(x => new FailingSubItem(Name: x.SubscriptionName, CallbackUrl: x.CallBackUrl, FailedCount: x.FailedCount)).ToList();
+
+        // _topFailures =
+        // [
+        //     new("Order Service Sub",   "https:orders.internal/webhook", 24),
+        //     new("CRM Sub",             "https:crm.internal/hooks",      16),
+        //     new("Notification Sub",    "https:notify.internal/events",  8),
+        // ];
 
         _isLoadingFailures = false;
         StateHasChanged();
