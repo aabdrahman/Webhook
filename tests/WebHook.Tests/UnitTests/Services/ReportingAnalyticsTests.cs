@@ -67,15 +67,15 @@ public class ReportingAnalyticsTests : IClassFixture<PostgreSqlFixture>, IAsyncL
             RESTART IDENTITY CASCADE;
         ");
 
-        await ctx.Database.ExecuteSqlRawAsync(@"
-                    CREATE OR REPLACE VIEW ""vw_GetMostRecentEvents"" AS
-                    SELECT ""we"".""CreatedAt"", ""we"".""CorrelationId"", ""we"".""EventType"", ""we"".""Source"", COUNT(""wd"".""Id"") AS ""DeliveryCount""
-                    FROM ""WebhookDeliveries"" AS ""wd""
-                    INNER JOIN ""WebhookEvents"" AS ""we""
-                    ON ""wd"".""WebhookEventId"" = ""we"".""Id""
-                    GROUP BY ""wd"".""Id"",""we"".""CreatedAt"",""we"".""CorrelationId"", ""we"".""EventType"", ""we"".""Source""
-                    ORDER BY ""we"".""CreatedAt""
-                    LIMIT 5;");
+        //await ctx.Database.ExecuteSqlRawAsync(@"
+        //            CREATE OR REPLACE VIEW ""vw_GetMostRecentEvents"" AS
+        //            SELECT ""we"".""CreatedAt"", ""we"".""CorrelationId"", ""we"".""EventType"", ""we"".""Source"", COUNT(""wd"".""Id"") AS ""DeliveryCount""
+        //            FROM ""WebhookDeliveries"" AS ""wd""
+        //            INNER JOIN ""WebhookEvents"" AS ""we""
+        //            ON ""wd"".""WebhookEventId"" = ""we"".""Id""
+        //            GROUP BY ""wd"".""Id"",""we"".""CreatedAt"",""we"".""CorrelationId"", ""we"".""EventType"", ""we"".""Source""
+        //            ORDER BY ""we"".""CreatedAt""
+        //            LIMIT 5;");
 
         _webHookEventCatalogs = new List<WebHookEventCatalog>()
         {
@@ -271,5 +271,43 @@ public class ReportingAnalyticsTests : IClassFixture<PostgreSqlFixture>, IAsyncL
         Assert.Equal(3, result.ResponseData.Count);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.Equal("Most recent events fetched successfully.", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetTopActiveEventCatalogsAsync_CancellationRequested_Returns500INternalServerError()
+    {
+        //Arrange
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var sut = CreateSut();
+
+        //Act
+        var result = await sut.GetTopActiveEventCatalogsAsync(cts.Token);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.NotNull(result.ErrorDetail);
+        Assert.Equal("An error occurred while fetching event catalogs analytics.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+    }
+
+    [Fact]
+    public async Task GetTopActiveEventCatalogsAsync_RecordExists_Returns200OK()
+    {
+        //Arrange
+        var sut = CreateSut();
+        
+
+        //Act
+        var result = await sut.GetTopActiveEventCatalogsAsync(CancellationToken.None);
+
+        //Asseert
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccessful);
+        Assert.Null(result.ErrorDetail);
+        Assert.NotNull(result.ResponseData);
     }
 }

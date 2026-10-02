@@ -21,6 +21,7 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
     public DbSet<WebhookServiceClient> WebhookServiceClients { get; set; }
     public DbSet<WebhookServiceClientEventCatalog> WebhookServiceClientEventCatalogs { get; set; }
     public DbSet<TopFiveEventAnalyticsEntity> TopFiveEventAnalyticsEntities { get; set; }
+    public DbSet<EventCatalogReportingAnalyticsEntity> EventCatalogReportingAnalyticsEntities { get; set; }
 
     public RepositoryContext(DbContextOptions<RepositoryContext> options) : base(options)
     {
@@ -41,5 +42,6 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
         modelBuilder.ApplyConfigurationsFromAssembly(assembly: Assembly.GetExecutingAssembly());
 
         modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView("vw_GetMostRecentEvents".ToLower());
+        modelBuilder.Entity<EventCatalogReportingAnalyticsEntity>().HasNoKey().ToView(@"vw_GetEventCatalogAnalytics");
     }
 }

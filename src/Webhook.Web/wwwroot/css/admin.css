@@ -53,6 +53,7 @@
 .admin-client-activity-list {
     display:        flex;
     flex-direction: column;
+    height: 100%;
 }
 
 .admin-client-activity-item {

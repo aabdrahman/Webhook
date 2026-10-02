@@ -214,9 +214,9 @@
         <!-- Service client activity -->
         <div class="card">
             <div class="card-header">
-                <h2 class="card-title">Service Client Activity</h2>
-                <a href="/admin/service-clients" class="btn btn-ghost btn-sm">
-                    View all
+                <h2 class="card-title">Event Catalog Activity</h2>
+                <a href="/admin/event-catalog" class="btn btn-ghost btn-sm">
+                    View all Catalogs
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                          style="width:14px;height:14px;">
@@ -229,15 +229,40 @@
                 {
                     <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
                 }
-                else if (!_clientActivity.Any())
+                else if (!_catalogActivity.Any())
                 {
                     <EmptyState Title="No activity"
-                                Description="No service clients have published events today."
+                                Description="@(string.IsNullOrEmpty(_loadEventCatalogAnalyticsErrorMessage) ? "No published events for catalogs." : _loadEventCatalogAnalyticsErrorMessage)"
                                 Icon="client" />
                 }
                 else
                 {
                     <ul class="admin-client-activity-list">
+                        @foreach (var catalog in _catalogActivity)
+                        {
+                            <li class="admin-client-activity-item">
+                                <div class="admin-client-activity-info">
+                                    <span class="text-sm font-semibold">
+                                        @catalog.NormalizedEventName
+                                    </span>
+                                    <span class="text-xs text-secondary">
+                                        @catalog.ActiveSubscriptions subscription@(catalog.ActiveSubscriptions == 1 ? "" : "s")
+                                    </span>
+                                    <span class="text-xs text-secondary">
+                                        Last raised @FormatLastRaised(catalog.LastRaised)
+                                    </span>
+                                </div>
+                                <div class="admin-client-activity-count">
+                                    <span class="text-sm font-bold">
+                                        @catalog.TotalRaisedEvents
+                                    </span>
+
+                                    <span class="text-xs text-secondary">@(catalog.TotalRaisedEvents > 1 ? "events" : catalog.TotalRaisedEvents == 1 ? "event" : "")</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                    @* <ul class="admin-client-activity-list">
                         @foreach (var client in _clientActivity)
                         {
                             <li class="admin-client-activity-item">
@@ -257,7 +282,7 @@
                                 </div>
                             </li>
                         }
-                    </ul>
+                    </ul> *@
                 }
             </div>
         </div>
@@ -288,6 +313,7 @@
                 }
                 else
                 {
+                    
                     <ul class="admin-client-activity-list">
                         @foreach (var sub in _topFailures)
                         {
@@ -405,8 +431,11 @@
     private List<ClientActivityItem> _clientActivity = [];
     private List<FailingSubItem>     _topFailures    = [];
     private List<SystemEventItem>    _recentEvents   = [];
+    private List<EventCatalogReportingAnalyticsEntity> _catalogActivity = [];
+
     private bool _isRefreshing;
     private string _loadRecentEventErrorMessage = string.Empty;
+    private string _loadEventCatalogAnalyticsErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -512,15 +541,25 @@
 
         await Task.Delay(500);
 
-        // TODO: replace with real service call
-        // var result = await AdminService.GetClientActivityAsync();
+        var result = await getEventCatalogAnalyticsHandler.HandleAsync();
 
-        _clientActivity =
-        [
-            new("order-service-prod",   "Order Management Service", 312),
-            new("payment-gateway-prod", "Payment Gateway",          198),
-            new("notification-prod",    "Notification Service",     87),
-    ];
+        if (!result.response.successStatus)
+        {
+            _loadEventCatalogAnalyticsErrorMessage = result.response.responseMessage;
+            _isLoadingClients = false;
+            _catalogActivity = [];
+            StateHasChanged();
+            return;
+        }
+
+        _catalogActivity = result.catalogEntities.ToList();
+
+        // _clientActivity =
+        // [
+        //     new("order-service-prod",   "Order Management Service", 312),
+        //     new("payment-gateway-prod", "Payment Gateway",          198),
+        //     new("notification-prod",    "Notification Service",     87),
+        // ];
 
         _isLoadingClients = false;
         StateHasChanged();
@@ -615,5 +654,22 @@
     private void HandleFilterCleared()
     {
         throw new NotImplementedException();
+    }
+
+    private string FormatLastRaised(DateTimeOffset? lastRaised)
+    {
+        if (lastRaised is null) return "never";
+
+        var diff = DateTime.UtcNow - lastRaised.Value;
+
+        return diff switch
+        {
+            {
+     TotalMinutes: < 1 } => "just now",
+            { TotalHours: < 1 } => $"{(int)diff.TotalMinutes}m ago",
+            { TotalDays: < 1 } => $"{(int)diff.TotalHours}h ago",
+            { TotalDays: < 7 } => $"{(int)diff.TotalDays}d ago",
+            _ => lastRaised.Value.ToString("dd MMM yyyy")
+        };
     }
 }

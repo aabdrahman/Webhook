@@ -9,4 +9,5 @@ namespace WebHook.Core.Interfaces.Services;
 public interface IReportingAnalyticsService
 {
     Task<GenericResponse<IReadOnlyList<TopFiveEventAnalyticsEntity>>> GetMostRecentEventsAsync(CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>> GetTopActiveEventCatalogsAsync(CancellationToken ct = default);
 }

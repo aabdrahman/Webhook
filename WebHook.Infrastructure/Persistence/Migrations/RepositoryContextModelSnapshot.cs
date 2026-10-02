@@ -130,6 +130,9 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CorrelationId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("DeliveryCount")
                         .HasColumnType("integer");
 
@@ -137,16 +140,13 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<TimeOnly>("PublishedAt")
-                        .HasColumnType("time without time zone");
-
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.ToTable((string)null);
 
-                    b.ToView("TopFiveEventAnalytics", (string)null);
+                    b.ToView("vw_getmostrecentevents", (string)null);
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.OtpOperationToken", b =>

@@ -93,4 +93,47 @@ public class ReportingAnalyticsController : ControllerBase
                 }));
         }
     }
+
+    /// <summary>
+    /// Retrieves analytics for the top active event catalogs,
+    /// ranked by total events raised.
+    /// </summary>
+    /// <remarks>
+    /// Returns up to 5 active event catalogs with their aggregated metrics:
+    /// total events raised, number of active subscriptions, and the timestamp
+    /// of the most recently raised event. Catalogs with no events or subscriptions
+    /// are included with zero counts.
+    /// </remarks>
+    /// <param name="ct">Cancellation token for the async operation.</param>
+    /// <returns>
+    /// <list type="bullet">
+    ///   <item><description><b>200 OK</b> — Analytics retrieved successfully.</description></item>
+    ///   <item><description><b>500 Internal Server Error</b> — An unexpected error occurred.</description></item>
+    /// </list>
+    /// </returns>
+    [ProducesResponseType(typeof(GenericResponse<IEnumerable<EventCatalogReportingAnalyticsEntity>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [HttpGet("get-event-catalog-analytics")]
+    public async Task<IActionResult> GetEventCatalogAnalytics(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetEventCatalogAnalytics));
+        try
+        {
+            var response = await _reportingAnalyticsService.GetTopActiveEventCatalogsAsync(ct);
+            return StatusCode((int)response.HttpStatusCode, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
 }

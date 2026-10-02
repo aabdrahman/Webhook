@@ -83,6 +83,7 @@ public static class ApplicationServiceExtensions
 
         //Reporting Analytics
         services.AddScoped<GetMostRecentEventsHandler>();
+        services.AddScoped<GetEventCatalogAnalyticsHandler>();
     }
 
     internal static void AddApplicationAuthenticationStateProvider(this IServiceCollection services)

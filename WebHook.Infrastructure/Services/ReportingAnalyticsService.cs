@@ -43,4 +43,25 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
         }
 
     }
+
+    public async Task<GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>> GetTopActiveEventCatalogsAsync(CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetTopActiveEventCatalogsAsync));
+        try
+        {
+            _logger.Information("Getting top five active event catalogs...");
+
+            List<EventCatalogReportingAnalyticsEntity> items = await _repositoryContext.EventCatalogReportingAnalyticsEntities.ToListAsync(ct);
+
+            _logger.Information("Top five event catalogs fetched successfully - {0}", items);
+
+            return GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>.Success(items, "Top active event catalogs fetched successfully.", HttpStatusCode.OK);
+
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while fetching event catalogs analytics.");
+            return GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>.Failure(null, "An error occurred while fetching event catalogs analytics.", HttpStatusCode.InternalServerError, new ErrorDetail { ErrorMessage = ex.Message });
+        }
+    }
 }
