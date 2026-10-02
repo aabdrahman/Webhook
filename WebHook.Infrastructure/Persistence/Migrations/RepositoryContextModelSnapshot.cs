@@ -125,6 +125,29 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("WebHook.Core.Entities.CustomEntities.EventCatalogReportingAnalyticsEntity", b =>
+                {
+                    b.Property<int>("ActiveSubscriptions")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastRaised")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEventName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TotalRaisedEvents")
+                        .HasColumnType("integer");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("vw_GetEventCatalogAnalytics", (string)null);
+                });
+
             modelBuilder.Entity("WebHook.Core.Entities.CustomEntities.TopFiveEventAnalyticsEntity", b =>
                 {
                     b.Property<Guid>("CorrelationId")

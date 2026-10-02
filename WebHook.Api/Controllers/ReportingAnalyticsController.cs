@@ -184,4 +184,45 @@ public class ReportingAnalyticsController : ControllerBase
                 }));
         }
     }
+
+    /// <summary>
+    /// Retrieves a summary of key metrics for the admin dashboard.
+    /// </summary>
+    /// <remarks>
+    /// Returns a platform-wide snapshot including active subscriptions, event catalogs,
+    /// service clients, onboarded users, pending deliveries, dead-letter queue depth,
+    /// and total events raised today.
+    /// </remarks>
+    /// <param name="ct">Cancellation token for the async operation.</param>
+    /// <returns>
+    /// <list type="bullet">
+    ///   <item><description><b>200 OK</b> — Dashboard summary retrieved successfully.</description></item>
+    ///   <item><description><b>500 Internal Server Error</b> — An unexpected error occurred.</description></item>
+    /// </list>
+    /// </returns>
+    [ProducesResponseType(typeof(GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [HttpGet("get-admin-dashboard-summary")]
+    public async Task<IActionResult> GetAdminDashboard(CancellationToken ct = default)
+    {
+        _logger.ForContext(_methodName, nameof(GetAdminDashboard));
+        try
+        {
+            var response = await _reportingAnalyticsService.GetAdminDashboardSummaryAsync(ct);
+            return StatusCode((int)response.HttpStatusCode, response);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
 }

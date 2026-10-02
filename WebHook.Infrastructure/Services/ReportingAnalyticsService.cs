@@ -112,4 +112,26 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
             return GenericResponse<IReadOnlyList<TopFailingSubscriptionDto>>.Failure(null, "An error occurred while fetching top failing subscriptions.", HttpStatusCode.InternalServerError, new ErrorDetail { ErrorMessage = ex.Message });
         }
     }
+
+    public async Task<GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>> GetAdminDashboardSummaryAsync(CancellationToken ct = default)
+    {
+        _logger.ForContext(_methodName, nameof(GetAdminDashboardSummaryAsync));
+        try
+        {
+            _logger.Information("Fetching Admin dashboard summary...");
+
+            var dashboard = await _repositoryContext.AdminDashboardSummaryReportingAnalyticsEntities.FirstOrDefaultAsync(ct);
+
+            _logger.Information("Admin dashboard summary fetched successfully - {0}", dashboard);
+
+            return GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>.Success(dashboard, "Admin dashboard summary fetched successfully.", HttpStatusCode.OK);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while getting admin dashboard summary.");
+            GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>.Failure(null, "An error occurred while getting admin dashboard summary.", HttpStatusCode.InternalServerError, new ErrorDetail() { ErrorMessage = ex.Message });
+            throw;
+        }
+        throw new NotImplementedException();
+    }
 }
