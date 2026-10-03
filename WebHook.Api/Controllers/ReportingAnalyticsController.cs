@@ -225,4 +225,69 @@ public class ReportingAnalyticsController : ControllerBase
                 }));
         }
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    [Authorize(Roles = "User,USER")]
+    [HttpGet("get-user-delivery-dashboard")]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<UserDeliveryDashboardDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<UserDeliveryDashboardDto>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetUserDeliveryDashboard(CancellationToken ct = default) 
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetUserDeliveryDashboard));
+        try
+        {
+            var result = await _reportingAnalyticsService.GetUserDeliveryDashboardAsync(ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    [Authorize(Roles = "User,USER")]
+    [HttpGet("get-user-top-failing-subscription")]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetUserTopFailingSubscriptionDashboard(CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _reportingAnalyticsService.GetUserTopFailingSubscriptionDashboardAsync(ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
 }

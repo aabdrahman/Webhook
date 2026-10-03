@@ -1,11 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
+using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.Services;
@@ -21,7 +23,10 @@ public class ReportingAnalyticsTests : IClassFixture<PostgreSqlFixture>, IAsyncL
     public ReportingAnalyticsTests(PostgreSqlFixture postgreSqlFixture)
     {
         _postgreSqlFixture = postgreSqlFixture;
+        _authenticatedUserDetailsMock = new Mock<IAuthenticatedUserDetails>();
     }
+
+    private Mock<IAuthenticatedUserDetails> _authenticatedUserDetailsMock;
 
     public async Task DisposeAsync()
     {
@@ -201,11 +206,11 @@ public class ReportingAnalyticsTests : IClassFixture<PostgreSqlFixture>, IAsyncL
         };
     }
 
-    private ReportingAnalyticsService CreateSut()
+    private ReportingAnalyticsService CreateSut(IAuthenticatedUserDetails authenticatedUserDetails = null)
     {
         var scope = _serviceProvider.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var sut = new ReportingAnalyticsService(ctx);
+        var sut = new ReportingAnalyticsService(ctx, authenticatedUserDetails ?? _authenticatedUserDetailsMock.Object);
         return sut;
     }
 

@@ -13,4 +13,6 @@ public interface IReportingAnalyticsService
     Task<GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>> GetTopActiveEventCatalogsAsync(CancellationToken ct = default);
     Task<GenericResponse<IReadOnlyList<TopFailingSubscriptionDto>>> GetTopFailingSubscriptionsAsync(CancellationToken ct = default);
     Task<GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>> GetAdminDashboardSummaryAsync(CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<UserDeliveryDashboardDto>>> GetUserDeliveryDashboardAsync(CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>> GetUserTopFailingSubscriptionDashboardAsync(CancellationToken ct = default);
 }
