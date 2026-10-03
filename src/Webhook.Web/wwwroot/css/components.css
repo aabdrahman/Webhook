@@ -960,6 +960,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: var(--space-2) var(--space-3);
+    min-width: 0;
 }
 
 .copy-field-value {
@@ -970,6 +971,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 
 .copy-btn {
@@ -1483,4 +1485,21 @@ input[type="number"] {
     gap: 16px;
     flex-wrap: wrap;
     width: 100%;
+}
+
+/*ADMIN SKELETON*/
+.admin-skeleton {
+    display: block;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--bg-subtle) 25%, var(--bg-muted) 50%, var(--bg-subtle) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+.admin-skeleton-label { height: 12px; width: 60%; }
+.admin-skeleton-value { height: 28px; width: 40%; margin: 6px 0; }
+.admin-skeleton-sub   { height: 10px; width: 75%; }
+
+@keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }

@@ -17,11 +17,11 @@ public class GetEventCatalogAnalyticsHandler
     {
         try
         {
-            var httpResponse = await _httpClient.GetAsync("api/ReportingAnalytics/get-event-catalog-analytics\r\n");
+            var httpResponse = await _httpClient.GetAsync("api/ReportingAnalytics/get-event-catalog-analytics");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
             GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>> responseBody = JsonSerializer.Deserialize<GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>>(responseContent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??
-                throw new InvalidOperationException("Http Respons ecould not be deserialized.");
+                throw new InvalidOperationException("Http Response could not be deserialized.");
 
             return (new ApiResponseDto(responseBody.IsSuccessful, responseBody.ResponseMessage), responseBody.ResponseData ?? []);
         }

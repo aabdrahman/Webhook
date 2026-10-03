@@ -51,10 +51,18 @@ public sealed class CacheService : ICacheService
         _logger = _logger.ForContext("MethodName", nameof(SetCacheItemAsync));
         try
         {
+            _logger.Information("Setting cached item for key - {0}, value - {1}", key, value);
             await Task.Delay(1);
 
-            var cacheResult = _memoryCache.Set<T>(key, value, new MemoryCacheEntryOptions() { Size = 2 * 1024 * 1024});
+            //var cacheResult = _memoryCache.Set<T>(key, value);
+            var cacheResult = _memoryCache.Set<T>(key, value, new MemoryCacheEntryOptions
+            {
+                Size = 1, //This memory cache option is necessary as the caching fails otherwise, also the 1unit ensures that the cache uses the defined value in the DI.
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(int.MaxValue),
+                SlidingExpiration = TimeSpan.FromMinutes(int.MaxValue)
+            });
 
+            _logger.Information("Item set in cache successfully. Key: {0}, Value: {1}, Result: {2}", key, value, cacheResult);
             return true;
         }
         catch (Exception ex)

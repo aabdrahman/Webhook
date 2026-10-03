@@ -68,65 +68,93 @@
     </div> *@
 
     <!-- Row 1 — System entity counts -->
-    <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
-        <div class="metric-card">
-            <span class="metric-card-label">Total Users</span>
-            <span class="metric-card-value">@_totalUsers</span>
-            <span class="metric-card-sub">Registered accounts</span>
+    @if (_summaryActivity is not null)
+    {
+        <!-- Row 1 — Platform overview metrics -->
+        <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
+            <div class="metric-card">
+                <span class="metric-card-label">Total Users</span>
+                <span class="metric-card-value">@_totalUsers</span>
+                <span class="metric-card-sub">Registered accounts</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Total Subscriptions</span>
+                <span class="metric-card-value">@_totalSubscriptions</span>
+                <span class="metric-card-sub">Across all users</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Service Clients</span>
+                <span class="metric-card-value">@_totalServiceClients</span>
+                <span class="metric-card-sub">Onboarded internal services</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Event Types</span>
+                <span class="metric-card-value">@_totalEventTypes</span>
+                <span class="metric-card-sub">Active catalog entries</span>
+            </div>
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Total Subscriptions</span>
-            <span class="metric-card-value">@_totalSubscriptions</span>
-            <span class="metric-card-sub">Across all users</span>
-        </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Service Clients</span>
-            <span class="metric-card-value">@_totalServiceClients</span>
-            <span class="metric-card-sub">Onboarded internal services</span>
-        </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Event Types</span>
-            <span class="metric-card-value">@_totalEventTypes</span>
-            <span class="metric-card-sub">Active catalog entries</span>
-        </div>
-    </div>
 
-    <!-- Row 2 — Pipeline health metrics -->
-    <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary"
-         style="margin-bottom:var(--space-6);">
-        <div class="metric-card">
-            <span class="metric-card-label">Events Today</span>
-            <span class="metric-card-value">@_eventsToday</span>
-            <span class="metric-card-sub">Published across all clients</span>
+        <!-- Row 2 — Pipeline health metrics -->
+        <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary"
+             style="margin-bottom:var(--space-6);">
+            <div class="metric-card">
+                <span class="metric-card-label">Events Today</span>
+                <span class="metric-card-value">@_eventsToday</span>
+                <span class="metric-card-sub">Published across all clients</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Global Success Rate</span>
+                <span class="metric-card-value" style="color:@SuccessRateColor;">
+                    @_successRate%
+                </span>
+                <span class="metric-card-sub">Delivery success today</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Pending</span>
+                <span class="metric-card-value" style="color:var(--color-warning);">
+                    @_pendingDeliveries
+                </span>
+                <span class="metric-card-sub">Queued for delivery</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Dead Letters</span>
+                <span class="metric-card-value" style="color:var(--color-dead-letter);">
+                    @_deadLetterCount
+                </span>
+                <span class="metric-card-sub">Awaiting admin retry</span>
+            </div>
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Global Success Rate</span>
-            <span class="metric-card-value" style="color:@SuccessRateColor;">
-                @_successRate%
-            </span>
-            <span class="metric-card-sub">Delivery success today</span>
+    }
+    else
+    {
+        <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="metric-card metric-card--skeleton">
+                    <span class="skeleton skeleton-label"></span>
+                    <span class="skeleton skeleton-value"></span>
+                    <span class="skeleton skeleton-sub"></span>
+                </div>
+            }
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Pending</span>
-            <span class="metric-card-value" style="color:var(--color-warning);">
-                @_pendingDeliveries
-            </span>
-            <span class="metric-card-sub">Queued for delivery</span>
+        <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary"
+             style="margin-bottom:var(--space-6);">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="metric-card metric-card--skeleton">
+                    <span class="skeleton skeleton-label"></span>
+                    <span class="skeleton skeleton-value"></span>
+                    <span class="skeleton skeleton-sub"></span>
+                </div>
+            }
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Dead Letters</span>
-            <span class="metric-card-value" style="color:var(--color-dead-letter);">
-                @_deadLetterCount
-            </span>
-            <span class="metric-card-sub">Awaiting admin retry</span>
-        </div>
-    </div>
+    }
 
     <!-- Worker status + Health checks side by side -->
     <div class="admin-dashboard-split" style="margin-bottom:var(--space-6);">
 
         <!-- Worker status -->
-        <div class="card">
+        <div class="card" style="height:100%;display:flex;flex-direction:column;">
             <div class="card-header">
                 <h2 class="card-title">Worker Status</h2>
                 <a href="/admin/health" class="btn btn-ghost btn-sm">
@@ -138,7 +166,7 @@
                     </svg>
                 </a>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="flex:1;overflow-y:auto;">
                 @if (_isLoadingWorkers)
                 {
                     <div style="display:flex;flex-direction:column;gap:var(--space-3);">
@@ -150,7 +178,7 @@
                 }
                 else
                 {
-                    <div class="admin-worker-list">
+                    <div class="admin-worker-list" style="height:100%;justify-content:space-evenly;">
                         @foreach (var worker in _workers)
                         {
                             <div class="admin-worker-item">
@@ -169,7 +197,7 @@
         </div>
 
         <!-- Health checks summary -->
-        <div class="card">
+        <div class="card" style="height:100%;display:flex;flex-direction:column;">
             <div class="card-header">
                 <h2 class="card-title">Health Checks</h2>
                 <Badge Value="@_overallHealth"
@@ -177,27 +205,50 @@
                        Text="@_overallHealth"
                        ShowDot="false" />
             </div>
-            <div class="card-body" style="padding:0;">
+            <div class="card-body" style="padding:0;flex:1;overflow-y:auto;">
                 @if (_isLoadingHealth)
                 {
                     <div style="padding:var(--space-4);display:flex;
-                                flex-direction:column;gap:var(--space-3);">
+                        flex-direction:column;gap:var(--space-3);">
                         @for (int i = 0; i < 5; i++)
                         {
                             <SkeletonLoader Shape="text" Width="100%" Height="20px" />
                         }
                     </div>
                 }
+                else if (!_healthChecks.Any())
+                {
+                    <div style="padding:var(--space-6);display:flex;flex-direction:column;
+                        align-items:center;gap:var(--space-2);text-align:center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+                             viewBox="0 0 24 24" fill="none" stroke="var(--muted)"
+                             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                        </svg>
+                        @if (!string.IsNullOrEmpty(_healthCheckErrorMessage))
+                        {
+                            <span class="text-sm font-semibold" style="color:var(--color-danger);">
+                                @_healthCheckErrorMessage
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-sm font-semibold">No health checks registered</span>
+                            <span class="text-xs text-muted">Health check services will appear here once configured.</span>
+                        }
+                        
+                    </div>
+                }
                 else
                 {
-                    <ul class="admin-health-list">
+                    <ul class="admin-health-list" style="height:100%;justify-content:space-evenly;">
                         @foreach (var check in _healthChecks)
                         {
                             <li class="admin-health-item">
                                 <StatusDot Status="@check.Status" />
                                 <span class="text-sm admin-health-name">@check.Name</span>
                                 <span class="text-xs text-muted">
-                                    @check.DurationMs ms
+                                    @check.DurationMs.ToString("F") ms
                                 </span>
                             </li>
                         }
@@ -212,7 +263,7 @@
     <div class="admin-dashboard-split" style="margin-bottom:var(--space-6);">
 
         <!-- Service client activity -->
-        <div class="card">
+        <div class="card" style="height:100%;display:flex;flex-direction:column;">
             <div class="card-header">
                 <h2 class="card-title">Event Catalog Activity</h2>
                 <a href="/admin/event-catalog" class="btn btn-ghost btn-sm">
@@ -224,7 +275,7 @@
                     </svg>
                 </a>
             </div>
-            <div class="card-body" style="padding:0;">
+            <div class="card-body" style="padding:0;flex:1;overflow-y:auto;">
                 @if (_isLoadingClients)
                 {
                     <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
@@ -237,7 +288,7 @@
                 }
                 else
                 {
-                    <ul class="admin-client-activity-list">
+                    <ul class="admin-client-activity-list" style="height:100%;justify-content:space-evenly;">
                         @foreach (var catalog in _catalogActivity)
                         {
                             <li class="admin-client-activity-item">
@@ -288,7 +339,7 @@
         </div>
 
         <!-- Top failing subscriptions — system-wide -->
-        <div class="card">
+        <div class="card" style="height:100%;display:flex;flex-direction:column;">
             <div class="card-header">
                 <h2 class="card-title">Top Failing Subscriptions</h2>
                 <a href="/deliveries" class="btn btn-ghost btn-sm">
@@ -300,7 +351,7 @@
                     </svg>
                 </a>
             </div>
-            <div class="card-body" style="padding:0;">
+            <div class="card-body" style="padding:0;flex:1;overflow-y:auto;">
                 @if (_isLoadingFailures)
                 {
                     <TableSkeleton Rows="4" Columns="3" ShowHeader="false" />
@@ -314,7 +365,7 @@
                 else
                 {
                     
-                    <ul class="admin-client-activity-list">
+                    <ul class="admin-client-activity-list" style="height:100%;justify-content:start;">
                         @foreach (var sub in _topFailures)
                         {
                             <li class="admin-client-activity-item">
@@ -343,12 +394,12 @@
     </div>
 
     <!-- Recent system events -->
-    <div class="card">
+    <div class="card" style="height:100%;display:flex;flex-direction:column;">
         <div class="card-header">
             <h2 class="card-title">Recent System Events</h2>
             <span class="text-sm text-muted">All sources</span>
         </div>
-        <div class="card-body" style="padding:0;">
+        <div class="card-body" style="padding:0;flex:1;overflow-y:auto;">
             @if (_isLoadingEvents)
             {
                 <TableSkeleton Rows="6" Columns="5" />
@@ -361,7 +412,7 @@
             }
             else
             {
-                <div class="table-wrapper" style="border:none;border-radius:0;">
+                <div class="table-wrapper" style="border:none;border-radius:0;height:100%;justify-content:space-evenly;">
                     <table class="table">
                         <thead>
                             <tr>
@@ -432,11 +483,14 @@
     private List<FailingSubItem>     _topFailures    = [];
     private List<SystemEventItem>    _recentEvents   = [];
     private List<EventCatalogReportingAnalyticsEntity> _catalogActivity = [];
+    private AdminDashboardSummaryReportingAnalyticsEntity? _summaryActivity;
 
     private bool _isRefreshing;
     private string _loadRecentEventErrorMessage = string.Empty;
     private string _loadEventCatalogAnalyticsErrorMessage = string.Empty;
     private string _loadTopFailingSubscriptionErrorMessage = string.Empty;
+    private string _loadSummaryAnalyticsErrorMessage = string.Empty;
+    private string _healthCheckErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -469,24 +523,58 @@
 
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await getAdminDashboardSummaryHandler.HandleAsync();
+            if (!result.response.successStatus)
+            {
+                _loadSummaryAnalyticsErrorMessage = result.response.responseMessage;
+                _isLoading = false;
+                StateHasChanged();
+                return;
+            }
 
-            _totalUsers          = success ? 48  : 0;
-            _totalSubscriptions  = success ? 124 : 0;
-            _totalServiceClients = success ? 6   : 0;
-            _totalEventTypes     = success ? 12  : 0;
-            _eventsToday         = success ? 842 : 0;
-            _successRate         = success ? 97.3 : 0;
-            _pendingDeliveries   = success ? 7   : 0;
-            _deadLetterCount     = success ? 11  : 0;
+            // bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+            if(result.adminDahsboardSummary is null)
+            {
+                _loadSummaryAnalyticsErrorMessage = result.response.responseMessage;
+                _isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            _summaryActivity = result.adminDahsboardSummary;
+
+            _totalUsers = result.adminDahsboardSummary.TotalOnboardedUsers;
+            _totalSubscriptions = result.adminDahsboardSummary.SubscriptionCount;
+            _totalServiceClients = result.adminDahsboardSummary.TotalServiceClients;
+            _totalEventTypes = result.adminDahsboardSummary.ActiveCatalogs;
+            _eventsToday = result.adminDahsboardSummary.TotalRaisedEvent;
+            _successRate = result.adminDahsboardSummary.SuccessRate;
+            _pendingDeliveries = result.adminDahsboardSummary.TotalPendingDeliveries;
+            _deadLetterCount = result.adminDahsboardSummary.TotalPendingDeadLetter;
+
+
+            // _totalUsers          = success ? 48  : 0;
+            // _totalSubscriptions  = success ? 124 : 0;
+            // _totalServiceClients = success ? 6   : 0;
+            // _totalEventTypes     = success ? 12  : 0;
+            // _eventsToday         = success ? 842 : 0;
+            // _successRate         = success ? 97.3 : 0;
+            // _pendingDeliveries   = success ? 7   : 0;
+            // _deadLetterCount     = success ? 11  : 0;
 
             _isLoading = false;
             StateHasChanged();
 
             // Load sections progressively
+            // await LoadWorkersAndHealthAsync();
+            // await LoadClientActivityAsync();
+            // await LoadTopFailuresAsync();
+            // await LoadRecentEventsAsync();
+            await Task.WhenAll( LoadWorkersAndHealthAsync(),
+                LoadClientActivityAsync());
+               // await Task.Delay(500);
             await Task.WhenAll(
-                LoadWorkersAndHealthAsync(),
-                LoadClientActivityAsync(),
                 LoadTopFailuresAsync(),
                 LoadRecentEventsAsync());
         }
@@ -506,30 +594,44 @@
         // TODO: replace with real health check call
         // var result = await HealthService.GetHealthAsync();
 
+        var result = await healthCheckStatusHandler.HandleAsync();
+
+        if(result is null)
+        {
+            _healthCheckErrorMessage = "Failed to retrieve health check status.";
+            _isLoadingWorkers = false;
+            _isLoadingHealth = false;
+            StateHasChanged();
+            return;
+        }
+
+        _overallHealth = result.status;
+        _healthChecks = result.checks.Select(x => new HealthCheckItem(Name: x.name.ToLower(), Status: x.status, DurationMs: x.duration)).ToList();
+
         _workers =
         [
             new("EventRaisedWorker",                "Healthy"),
             new("PendingRaisedEventWorker",          "Healthy"),
             new("DeliveryWorker",                    "Healthy"),
-            new("RetryWorker",                       "Degraded"),
+            new("RetryWorker",                       "Healthy"),
             new("StaleClaimedDeliveryReleaseWorker", "Healthy"),
             new("EmailProcessorWorker",              "Healthy"),
-    ];
+        ];
 
-        _healthChecks =
-        [
-            new("postgresql",         "Healthy",   12.3),
-            new("email-queue",        "Healthy",   0.1),
-            new("dead-letter-queue",  "Degraded",  1.8),
-            new("pending-deliveries", "Healthy",   2.1),
-            new("stale-processing",   "Healthy",   0.9),
-    ];
+        // _healthChecks =
+        // [
+        //     new("postgresql",         "Healthy",   12.3),
+        //     new("email-queue",        "Healthy",   0.1),
+        //     new("dead-letter-queue",  "Degraded",  1.8),
+        //     new("pending-deliveries", "Healthy",   2.1),
+        //     new("stale-processing",   "Healthy",   0.9),
+        // ];
 
-        _overallHealth = _healthChecks.Any(h => h.Status == "Unhealthy")
-            ? "Unhealthy"
-            : _healthChecks.Any(h => h.Status == "Degraded")
-                ? "Degraded"
-                : "Healthy";
+        // _overallHealth = _healthChecks.Any(h => h.Status == "Unhealthy")
+        //     ? "Unhealthy"
+        //     : _healthChecks.Any(h => h.Status == "Degraded")
+        //         ? "Degraded"
+        //         : "Healthy";
 
         _isLoadingWorkers = false;
         _isLoadingHealth  = false;

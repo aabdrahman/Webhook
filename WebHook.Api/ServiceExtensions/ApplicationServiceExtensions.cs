@@ -420,7 +420,7 @@ internal static class ApplicationServiceExtensions
     {
         services.AddMemoryCache(opts =>
         {
-            opts.SizeLimit = 2 * 1024 * 1024;
+            opts.SizeLimit = 256 * 1024 * 1024;
 
         });
     }

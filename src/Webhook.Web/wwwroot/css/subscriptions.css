@@ -166,9 +166,13 @@
 /* Two column layout */
 .detail-layout {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 1fr auto;
     gap: var(--space-6);
     align-items: start;
+}
+
+.detail-layout > * {
+    min-width: 0;
 }
 
 .detail-left {
@@ -211,10 +215,21 @@
 }
 
 /* Secret key row */
+/*.detail-secret-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}*/
+
 .detail-secret-row {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* keep it on one line, truncate with ... */
+    min-width: 0; /* critical — allows flex children to shrink */
+    max-width: 100%;
 }
 
 /* Responsive */

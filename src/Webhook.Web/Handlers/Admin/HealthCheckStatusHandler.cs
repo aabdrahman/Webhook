@@ -18,7 +18,7 @@ public class HealthCheckStatusHandler
             var httpResponse = await _httpClient.GetAsync("Admin/_health");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
 
-            Console.WriteLine(responseContent);
+            //Console.WriteLine(responseContent);
 
             HealthCheckDetails response = JsonSerializer.Deserialize<HealthCheckDetails>(responseContent, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true }) ??
                 throw new InvalidOperationException("Http Response could not be deserialized.");

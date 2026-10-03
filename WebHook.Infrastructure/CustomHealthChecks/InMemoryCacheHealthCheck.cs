@@ -30,7 +30,7 @@ public sealed class InMemoryCacheHealthCheck : IHealthCheck
             string? itemFromCache = await _cacheService.GetItemsFromCacheAsync<string>(test_cache_key);
             if (string.IsNullOrWhiteSpace(itemFromCache))
             {
-                return new HealthCheckResult(status: HealthStatus.Unhealthy, description: "Test item cached scuucessfulluy but could not be retieved.");
+                return new HealthCheckResult(status: HealthStatus.Unhealthy, description: $"Test item: {testValue} cached successfully but could not be retrieved: {itemFromCache}.");
             }
 
             await _cacheService.RemoveItemsFromCacheAsync(test_cache_key);

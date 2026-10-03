@@ -6,8 +6,9 @@
 .admin-dashboard-split {
     display:               grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
     gap:                   var(--space-6);
-    align-items:           start;
+    align-items:           stretch;
 }
 
 /* Worker list */

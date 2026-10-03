@@ -27,7 +27,7 @@ public class AuthenticationTokenHandler : DelegatingHandler
 
         if(accessToken is null)
         {
-             await ((UserJwtAuthenticationStateProvider)_authenticationStateProvider).NotifyUserLogout();
+            await ((UserJwtAuthenticationStateProvider)_authenticationStateProvider).NotifyUserLogout();
             return new HttpResponseMessage(HttpStatusCode.Unauthorized);
         }
 

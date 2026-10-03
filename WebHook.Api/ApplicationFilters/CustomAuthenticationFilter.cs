@@ -79,7 +79,7 @@ public class CustomAuthenticationFilter(ICacheService cacheService, ILogger<Cust
         string requestAuthToken = authorizationBearerHeader.ToString();
         if (string.IsNullOrWhiteSpace(requestAuthToken) || !requestAuthToken.StartsWith("Bearer "))
         {
-            logger.LogWarning("Request rejected — Authorization header does not use Bearer scheme.");
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — Authorization header does not use Bearer scheme.", context.HttpContext.Request.Path);
             Reject(context);
             return;
         }
@@ -88,7 +88,7 @@ public class CustomAuthenticationFilter(ICacheService cacheService, ILogger<Cust
         string requestToken = requestAuthToken["Bearer ".Length..].Trim();
         if (string.IsNullOrWhiteSpace(requestToken))
         {
-            logger.LogWarning("Request rejected — Bearer token value is empty.");
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — Bearer token value is empty.", context.HttpContext.Request.Path);
             Reject(context);
             return;
         }
@@ -98,7 +98,7 @@ public class CustomAuthenticationFilter(ICacheService cacheService, ILogger<Cust
 
         if (string.IsNullOrWhiteSpace(tokenStringJti) || !Guid.TryParse(tokenStringJti, out Guid tokenJti))
         {
-            logger.LogWarning("Request rejected — JTI claim missing or invalid in token.");
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — JTI claim missing or invalid in token.", context.HttpContext.Request.Path);
             Reject(context);
             return;
         }
@@ -109,7 +109,7 @@ public class CustomAuthenticationFilter(ICacheService cacheService, ILogger<Cust
 
         if (string.IsNullOrWhiteSpace(userEmail))
         {
-            logger.LogWarning("Request rejected — Email claim missing in token.");
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — Email claim missing in token.", context.HttpContext.Request.Path);
             Reject(context);
             return;
         }
@@ -119,14 +119,14 @@ public class CustomAuthenticationFilter(ICacheService cacheService, ILogger<Cust
 
         if (cachedJti == default)
         {
-            logger.LogWarning("Request rejected — no cached JTI for user {Email}. Session may have expired or been revoked.", userEmail);
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — no cached JTI for user {Email}. Session may have expired or been revoked.", context.HttpContext.Request.Path, userEmail);
             Reject(context);
             return;
         }
 
         if (cachedJti != tokenJti)
         {
-            logger.LogWarning("Request rejected — JTI mismatch for user {Email}. " + "Token JTI: {TokenJti}, Cached JTI: {CachedJti}. Possible token replay attempt.", userEmail, tokenJti, cachedJti);
+            logger.LogWarning("Route Endpoint - {0} || Request rejected — JTI mismatch for user {1}. " + "Token JTI: {2}, Cached JTI: {3}. Possible token replay attempt.", context.HttpContext.Request.Path, userEmail, tokenJti, cachedJti);
             Reject(context);
             return;
         }
