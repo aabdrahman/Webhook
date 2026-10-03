@@ -152,7 +152,7 @@
             else if (!_recentDeliveries.Any())
             {
                 <EmptyState Title="No recent deliveries"
-                            Description="Deliveries will appear here once events are published."
+                            Description="@(string.IsNullOrEmpty(_getUserDeliveryDashboardErrorMessage) ? "Deliveries will appear here once events are published." : _getUserDeliveryDashboardErrorMessage)"
                             Icon="delivery" />
             }
             else
@@ -196,7 +196,7 @@
     <div class="card">
         <div class="card-header">
             <h2 class="card-title">Top Failing Subscriptions</h2>
-            <a href="/deliveries?status=Failed" class="btn btn-ghost btn-sm">
+            <a href="/deliveries" class="btn btn-ghost btn-sm">
                 View all
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -213,7 +213,7 @@
             else if (!_topFailingSubscriptions.Any())
             {
                 <EmptyState Title="No failing subscriptions"
-                            Description="All your subscriptions are delivering successfully."
+                            Description="@(string.IsNullOrEmpty(_getUserTopFailingErrorMessage) ? "All your subscriptions are delivering successfully." : _getUserTopFailingErrorMessage)"
                             Icon="delivery" />
             }
             else
@@ -292,6 +292,9 @@
     private List<RecentDeliveryItem>     _recentDeliveries        = [];
     private List<FailingSubscriptionItem> _topFailingSubscriptions = [];
     private bool _isRefreshing;
+
+    private string _getUserDeliveryDashboardErrorMessage = string.Empty;
+    private string _getUserTopFailingErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Computed
@@ -385,7 +388,7 @@
             new("EventRaisedWorker",               "Healthy"),
             new("PendingRaisedEventWorker",         "Healthy"),
             new("DeliveryWorker",                   "Healthy"),
-            new("RetryWorker",                      "Degraded"),
+            new("RetryWorker",                      "Healthy"),
             new("StaleClaimedDeliveryReleaseWorker","Healthy"),
             new("EmailProcessorWorker",             "Healthy"),
     ];
@@ -402,14 +405,29 @@
 
         // TODO: replace with real delivery service call
         // var result = await DeliveryService.GetRecentAsync(limit: 10);
-        _recentDeliveries =
-        [
-            new("OrderCreated",    "Order Service Sub",   "Delivered",   142, DateTimeOffset.UtcNow.AddMinutes(-2)),
-            new("PaymentReceived", "Payment Sub",         "Delivered",   98,  DateTimeOffset.UtcNow.AddMinutes(-5)),
-            new("OrderCancelled",  "Order Service Sub",   "Failed",      3012,DateTimeOffset.UtcNow.AddMinutes(-8)),
-            new("OrderCreated",    "Notification Sub",    "Delivered",   201, DateTimeOffset.UtcNow.AddMinutes(-12)),
-            new("UserRegistered",  "CRM Sub",             "DeadLetter",  0,   DateTimeOffset.UtcNow.AddMinutes(-20)),
-    ];
+
+        var result = await getUserDeliveryDashboardHandler.HandleAsync();
+
+        if (!result.response.successStatus)
+        {
+
+            _recentDeliveries = [];
+            _getUserDeliveryDashboardErrorMessage = result.response.responseMessage;
+            _isLoadingDeliveries = false;
+            StateHasChanged();
+            return;
+        }
+
+        _recentDeliveries = result.userDeliveries.Select(x => new RecentDeliveryItem(x.EventType, x.SubscriptionName, x.Status, x.AverageDuration, x.CreatedAt)).ToList();
+
+        // _recentDeliveries =
+        // [
+        //     new("OrderCreated",    "Order Service Sub",   "Delivered",   142, DateTimeOffset.UtcNow.AddMinutes(-2)),
+        //     new("PaymentReceived", "Payment Sub",         "Delivered",   98,  DateTimeOffset.UtcNow.AddMinutes(-5)),
+        //     new("OrderCancelled",  "Order Service Sub",   "Failed",      3012,DateTimeOffset.UtcNow.AddMinutes(-8)),
+        //     new("OrderCreated",    "Notification Sub",    "Delivered",   201, DateTimeOffset.UtcNow.AddMinutes(-12)),
+        //     new("UserRegistered",  "CRM Sub",             "DeadLetter",  0,   DateTimeOffset.UtcNow.AddMinutes(-20)),
+        // ];
 
         _isLoadingDeliveries = false;
         StateHasChanged();
@@ -423,12 +441,26 @@
 
         // TODO: replace with real subscription service call
         // var result = await SubscriptionService.GetTopFailingAsync(limit: 5);
-        _topFailingSubscriptions =
-        [
-            new("Order Service Sub",   "https://orders.internal/webhook",   14, 2),
-            new("CRM Sub",             "https://crm.internal/hooks",        8,  1),
-            new("Notification Sub",    "https://notify.internal/events",    3,  0),
-    ];
+
+        var result = await getUserTopFailingSubscriptionsHandler.HandleAsync();
+
+        if (!result.response.successStatus)
+        {
+            _topFailingSubscriptions = [];
+            _getUserDeliveryDashboardErrorMessage = result.response.responseMessage;
+            _isLoadingFailures = false;
+            StateHasChanged();
+            return;
+        }
+
+        _topFailingSubscriptions = result.details.Select(x => new FailingSubscriptionItem(x.SubscriptionName, x.CallBackUrl, x.FailedDeliveryAtttempts, x.DeadLetterCount)).ToList();
+
+        // _topFailingSubscriptions =
+        // [
+        //     new("Order Service Sub",   "https:orders.internal/webhook",   14, 2),
+        //     new("CRM Sub",             "https:crm.internal/hooks",        8,  1),
+        //     new("Notification Sub",    "https:notify.internal/events",    3,  0),
+        // ];
 
         _isLoadingFailures = false;
         StateHasChanged();
@@ -447,7 +479,7 @@
         string          EventType,
         string          SubscriptionName,
         string          Status,
-        int             DurationMs,
+        double?             DurationMs,
         DateTimeOffset  CreatedAt);
 
     private sealed record FailingSubscriptionItem(

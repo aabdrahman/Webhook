@@ -17,7 +17,7 @@ namespace WebHook.Api.Controllers;
 /// </summary>
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Admin, ADMIN")]
+
 public class ReportingAnalyticsController : ControllerBase
 {
     private readonly IReportingAnalyticsService _reportingAnalyticsService;
@@ -66,6 +66,7 @@ public class ReportingAnalyticsController : ControllerBase
     ///   <item><description><b>500 Internal Server Error</b> — unhandled exception with error detail.</description></item>
     /// </list>
     /// </returns>
+    [Authorize(Roles = "Admin, ADMIN")]
     [HttpGet("most-recent-events")]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopFiveEventAnalyticsEntity>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
@@ -118,6 +119,7 @@ public class ReportingAnalyticsController : ControllerBase
     /// </returns>
     [ProducesResponseType(typeof(GenericResponse<IEnumerable<EventCatalogReportingAnalyticsEntity>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin, ADMIN")]
     [HttpGet("get-event-catalog-analytics")]
     public async Task<IActionResult> GetEventCatalogAnalytics(CancellationToken ct = default)
     {
@@ -161,6 +163,7 @@ public class ReportingAnalyticsController : ControllerBase
     /// </returns>
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopFailingSubscriptionDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin, ADMIN")]
     [HttpGet("get-top-failing-subscriptions")]
     public async Task<IActionResult> GetTopFailingSubscriptionsAsync(CancellationToken ct = default)
     {
@@ -202,6 +205,7 @@ public class ReportingAnalyticsController : ControllerBase
     /// </returns>
     [ProducesResponseType(typeof(GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "Admin, ADMIN")]
     [HttpGet("get-admin-dashboard-summary")]
     public async Task<IActionResult> GetAdminDashboard(CancellationToken ct = default)
     {
