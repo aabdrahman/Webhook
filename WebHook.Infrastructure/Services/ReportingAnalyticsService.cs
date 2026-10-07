@@ -6,6 +6,7 @@ using WebHook.Core.DataTransferObjects.ReportingAnalytics;
 using WebHook.Core.Entities.CustomEntities;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Core.Interfaces.Services;
+using WebHook.Core.RequestParameter;
 using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
@@ -217,5 +218,37 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
 
         }
 
+    }
+
+    public async Task<GenericResponse<UserDashboardSummaryReportAnalyticsEntity>> GetUserDashboardSummaryAsync(UserDashboardSummaryAnalyticsRequestParamterDto request, CancellationToken ct = default)
+    {
+        _logger = _logger.ForContext(_methodName, nameof(GetUserDashboardSummaryAsync));
+        try
+        {
+            _logger.Information("Fetching user analytics for user - {0} with parameters - Start Date: {1}, End Date: {2}", _authenticatedUserDetails.userId, request.StartDate, request.EndDate);
+
+            if(request.StartDate > request.EndDate)
+            {
+                _logger.Warning("Start date is greater than end date for user - {0},Start Date:{1}, End Date:{2}", _authenticatedUserDetails.userId, request.StartDate, request.EndDate);
+                return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Failure(null, "Start date cannot be greater than end date.", HttpStatusCode.BadRequest);
+            }
+
+            if (!Guid.TryParse(_authenticatedUserDetails.userId, out var userId))
+            {
+                _logger.Warning("Authenticated user details could not be parsed successfully - {0}", _authenticatedUserDetails.userId);
+                return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Failure(null, "User dashboard could not be fetched.", HttpStatusCode.BadRequest);
+            }
+
+            var result = await _repositoryContext.GetUserDashboardSummary(userId, request.StartDate, request.EndDate).FirstOrDefaultAsync(ct);
+
+            _logger.Information("User dashboard summary fetched successfully for user - {0}, {1}", _authenticatedUserDetails.userId, result);
+            return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Success(result, "User dashboard summary fetched successfully.", HttpStatusCode.OK);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred while fetching user dashboard summary for user - {0}", _authenticatedUserDetails.userId);
+            return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Failure(null, "An error occurred while fetching user dashboard summary.", HttpStatusCode.InternalServerError, new ErrorDetail { ErrorMessage = ex.Message });
+
+        }
     }
 }

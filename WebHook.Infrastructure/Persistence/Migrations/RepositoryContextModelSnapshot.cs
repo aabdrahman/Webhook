@@ -125,6 +125,37 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("WebHook.Core.Entities.CustomEntities.AdminDashboardSummaryReportingAnalyticsEntity", b =>
+                {
+                    b.Property<int>("ActiveCatalogs")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SubscriptionCount")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("SuccessRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("TotalOnboardedUsers")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalPendingDeadLetter")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalPendingDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalRaisedEvent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalServiceClients")
+                        .HasColumnType("integer");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("vw_AdminDashboardSummary", (string)null);
+                });
+
             modelBuilder.Entity("WebHook.Core.Entities.CustomEntities.EventCatalogReportingAnalyticsEntity", b =>
                 {
                     b.Property<int>("ActiveSubscriptions")

@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using WebHook.Core.DataTransferObjects;
+﻿using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.ReportingAnalytics;
 using WebHook.Core.Entities.CustomEntities;
+using WebHook.Core.RequestParameter;
 
 namespace WebHook.Core.Interfaces.Services;
 
@@ -15,4 +13,5 @@ public interface IReportingAnalyticsService
     Task<GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>> GetAdminDashboardSummaryAsync(CancellationToken ct = default);
     Task<GenericResponse<IReadOnlyList<UserDeliveryDashboardDto>>> GetUserDeliveryDashboardAsync(CancellationToken ct = default);
     Task<GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>> GetUserTopFailingSubscriptionDashboardAsync(CancellationToken ct = default);
+    Task<GenericResponse<UserDashboardSummaryReportAnalyticsEntity>> GetUserDashboardSummaryAsync(UserDashboardSummaryAnalyticsRequestParamterDto request, CancellationToken ct = default);
 }

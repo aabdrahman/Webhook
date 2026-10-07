@@ -42,8 +42,16 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
 
         modelBuilder.ApplyConfigurationsFromAssembly(assembly: Assembly.GetExecutingAssembly());
 
-        modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView("vw_GetMostRecentEvents".ToLower());
+        modelBuilder.Entity<TopFiveEventAnalyticsEntity>().HasNoKey().ToView(@"vw_GetMostRecentEvents".ToLower());
         modelBuilder.Entity<EventCatalogReportingAnalyticsEntity>().HasNoKey().ToView(@"vw_GetEventCatalogAnalytics");
         modelBuilder.Entity<AdminDashboardSummaryReportingAnalyticsEntity>().HasNoKey().ToView(@"vw_AdminDashboardSummary");
+        modelBuilder.Entity<UserDashboardSummaryReportAnalyticsEntity>().HasNoKey();
+
+
+        modelBuilder.HasDbFunction(() => GetUserDashboardSummary(default, default, default))
+            .HasName("get_user_dashboard_summary");
     }
+
+    public IQueryable<UserDashboardSummaryReportAnalyticsEntity> GetUserDashboardSummary(Guid userId, DateOnly? startDate, DateOnly? endDate)
+            => FromExpression(() => GetUserDashboardSummary(userId, startDate, endDate));
 }

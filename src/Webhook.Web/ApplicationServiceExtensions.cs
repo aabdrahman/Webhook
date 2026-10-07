@@ -88,6 +88,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<GetAdminDashboardSummaryHandler>();
         services.AddScoped<GetUserDeliveryDashboardHandler>();
         services.AddScoped<GetUserTopFailingSubscriptionsHandler>();
+        services.AddScoped<GetUserDashboardSummaryReportAnalyticsHandler>();
     }
 
     internal static void AddApplicationAuthenticationStateProvider(this IServiceCollection services)

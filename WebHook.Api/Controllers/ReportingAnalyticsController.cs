@@ -6,6 +6,7 @@ using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.ReportingAnalytics;
 using WebHook.Core.Entities.CustomEntities;
 using WebHook.Core.Interfaces.Services;
+using WebHook.Core.RequestParameter;
 
 namespace WebHook.Api.Controllers;
 
@@ -264,10 +265,22 @@ public class ReportingAnalyticsController : ControllerBase
     }
 
     /// <summary>
-    /// 
+    /// Retrieves the top failing webhook subscriptions for the currently authenticated user,
+    /// ranked by total delivery failures.
     /// </summary>
-    /// <param name="ct"></param>
-    /// <returns></returns>
+    /// <remarks>
+    /// Returns the user's subscriptions with the highest failure counts, useful for
+    /// identifying endpoints that are consistently rejecting webhook deliveries.
+    /// Only subscriptions belonging to the authenticated user are included.
+    /// </remarks>
+    /// <param name="ct">Cancellation token for the async operation.</param>
+    /// <returns>
+    /// <list type="bullet">
+    ///   <item><description><b>200 OK</b> — Top failing subscriptions retrieved successfully.</description></item>
+    ///   <item><description><b>400 Bad Request</b> — The request could not be processed.</description></item>
+    ///   <item><description><b>500 Internal Server Error</b> — An unexpected error occurred.</description></item>
+    /// </list>
+    /// </returns>
     [Authorize(Roles = "User,USER")]
     [HttpGet("get-user-top-failing-subscription")]
     [ProducesResponseType(typeof(GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>), StatusCodes.Status200OK)]
@@ -278,6 +291,55 @@ public class ReportingAnalyticsController : ControllerBase
         try
         {
             var result = await _reportingAnalyticsService.GetUserTopFailingSubscriptionDashboardAsync(ct);
+            return StatusCode((int)result.HttpStatusCode, result);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "An error occurred invoking endpoint.");
+            return StatusCode(500, GenericResponse<string>.Failure(null,
+                "An error occurred invoking endpoint.",
+                System.Net.HttpStatusCode.InternalServerError,
+                new ErrorDetail
+                {
+                    ErrorMessage = ex.Message,
+                    ErrorTitle = ex.GetType().Name,
+                    ErrorDescription = ex.InnerException?.Message ?? ""
+                }));
+        }
+    }
+
+    /// <summary>
+    /// Retrieves a summary of key delivery metrics for the currently authenticated user's dashboard.
+    /// </summary>
+    /// <remarks>
+    /// Returns aggregated statistics scoped to the authenticated user's subscriptions,
+    /// including active subscriptions, subscribed event catalogs, pending deliveries,
+    /// dead-letter queue depth, and overall delivery success rate.
+    /// Supports optional date range filtering via <paramref name="request"/> to narrow
+    /// metrics to a specific period.
+    /// </remarks>
+    /// <param name="request">
+    /// Optional query parameters for filtering the summary by date range
+    /// (<c>StartDate</c> and <c>EndDate</c>). Defaults to the current day when omitted.
+    /// </param>
+    /// <param name="ct">Cancellation token for the async operation.</param>
+    /// <returns>
+    /// <list type="bullet">
+    ///   <item><description><b>200 OK</b> — Dashboard summary retrieved successfully.</description></item>
+    ///   <item><description><b>400 Bad Request</b> — Invalid request parameters.</description></item>
+    ///   <item><description><b>500 Internal Server Error</b> — An unexpected error occurred.</description></item>
+    /// </list>
+    /// </returns>
+    [ProducesResponseType(typeof(GenericResponse<UserDashboardSummaryReportAnalyticsEntity>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GenericResponse<UserDashboardSummaryReportAnalyticsEntity>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(GenericResponse<string>), StatusCodes.Status500InternalServerError)]
+    [Authorize(Roles = "User,USER")]
+    [HttpGet("get-user-dashboard-summary")]
+    public async Task<IActionResult> GetUserDashboardSummaryAsync([FromQuery] UserDashboardSummaryAnalyticsRequestParamterDto request, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _reportingAnalyticsService.GetUserDashboardSummaryAsync(request, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)

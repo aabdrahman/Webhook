@@ -38,62 +38,91 @@
     </div> *@
 
     <!-- Row 1 — Primary metrics -->
-    <div class="dashboard-metrics-grid">
-        <div class="metric-card">
-            <span class="metric-card-label">Total Subscriptions</span>
-            <span class="metric-card-value">@_totalSubscriptions</span>
-            <span class="metric-card-sub">All registered subscriptions</span>
+    @if(_userDashboard is not null)
+    {
+        <div class="dashboard-metrics-grid">
+            <div class="metric-card">
+                <span class="metric-card-label">Total Subscriptions</span>
+                <span class="metric-card-value">@_totalSubscriptions</span>
+                <span class="metric-card-sub">All registered subscriptions</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Active Subscriptions</span>
+                <span class="metric-card-value" style="color:var(--color-success);">
+                    @_activeSubscriptions
+                </span>
+                <span class="metric-card-sub">Currently receiving events</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Success Rate</span>
+                <span class="metric-card-value" style="color:@SuccessRateColor;">
+                    @_successRate%
+                </span>
+                <span class="metric-card-sub">Delivery success today</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Dead Letters</span>
+                <span class="metric-card-value" style="color:var(--color-dead-letter);">
+                    @_deadLetterCount
+                </span>
+                <span class="metric-card-sub">Awaiting manual retry</span>
+            </div>
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Active Subscriptions</span>
-            <span class="metric-card-value" style="color:var(--color-success);">
-                @_activeSubscriptions
-            </span>
-            <span class="metric-card-sub">Currently receiving events</span>
-        </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Success Rate</span>
-            <span class="metric-card-value" style="color:@SuccessRateColor;">
-                @_successRate%
-            </span>
-            <span class="metric-card-sub">Delivery success today</span>
-        </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Dead Letters</span>
-            <span class="metric-card-value" style="color:var(--color-dead-letter);">
-                @_deadLetterCount
-            </span>
-            <span class="metric-card-sub">Awaiting manual retry</span>
-        </div>
-    </div>
 
-    <!-- Row 2 — Secondary metrics -->
-    <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary">
-        <div class="metric-card">
-            <span class="metric-card-label">Events Today</span>
-            <span class="metric-card-value">@_eventsToday</span>
-            <span class="metric-card-sub">Published by internal services</span>
+        <!-- Row 2 — Secondary metrics -->
+        <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary">
+            <div class="metric-card">
+                <span class="metric-card-label">Events Today</span>
+                <span class="metric-card-value">@_eventsToday</span>
+                <span class="metric-card-sub">Published by internal services</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Deliveries Today</span>
+                <span class="metric-card-value">@_deliveriesToday</span>
+                <span class="metric-card-sub">Total delivery attempts</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Pending</span>
+                <span class="metric-card-value" style="color:var(--color-warning);">
+                    @_pendingDeliveries
+                </span>
+                <span class="metric-card-sub">Queued for delivery</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-card-label">Retries Today</span>
+                <span class="metric-card-value" style="color:var(--color-warning);">
+                    @_retriesToday
+                </span>
+                <span class="metric-card-sub">Failed and retried deliveries</span>
+            </div>
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Deliveries Today</span>
-            <span class="metric-card-value">@_deliveriesToday</span>
-            <span class="metric-card-sub">Total delivery attempts</span>
+    }
+    else
+    {
+        <div class="dashboard-metrics-grid" style="margin-bottom:var(--space-4);">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="metric-card metric-card--skeleton">
+                    <span class="skeleton skeleton-label"></span>
+                    <span class="skeleton skeleton-value"></span>
+                    <span class="skeleton skeleton-sub"></span>
+                </div>
+            }
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Pending</span>
-            <span class="metric-card-value" style="color:var(--color-warning);">
-                @_pendingDeliveries
-            </span>
-            <span class="metric-card-sub">Queued for delivery</span>
+        <div class="dashboard-metrics-grid dashboard-metrics-grid-secondary"
+             style="margin-bottom:var(--space-6);">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="metric-card metric-card--skeleton">
+                    <span class="skeleton skeleton-label"></span>
+                    <span class="skeleton skeleton-value"></span>
+                    <span class="skeleton skeleton-sub"></span>
+                </div>
+            }
         </div>
-        <div class="metric-card">
-            <span class="metric-card-label">Retries Today</span>
-            <span class="metric-card-value" style="color:var(--color-warning);">
-                @_retriesToday
-            </span>
-            <span class="metric-card-sub">Failed and retried deliveries</span>
-        </div>
-    </div>
+    }
+
+    
 
     <!-- Worker status strip -->
     <div class="card" style="margin-bottom:var(--space-6);">
@@ -271,6 +300,9 @@
     private bool   _isLoadingDeliveries = true;
     private bool   _isLoadingFailures  = true;
 
+    private UserDashboardSummaryReportAnalyticsEntity? _userDashboard;
+    private UserDashboardSummaryAnalyticsRequestParamterDto _userDashboardRRequestParamter;
+
     private string _greeting   = "Good morning";
     private string _firstName  = "there";
     private string _lastName = string.Empty;
@@ -349,18 +381,36 @@
 
             await Task.Delay(800);
 
-            bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+            var result = await getUserDashboardSummaryHandler.HandleAsync();
+
+
+
+            bool success = result.response.successStatus;
+
+            if (success && result.userDashboardSummary is not null)
+            {
+                _userDashboard = result.userDashboardSummary;
+                _totalSubscriptions  = _userDashboard.TotalSubscription;
+                _activeSubscriptions = _userDashboard.ActiveSubscriptions;
+                _successRate         = _userDashboard.SuccessRate ?? 0.00;
+                _deadLetterCount     = _userDashboard.TotalDeadLetter;
+                _eventsToday         = _userDashboard.ActiveSubscribedCatalogs;
+                _deliveriesToday     = _userDashboard.TotalDeliveries;
+                _pendingDeliveries   = _userDashboard.PendingDeliveries;
+                _retriesToday        = _userDashboard.DeadLetterRetriedToday;
+            }
 
             // Fake metrics
-            _totalSubscriptions  = success ? 12 : 0;
-            _activeSubscriptions = success ? 9  : 0;
-            _successRate         = success ? 94.2 : 0;
-            _deadLetterCount     = success ? 3  : 0;
-            _eventsToday         = success ? 148 : 0;
-            _deliveriesToday     = success ? 312 : 0;
-            _pendingDeliveries   = success ? 4  : 0;
-            _retriesToday        = success ? 17 : 0;
+            // _totalSubscriptions  = success ? 12 : 0;
+            // _activeSubscriptions = success ? 9  : 0;
+            // _successRate         = success ? 94.2 : 0;
+            // _deadLetterCount     = success ? 3  : 0;
+            // _eventsToday         = success ? 148 : 0;
+            // _deliveriesToday     = success ? 312 : 0;
+            // _pendingDeliveries   = success ? 4  : 0;
+            // _retriesToday        = success ? 17 : 0;
 
+            _userDashboardRRequestParamter = new UserDashboardSummaryAnalyticsRequestParamterDto();
             _isLoading = false;
             StateHasChanged();
 

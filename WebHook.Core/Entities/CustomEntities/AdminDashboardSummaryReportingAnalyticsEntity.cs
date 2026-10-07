@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace WebHook.Core.Entities.CustomEntities;
+﻿namespace WebHook.Core.Entities.CustomEntities;
 
 public class AdminDashboardSummaryReportingAnalyticsEntity
 {
