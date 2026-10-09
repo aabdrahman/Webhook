@@ -199,7 +199,7 @@
 
         try
         {
-            await Task.Delay(500);
+            //await Task.Delay(500);
             var uri = new Uri(navigationManager.Uri);
             var query = QueryHelpers.ParseQuery(uri.Query);
             if (query.TryGetValue("registered", out var newRegistration) && newRegistration == "true")

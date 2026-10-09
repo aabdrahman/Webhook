@@ -301,7 +301,7 @@
     private bool   _isLoadingFailures  = true;
 
     private UserDashboardSummaryReportAnalyticsEntity? _userDashboard;
-    private UserDashboardSummaryAnalyticsRequestParamterDto _userDashboardRRequestParamter;
+    private UserDashboardSummaryAnalyticsRequestParamterDto _userDashboardRRequestParamter = new UserDashboardSummaryAnalyticsRequestParamterDto();
 
     private string _greeting   = "Good morning";
     private string _firstName  = "there";
@@ -381,7 +381,7 @@
 
             await Task.Delay(800);
 
-            var result = await getUserDashboardSummaryHandler.HandleAsync();
+            var result = await getUserDashboardSummaryHandler.HandleAsync(_userDashboardRRequestParamter);
 
 
 
@@ -538,13 +538,16 @@
         int    FailedCount,
         int    DeadLetterCount);
 
-    private Task HandleFilterApplied(DashboardHeader.DateRangeFilter args)
+    private async Task HandleFilterApplied(DashboardHeader.DateRangeFilter args)
     {
-        throw new NotImplementedException();
+        _userDashboardRRequestParamter = new UserDashboardSummaryAnalyticsRequestParamterDto() { EndDate = DateOnly.FromDateTime(args.EndDate), StartDate = DateOnly.FromDateTime(args.StartDate) };
+        await LoadDashboardAsync();
     }
 
-    private Task HandleFilterCleared()
+    private async Task HandleFilterCleared()
     {
-        throw new NotImplementedException();
+        _userDashboardRRequestParamter = new UserDashboardSummaryAnalyticsRequestParamterDto();
+        await LoadDashboardAsync();
+       
     }
 }

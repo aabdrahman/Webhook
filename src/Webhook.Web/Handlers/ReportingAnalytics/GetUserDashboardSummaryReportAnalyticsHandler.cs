@@ -2,6 +2,7 @@
 using Webhook.Web.Helper;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.Entities.CustomEntities;
+using WebHook.Core.RequestParameter;
 
 namespace Webhook.Web.Handlers.ReportingAnalytics;
 
@@ -13,11 +14,11 @@ public class GetUserDashboardSummaryReportAnalyticsHandler
         _httpClient = httpClientFactory.CreateClient(ApplicationClientHelper.ApplicationHttpClientNameSecure);
     }
 
-    public async Task<(ApiResponseDto response, UserDashboardSummaryReportAnalyticsEntity? userDashboardSummary)> HandleAsync()
+    public async Task<(ApiResponseDto response, UserDashboardSummaryReportAnalyticsEntity? userDashboardSummary)> HandleAsync(UserDashboardSummaryAnalyticsRequestParamterDto userDashboardSummaryAnalyticsRequestParamter)
     {
         try
         {
-            var httpResponse = await _httpClient.GetAsync("api/ReportingAnalytics/get-user-dashboard-summary");
+            var httpResponse = await _httpClient.GetAsync($"api/ReportingAnalytics/get-user-dashboard-summary?startDate={userDashboardSummaryAnalyticsRequestParamter.StartDate}&endDate={userDashboardSummaryAnalyticsRequestParamter.EndDate}");
             string responseContent = await httpResponse.Content.ReadAsStringAsync();
             GenericResponse<UserDashboardSummaryReportAnalyticsEntity> responseBody = JsonSerializer.Deserialize<GenericResponse<UserDashboardSummaryReportAnalyticsEntity>>(responseContent, new JsonSerializerOptions
             {
