@@ -1,0 +1,85 @@
+﻿
+@if (IsLoading)
+{
+    <div class="chart-card chart-card--skeleton">
+        <div class="skeleton skeleton-chart-title"></div>
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="skeleton" style="height:36px;margin-top:8px;border-radius:4px;"></div>
+        }
+    </div>
+}
+else
+{
+    <div class="chart-card">
+        <div class="chart-head">
+            <div>
+                <div class="chart-title">@Title</div>
+                <div class="chart-subtitle">@Subtitle</div>
+            </div>
+        </div>
+
+        @if (!Data.Any())
+        {
+            <div class="chart-empty" style="height:160px;">
+                <div class="chart-empty-icon">✅</div>
+                <div class="chart-empty-text">No failing subscriptions</div>
+                <div class="chart-empty-sub">All subscriptions are delivering successfully.</div>
+            </div>
+        }
+        else
+        {
+            <table class="analytics-table">
+                <thead>
+                    <tr>
+                        <th>Subscription</th>
+                        <th>Failed / Total</th>
+                        <th>Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Data)
+                    {
+                        var failRate = item.TotalCount > 0
+                                          ? (double)item.FailedCount / item.TotalCount * 100
+                                          : 0;
+                        var badgeClass = failRate >= 50 ? "badge-red"
+                                        : failRate >= 20 ? "badge-amber"
+                                        : "badge-green";
+
+                        <tr>
+                            <td>
+                                <div class="table-name">@item.SubscriptionName</div>
+                                <div class="table-url">@item.CallBackUrl</div>
+                            </td>
+                            <td>
+                                <div class="mini-bar-wrap">
+                                    <div class="mini-bar-bg">
+                                        <div class="mini-bar-fill"
+                                             style="width: @($"{failRate:0}%")">
+                                        </div>
+                                    </div>
+                                    <span class="mini-bar-count">
+                                        @item.FailedCount/@item.TotalCount
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge @badgeClass">
+                                    @($"{failRate:0}%")
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<TopFailingSubscriptionDto> Data { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string Title { get; set; } = "Top Failing Subscriptions";
+    [Parameter] public string Subtitle { get; set; } = "Highest failure count this period";
+}

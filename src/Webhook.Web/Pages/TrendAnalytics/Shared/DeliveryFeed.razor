@@ -1,0 +1,67 @@
+﻿
+@if (IsLoading)
+{
+    <div class="chart-card chart-card--skeleton">
+        <div class="skeleton skeleton-chart-title"></div>
+        @for (int i = 0; i < 6; i++)
+        {
+            <div class="skeleton" style="height:32px;margin-top:8px;border-radius:4px;"></div>
+        }
+    </div>
+}
+else
+{
+    <div class="chart-card">
+        <div class="chart-head">
+            <div>
+                <div class="chart-title">Recent Deliveries</div>
+                <div class="chart-subtitle">Latest activity across your subscriptions</div>
+            </div>
+        </div>
+
+        @if (!Data.Any())
+        {
+            <div class="chart-empty" style="height:200px;">
+                <div class="chart-empty-icon">📭</div>
+                <div class="chart-empty-text">No recent deliveries</div>
+                <div class="chart-empty-sub">Delivery activity will appear here.</div>
+            </div>
+        }
+        else
+        {
+            <div class="feed">
+                @foreach (var item in Data)
+                {
+                    var isSuccess = item.HttpResponseCode.StartsWith("2");
+                    var is4xx = item.HttpResponseCode.StartsWith("4");
+                    var dotColor = isSuccess ? "#2cb67d" : is4xx ? "#f59e0b" : "#e04b4b";
+                    var codeClass = isSuccess ? "code-2xx" : is4xx ? "code-4xx" : "code-5xx";
+
+                    <div class="feed-row">
+                        <span class="feed-dot" style="background: @dotColor"></span>
+                        <span class="feed-event">
+                            @item.EventType → @item.SubscriptionName
+                        </span>
+                        <span class="feed-code @codeClass">@item.HttpResponseCode</span>
+                        <span class="feed-time">@FormatTime(item.OccurredAt)</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<DeliveryFeedItemDto> Data { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+
+    private static string FormatTime(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt.ToUniversalTime();
+
+        return diff.TotalMinutes < 1 ? "just now"
+             : diff.TotalMinutes < 60 ? $"{(int)diff.TotalMinutes}m ago"
+             : diff.TotalHours < 24 ? $"{(int)diff.TotalHours}h ago"
+             : $"{(int)diff.TotalDays}d ago";
+    }
+}
