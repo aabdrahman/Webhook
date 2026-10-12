@@ -1,4 +1,5 @@
-﻿using Blazored.LocalStorage;
+﻿using ApexCharts;
+using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Text.Json;
 using Webhook.Web.ApplicationAuthenticationHandler;
@@ -123,6 +124,18 @@ public static class ApplicationServiceExtensions
         {
             client.BaseAddress = new Uri(environmentVariables.AppBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(environmentVariables.ApiTimeOutInSeconds);
+        });
+    }
+
+    internal static void AddApplicationCharts(this IServiceCollection services)
+    {
+        services.AddApexCharts(opts =>
+        {
+            opts.GlobalOptions = new ApexChartBaseOptions()
+            {
+                Debug = true,
+                Theme = new Theme() { Palette = PaletteType.Palette10, Mode = Mode.Light }
+            };
         });
     }
 }

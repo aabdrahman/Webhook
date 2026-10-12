@@ -34,5 +34,6 @@ builder.Services.AddApplicationAuthenticationStateProvider();
 builder.Services.ConfigureApplicationHttpClient(environmentVariables);
 builder.Services.ConfigureApplicationLocalStorage();
 builder.Services.AddApplicationHandlers();
+builder.Services.AddApplicationCharts();
 
 await builder.Build().RunAsync();
