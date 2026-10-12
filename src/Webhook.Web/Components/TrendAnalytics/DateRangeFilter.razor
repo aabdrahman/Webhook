@@ -1,0 +1,90 @@
+﻿@using Webhook.Web.Components.TrendAnalytics.Models
+
+<div class="date-filter">
+    <span class="date-filter-label">Period</span>
+    @foreach (var preset in _presets)
+    {
+        <button class="pill-btn @(IsActive(preset.Range) ? "active" : "")"
+                @onclick="() => SelectPreset(preset.Range)">
+            @preset.Label
+        </button>
+    }
+    <button class="pill-btn @(_isCustom ? "active" : "")"
+            @onclick="ToggleCustom">
+        Custom
+    </button>
+
+    @if (_isCustom)
+    {
+        <div class="custom-range">
+            <input type="date" class="date-input"
+                   value="@_customStart.ToString("yyyy-MM-dd")"
+                   @onchange="e => OnCustomStartChanged(e.Value?.ToString())" />
+            <span class="date-separator">to</span>
+            <input type="date" class="date-input"
+                   value="@_customEnd.ToString("yyyy-MM-dd")"
+                   @onchange="e => OnCustomEndChanged(e.Value?.ToString())" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EventCallback<DateRange> OnRangeChanged { get; set; }
+    [Parameter] public DateRange InitialRange { get; set; } = DateRange.Last30Days();
+
+    private DateRange _current = DateRange.Last30Days();
+    private DateOnly _customStart;
+    private DateOnly _customEnd;
+    private bool _isCustom;
+
+    private readonly List<(string Label, DateRange Range)> _presets =
+    [
+        ("7d",  DateRange.Last7Days()),
+        ("30d", DateRange.Last30Days()),
+        ("90d", DateRange.Last90Days()),
+    ];
+
+    protected override void OnParametersSet()
+    {
+        _current = InitialRange;
+        _customStart = InitialRange.Start;
+        _customEnd = InitialRange.End;
+    }
+
+    private bool IsActive(DateRange range) =>
+        !_isCustom && range == _current;
+
+    private async Task SelectPreset(DateRange range)
+    {
+        _isCustom = false;
+        _current = range;
+        await OnRangeChanged.InvokeAsync(range);
+    }
+
+    private void ToggleCustom() => _isCustom = !_isCustom;
+
+    private async Task OnCustomStartChanged(string? value)
+    {
+        if (DateOnly.TryParse(value, out var date))
+        {
+            _customStart = date;
+            await EmitCustomRange();
+        }
+    }
+
+    private async Task OnCustomEndChanged(string? value)
+    {
+        if (DateOnly.TryParse(value, out var date))
+        {
+            _customEnd = date;
+            await EmitCustomRange();
+        }
+    }
+
+    private async Task EmitCustomRange()
+    {
+        if (_customStart >= _customEnd) return;
+        _current = new DateRange(_customStart, _customEnd);
+        await OnRangeChanged.InvokeAsync(_current);
+    }
+}

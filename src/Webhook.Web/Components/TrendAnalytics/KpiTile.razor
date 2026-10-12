@@ -1,0 +1,22 @@
+﻿@using Webhook.Web.Components.TrendAnalytics.Models
+
+<div class="kpi-card kpi-card--@Accent.ToString().ToLower()">
+    <div class="kpi-label">@Label</div>
+    <div class="kpi-value">@Value</div>
+    @if (!string.IsNullOrEmpty(Trend))
+    {
+        <div class="kpi-trend">
+            <span class="@(TrendDirection == TrendDirection.Up ? "trend-up" : "trend-down")">
+                @(TrendDirection == TrendDirection.Up ? "↑" : "↓") @Trend
+            </span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Trend { get; set; }
+    [Parameter] public TrendDirection TrendDirection { get; set; } = TrendDirection.Up;
+    [Parameter] public KpiAccent Accent { get; set; } = KpiAccent.Blue;
+}

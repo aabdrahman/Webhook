@@ -1,0 +1,542 @@
+﻿/* ─── Analytics Page Layout ─── */
+.analytics-page {
+    padding: var(--space-6, 24px);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.page-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ─── Date Range Filter ─── */
+.date-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.date-filter-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+.pill-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .15s ease;
+    font-family: inherit;
+    line-height: 1;
+}
+
+    .pill-btn:hover:not(.active) {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .pill-btn.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: #fff;
+    }
+
+.custom-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 4px;
+}
+
+.date-input {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+    .date-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+    }
+
+.date-separator {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ─── Section Label ─── */
+.section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ─── KPI Grid ─── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ─── KPI Card ─── */
+.kpi-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
+}
+
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        border-radius: 10px 10px 0 0;
+    }
+
+.kpi-card--blue::before {
+    background: #1a4ac7;
+}
+
+.kpi-card--green::before {
+    background: #2cb67d;
+}
+
+.kpi-card--amber::before {
+    background: #f59e0b;
+}
+
+.kpi-card--red::before {
+    background: #e04b4b;
+}
+
+.kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.kpi-value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    margin: 6px 0 4px;
+    line-height: 1;
+}
+
+.kpi-trend {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.trend-up {
+    color: #2cb67d;
+}
+
+.trend-down {
+    color: #e04b4b;
+}
+
+/* ─── Chart Grid ─── */
+.chart-row {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+    .chart-row.two-col {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .chart-row.three-two {
+        grid-template-columns: 3fr 2fr;
+    }
+
+    .chart-row.full {
+        grid-template-columns: 1fr;
+    }
+
+@media (max-width: 768px) {
+    .chart-row.two-col,
+    .chart-row.three-two {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ─── Chart Card ─── */
+.chart-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+    min-width: 0;
+}
+
+.chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chart-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ─── Latency Tiles ─── */
+.latency-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.latency-tile {
+    flex: 1;
+    min-width: 90px;
+    background: var(--surface-secondary, #f8f9fc);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+}
+
+.latency-tile--critical {
+    border-color: rgba(224, 75, 75, .3);
+    background: rgba(224, 75, 75, .04);
+}
+
+.latency-pct {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.latency-tile--critical .latency-pct {
+    color: #e04b4b;
+}
+
+.latency-val {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    margin: 4px 0 2px;
+    line-height: 1;
+}
+
+.latency-tile--critical .latency-val {
+    color: #e04b4b;
+}
+
+.latency-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ─── Failing Subscriptions Table ─── */
+.analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .analytics-table th {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        text-align: left;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border-color);
+        white-space: nowrap;
+    }
+
+    .analytics-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .analytics-table tr:last-child td {
+        border-bottom: none;
+    }
+
+.table-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.table-url {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.mini-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 110px;
+}
+
+.mini-bar-bg {
+    flex: 1;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--border-color);
+    overflow: hidden;
+}
+
+.mini-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #e04b4b;
+    transition: width .3s ease;
+}
+
+.mini-bar-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ─── Badges ─── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-red {
+    background: rgba(224, 75, 75, .12);
+    color: #e04b4b;
+}
+
+.badge-amber {
+    background: rgba(245, 158, 11, .12);
+    color: #f59e0b;
+}
+
+.badge-green {
+    background: rgba(44, 182, 125,.12);
+    color: #2cb67d;
+}
+
+.badge-blue {
+    background: rgba(26, 74, 199,.12);
+    color: #1a4ac7;
+}
+
+/* ─── Delivery Feed ─── */
+.feed {
+    display: flex;
+    flex-direction: column;
+}
+
+.feed-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-color);
+    min-width: 0;
+}
+
+    .feed-row:last-child {
+        border-bottom: none;
+    }
+
+.feed-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.feed-event {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.feed-code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.code-2xx {
+    background: rgba(44, 182, 125,.12);
+    color: #2cb67d;
+}
+
+.code-4xx {
+    background: rgba(245, 158, 11, .12);
+    color: #f59e0b;
+}
+
+.code-5xx {
+    background: rgba(224, 75, 75, .12);
+    color: #e04b4b;
+}
+
+.feed-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ─── Skeleton loaders ─── */
+.chart-card--skeleton {
+    pointer-events: none;
+}
+
+.skeleton {
+    background: linear-gradient( 90deg, var(--border-color) 25%, var(--surface-secondary, #f0f2f7) 50%, var(--border-color) 75% );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 6px;
+}
+
+.skeleton-chart-title {
+    height: 14px;
+    width: 40%;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.skeleton-chart-body {
+    height: 220px;
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ─── Empty state ─── */
+.chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 220px;
+    gap: 8px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.chart-empty-icon {
+    font-size: 28px;
+    opacity: .4;
+}
+
+.chart-empty-text {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.chart-empty-sub {
+    font-size: 12px;
+    opacity: .7;
+}
