@@ -375,11 +375,20 @@ hr {
     line-height: var(--leading-tight);
 }
 
-.section-title {
+/*.section-title {
     font-family: var(--font-heading);
     font-size: var(--text-lg);
     color: var(--color-text-primary);
     letter-spacing: var(--tracking-tight);
+}*/
+
+.section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    margin: 2rem 0 0.75rem;
 }
 
 /* -----------------------------------------------------------------------------

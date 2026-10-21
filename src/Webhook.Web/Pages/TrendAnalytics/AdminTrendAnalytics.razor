@@ -1,0 +1,234 @@
+﻿@page "/admin/analytics"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Analytics — Admin · WebhookHub</PageTitle>
+
+<div class="analytics-page">
+
+    <div class="analytics-page__header">
+        <div>
+            <h1 class="analytics-page__title">Platform Analytics</h1>
+            <p class="analytics-page__subtitle">Delivery health and usage metrics across all tenants</p>
+        </div>
+        <DateRangeFilter OnRangeChanged="OnRangeChanged" />
+    </div>
+
+    <!-- KPI Row -->
+    <div class="analytics-kpi-grid">
+        <KpiTile Label="Total Deliveries"
+                 Value="@_kpiTotalDeliveries"
+                 Trend="+12.4%"
+                 TrendDirection="TrendDirection.Up"
+                 Accent="KpiAccent.Blue"
+                 IsLoading="_kpisLoading" />
+
+        <KpiTile Label="Success Rate"
+                 Value="@_kpiSuccessRate"
+                 Trend="+0.8%"
+                 TrendDirection="TrendDirection.Up"
+                 Accent="KpiAccent.Green"
+                 IsLoading="_kpisLoading" />
+
+        <KpiTile Label="Dead Letters"
+                 Value="@_kpiDeadLetters"
+                 Trend="-3.1%"
+                 TrendDirection="TrendDirection.Down"
+                 Accent="KpiAccent.Red"
+                 IsLoading="_kpisLoading" />
+
+        <KpiTile Label="Active Subscriptions"
+                 Value="@_kpiActiveSubs"
+                 Trend="+24 this period"
+                 TrendDirection="TrendDirection.Up"
+                 Accent="KpiAccent.Amber"
+                 IsLoading="_kpisLoading" />
+    </div>
+
+    <!-- Volume & Health -->
+    <section class="analytics-section">
+        <h2 class="analytics-section__label">Volume &amp; Health</h2>
+        <div class="analytics-chart-row analytics-chart-row--two-col">
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">Delivery Volume</span>
+                    <span class="analytics-chart-card__subtitle">Daily totals over the selected period</span>
+                </div>
+                <DeliveryVolumeChart Data="_volumeData" IsLoading="_volumeLoading" />
+            </div>
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">Success Rate Trend</span>
+                    <span class="analytics-chart-card__subtitle">% successful deliveries per day</span>
+                </div>
+                <SuccessRateTrendChart Data="_successRateData" IsLoading="_successRateLoading" SlaTarget="95m" />
+            </div>
+        </div>
+    </section>
+
+    <!-- Failure Analysis -->
+    <section class="analytics-section">
+        <h2 class="analytics-section__label">Failure Analysis</h2>
+        <div class="analytics-chart-row analytics-chart-row--two-col">
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">Failures by HTTP Code</span>
+                    <span class="analytics-chart-card__subtitle">Distribution of non-2xx responses</span>
+                </div>
+                <FailureByHttpCodeChart Data="_failureByCodeData" IsLoading="_failureByCodeLoading" />
+            </div>
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">Dead Letter Rate</span>
+                    <span class="analytics-chart-card__subtitle">Deliveries entering dead letter per day</span>
+                </div>
+                <DeadLetterRateChart Data="_deadLetterData" IsLoading="_deadLetterLoading" />
+            </div>
+        </div>
+    </section>
+
+    <!-- Distribution -->
+    <section class="analytics-section">
+        <h2 class="analytics-section__label">Distribution</h2>
+        <div class="analytics-chart-row analytics-chart-row--three-two">
+            <div class="analytics-chart-card">
+                <EventTypeDonutChart Data="_eventTypeData"
+                                     IsLoading="_eventTypeLoading"
+                                     Title="Event Type Distribution"
+                                     Subtitle="Platform-wide across all tenants" />
+            </div>
+            <div class="analytics-chart-card">
+                <FailingSubscriptionsTable Data="_topFailingData"
+                                           IsLoading="_topFailingLoading"
+                                           Title="Top Failing Subscriptions"
+                                           Subtitle="Highest failure rates in range" />
+            </div>
+        </div>
+    </section>
+
+    <!-- Latency -->
+    <section class="analytics-section">
+        <h2 class="analytics-section__label">Latency Percentiles</h2>
+        <div class="analytics-chart-row analytics-chart-row--full">
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">End-to-End Delivery Latency</span>
+                    <span class="analytics-chart-card__subtitle">Time from event received to first successful delivery attempt</span>
+                </div>
+                <LatencyPercentilesDisplay Data="_latencyData" IsLoading="_latencyLoading" />
+            </div>
+        </div>
+    </section>
+
+    <!-- Per-Subscription Breakdown -->
+    <section class="analytics-section">
+        <h2 class="analytics-section__label">Per-Subscription Breakdown</h2>
+        <div class="analytics-chart-row analytics-chart-row--full">
+            <div class="analytics-chart-card">
+                <div class="analytics-chart-card__header">
+                    <span class="analytics-chart-card__title">Deliveries per Subscription</span>
+                    <span class="analytics-chart-card__subtitle">Total vs failed — top 10 by volume</span>
+                </div>
+                <DeliveriesPerSubChart Data="_perSubData" IsLoading="_perSubLoading" />
+            </div>
+        </div>
+    </section>
+
+</div>
+
+@code {
+    private DateRange _range = DateRange.Last30Days();
+
+    private bool _kpisLoading = false;
+    private bool _volumeLoading = false;
+    private bool _successRateLoading = false;
+    private bool _failureByCodeLoading = false;
+    private bool _deadLetterLoading = false;
+    private bool _eventTypeLoading = false;
+    private bool _topFailingLoading = false;
+    private bool _latencyLoading = false;
+    private bool _perSubLoading = false;
+
+    private string _kpiTotalDeliveries = "1.24M";
+    private string _kpiSuccessRate = "98.7%";
+    private string _kpiDeadLetters = "312";
+    private string _kpiActiveSubs = "836";
+
+    private List<DailyVolumeDto> _volumeData = Enumerable.Range(0, 30).Select(i =>
+    {
+        var date = DateOnly.FromDateTime(DateTime.Today.AddDays(-29 + i));
+        var total = Random.Shared.Next(28_000, 55_000);
+        var failed = Random.Shared.Next(200, 1_400);
+        return new DailyVolumeDto(date, total, total - failed, failed);
+    }).ToList();
+
+    private List<SuccessRateTrendDto> _successRateData = Enumerable.Range(0, 30).Select(i =>
+        new SuccessRateTrendDto(
+            DateOnly.FromDateTime(DateTime.Today.AddDays(-29 + i)),
+            Math.Round((decimal)(96.5 + Random.Shared.NextDouble() * 3.0), 2)
+        )
+    ).ToList();
+
+    private List<FailureByCodeDto> _failureByCodeData = new()
+    {
+        new("5xx Server Error", 874),
+        new("4xx Client Error", 312),
+        new("Timeout",          198),
+        new("No Response",       89),
+        new("SSL/TLS Error",     37),
+    };
+
+    private List<DeadLetterRateDto> _deadLetterData = Enumerable.Range(0, 30).Select(i =>
+        new DeadLetterRateDto(
+            DateOnly.FromDateTime(DateTime.Today.AddDays(-29 + i)),
+            Random.Shared.Next(4, 28)
+        )
+    ).ToList();
+
+    private List<EventTypeDistributionDto> _eventTypeData = new()
+    {
+        new("order.created",     42_180, 34.1m),
+        new("payment.completed", 28_440, 23.0m),
+        new("user.registered",   19_870, 16.1m),
+        new("shipment.updated",  15_320, 12.4m),
+        new("invoice.generated",  9_810,  7.9m),
+        new("other",              8_180,  6.5m),
+    };
+
+    private List<TopFailingSubscriptionDto> _topFailingData = new()
+    {
+        new TopFailingSubscriptionDto{ CallBackUrl = "payments.acme.io", FailedCount = 1_608, SubscriptionName = "Acme Corp — Payments", TotalCount = 3_210 },
+        new TopFailingSubscriptionDto{ CallBackUrl = "hooks.novatech.ng", FailedCount =   934, SubscriptionName = "NovaTech — Shipments", TotalCount = 5_840 },
+        new TopFailingSubscriptionDto{ CallBackUrl = "api.globex.com", FailedCount =   744, SubscriptionName = "Globex — Orders", TotalCount = 12_400 },
+        new TopFailingSubscriptionDto{ CallBackUrl = "webhooks.initech.io", FailedCount =   614, SubscriptionName = "Initech — Invoices", TotalCount = 2_190 },
+        new TopFailingSubscriptionDto{ CallBackUrl = "events.umbrella.co", FailedCount =   438, SubscriptionName = "Umbrella — Users", TotalCount = 8_760 }
+    };
+
+    private LatencyPercentilesDto? _latencyData = new(
+        P50Ms: 112.0,
+        P75Ms: 198.0,
+        P95Ms: 284.0,
+        P99Ms: 541.0,
+        MaxMs: 2_340.0
+    );
+
+    private List<DeliveriesPerSubDto> _perSubData = new()
+    {
+        new("Globex — Orders",      12_400,   744),
+        new("Umbrella — Users",      8_760,   438),
+        new("NovaTech — Shipments",  5_840,   934),
+        new("Acme Corp — Payments",  3_210, 1_608),
+        new("Initech — Invoices",    2_190,   614),
+        new("Soylent — Inventory",   1_980,    92),
+        new("Massive Dynamic",       1_740,   187),
+        new("Vandelay Industries",   1_310,    44),
+        new("Prestige Worldwide",      980,   210),
+        new("Buy n Large",             740,    18),
+    };
+
+    private async Task OnRangeChanged(DateRange range)
+    {
+        _range = range;
+        await Task.CompletedTask;
+        StateHasChanged();
+    }
+}

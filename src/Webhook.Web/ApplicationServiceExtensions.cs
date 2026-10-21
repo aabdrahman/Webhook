@@ -133,8 +133,8 @@ public static class ApplicationServiceExtensions
         {
             opts.GlobalOptions = new ApexChartBaseOptions()
             {
-                Debug = true,
-                Theme = new Theme() { Palette = PaletteType.Palette10, Mode = Mode.Light }
+                Debug = true
+                //Theme = new Theme() { Palette = PaletteType.Palette10, Mode = Mode.Light }
             };
         });
     }
