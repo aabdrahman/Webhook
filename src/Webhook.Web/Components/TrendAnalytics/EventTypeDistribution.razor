@@ -1,0 +1,95 @@
+@* Components/Analytics/Charts/EventTypeDistribution.razor *@
+@using ApexCharts
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">📡</span>
+            <div>
+                <div class="analytics-card__title">Event Type Distribution</div>
+                <div class="analytics-card__subtitle">Breakdown by event type</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--chart"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">📡</div>
+            <div>No event data available</div>
+        </div>
+    }
+    else
+    {
+        <div class="analytics-donut-wrap">
+            <ApexChart TItem="EventTypeItem"
+                       Options="_options"
+                       Width="150"
+                       Height="150">
+                <ApexPointSeries TItem="EventTypeItem"
+                                 Items="Items"
+                                 Name="Events"
+                                 SeriesType="SeriesType.Donut"
+                                 XValue="i => i.Name"
+                                 YValue="i => i.Percentage"
+                                 OrderBy="i => i.Y" />
+            </ApexChart>
+
+            <div class="analytics-donut-legend">
+                @foreach (var item in Items.OrderByDescending(i => i.Percentage))
+                {
+                    <div class="analytics-donut-legend__item">
+                        <div class="analytics-donut-legend__dot" style="background:@item.Color"></div>
+                        <span>@item.Name</span>
+                        <span class="analytics-donut-legend__pct">@item.Percentage.ToString("0.0")%</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    public record EventTypeItem(string Name, decimal Percentage, string Color);
+
+    [Parameter] public List<EventTypeItem> Items     { get; set; } = [];
+    [Parameter] public bool                IsLoading  { get; set; }
+
+    private ApexChartOptions<EventTypeItem> _options = new()
+    {
+        Chart = new Chart
+        {
+            Background = "transparent",
+            Toolbar    = new Toolbar { Show = false },
+            Animations = new Animations
+            {
+                Easing = Easing.Easeinout,
+                Speed = 800
+            }
+        },
+        Colors     = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#5a6a85"],
+        Stroke     = new Stroke { Width = [0] },
+        DataLabels = new DataLabels { Enabled = false },
+        Legend     = new Legend { Show = false },
+        Tooltip    = new Tooltip
+        {
+            Theme = Mode.Dark,
+            Y     = new TooltipY { Formatter = "function(v){ return v.toFixed(1)+'%' }" }
+        },
+        PlotOptions = new PlotOptions
+        {
+            Pie = new PlotOptionsPie
+            {
+                Donut = new PlotOptionsDonut
+                {
+                    Size = "65%",
+                    Labels = new DonutLabels { Show = false }
+                }
+            }
+        }
+    };
+}

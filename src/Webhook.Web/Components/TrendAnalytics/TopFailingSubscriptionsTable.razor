@@ -1,0 +1,72 @@
+@* Components/Analytics/Admin/TopFailingSubscriptionsTable.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">⚡</span>
+            <div>
+                <div class="analytics-card__title">Top Failing Subscriptions</div>
+                <div class="analytics-card__subtitle">Highest failure rates in selected period</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--table"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">✅</div>
+            <div>No failing subscriptions</div>
+        </div>
+    }
+    else
+    {
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Subscription</th>
+                    <th>Failed</th>
+                    <th>Failure Rate</th>
+                    <th>Retries</th>
+                    <th>Last Failure</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td class="analytics-table__name">@item.Name</td>
+                        <td>@item.FailedCount.ToString("N0")</td>
+                        <td style="color:@RateColor(item.FailureRate)">
+                            @item.FailureRate.ToString("0.0")%
+                        </td>
+                        <td>@item.Retries.ToString("N0")</td>
+                        <td style="color:var(--text-muted)">@item.LastFailure</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    public record FailingSubscription(
+        string  Name,
+        int     FailedCount,
+        decimal FailureRate,
+        int     Retries,
+        string  LastFailure);
+
+    [Parameter] public List<FailingSubscription> Items     { get; set; } = [];
+    [Parameter] public bool                      IsLoading  { get; set; }
+
+    private static string RateColor(decimal rate) => rate switch
+    {
+        >= 10 => "#ef4444",
+        >= 5  => "#f59e0b",
+        _     => "var(--text-muted)"
+    };
+}

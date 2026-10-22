@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\WebHook.Core\WebHook.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Pages\TrendAnalytics\Shared\" />
+  </ItemGroup>
+
 </Project>

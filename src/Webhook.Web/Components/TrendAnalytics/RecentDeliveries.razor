@@ -1,0 +1,73 @@
+@* Components/Analytics/User/RecentDeliveries.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">📋</span>
+            <div>
+                <div class="analytics-card__title">Recent Deliveries</div>
+            </div>
+        </div>
+        @if (OnViewAll.HasDelegate)
+        {
+            <button class="analytics-view-all" @onclick="() => OnViewAll.InvokeAsync()">
+                View all →
+            </button>
+        }
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--table"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">📋</div>
+            <div>No deliveries in this period</div>
+        </div>
+    }
+    else
+    {
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Date &amp; Time</th>
+                    <th>Event</th>
+                    <th>Subscription</th>
+                    <th>Status</th>
+                    <th>Attempts</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td style="color:var(--text-muted);white-space:nowrap">@item.DeliveredAt</td>
+                        <td class="analytics-table__name">@item.EventType</td>
+                        <td>@item.Subscription</td>
+                        <td>
+                            <span class="analytics-badge @(item.Success ? "analytics-badge--success" : "analytics-badge--failed")">
+                                @(item.Success ? "✓ Success" : "✗ Failed")
+                            </span>
+                        </td>
+                        <td>@item.Attempts</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    public record DeliveryRow(
+        string DeliveredAt,
+        string EventType,
+        string Subscription,
+        bool   Success,
+        int    Attempts);
+
+    [Parameter] public List<DeliveryRow> Items     { get; set; } = [];
+    [Parameter] public bool              IsLoading  { get; set; }
+    [Parameter] public EventCallback     OnViewAll  { get; set; }
+}

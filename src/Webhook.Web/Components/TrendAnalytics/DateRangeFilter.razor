@@ -1,90 +1,87 @@
-﻿@using Webhook.Web.Components.TrendAnalytics.Models
+@* Components/Analytics/Shared/DateRangeFilter.razor *@
 
-<div class="date-filter">
-    <span class="date-filter-label">Period</span>
-    @foreach (var preset in _presets)
-    {
-        <button class="pill-btn @(IsActive(preset.Range) ? "active" : "")"
-                @onclick="() => SelectPreset(preset.Range)">
-            @preset.Label
-        </button>
-    }
-    <button class="pill-btn @(_isCustom ? "active" : "")"
-            @onclick="ToggleCustom">
-        Custom
-    </button>
+<div class="analytics-topbar__right">
+    <div class="analytics-date-picker">
+        <span>📅</span>
+        <span class="analytics-date-picker__label">@ActivePeriodLabel</span>
+        @if (ActivePeriod != Period.Custom)
+        {
+            <span class="analytics-date-picker__range">(@RangeText)</span>
+        }
+    </div>
 
-    @if (_isCustom)
+    <div class="analytics-period-pills">
+        @foreach (var p in Enum.GetValues<Period>())
+        {
+            <button class="analytics-period-pill @(ActivePeriod == p ? "analytics-period-pill--active" : "")"
+                    @onclick="() => SelectPeriod(p)">
+                @PeriodLabel(p)
+            </button>
+        }
+    </div>
+
+    @if (ActivePeriod == Period.Custom)
     {
-        <div class="custom-range">
-            <input type="date" class="date-input"
-                   value="@_customStart.ToString("yyyy-MM-dd")"
-                   @onchange="e => OnCustomStartChanged(e.Value?.ToString())" />
-            <span class="date-separator">to</span>
-            <input type="date" class="date-input"
-                   value="@_customEnd.ToString("yyyy-MM-dd")"
-                   @onchange="e => OnCustomEndChanged(e.Value?.ToString())" />
-        </div>
+        <input type="date" class="analytics-filter-select" style="width:130px"
+               @bind="CustomFrom" @bind:after="NotifyChanged" />
+        <span style="font-size:0.75rem;color:var(--text-muted)">–</span>
+        <input type="date" class="analytics-filter-select" style="width:130px"
+               @bind="CustomTo" @bind:after="NotifyChanged" />
     }
 </div>
 
 @code {
-    [Parameter, EditorRequired] public EventCallback<DateRange> OnRangeChanged { get; set; }
-    [Parameter] public DateRange InitialRange { get; set; } = DateRange.Last30Days();
+    public enum Period { Days7, Days30, Days90, Custom }
 
-    private DateRange _current = DateRange.Last30Days();
-    private DateOnly _customStart;
-    private DateOnly _customEnd;
-    private bool _isCustom;
+    [Parameter] public Period     ActivePeriod { get; set; } = Period.Days30;
+    [Parameter] public DateOnly   CustomFrom   { get; set; } = DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
+    [Parameter] public DateOnly   CustomTo     { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    [Parameter] public EventCallback<(Period Period, DateOnly From, DateOnly To)> OnChanged { get; set; }
 
-    private readonly List<(string Label, DateRange Range)> _presets =
-    [
-        ("7d",  DateRange.Last7Days()),
-        ("30d", DateRange.Last30Days()),
-        ("90d", DateRange.Last90Days()),
-    ];
+    private string ActivePeriodLabel => PeriodLabel(ActivePeriod);
 
-    protected override void OnParametersSet()
+    private string RangeText
     {
-        _current = InitialRange;
-        _customStart = InitialRange.Start;
-        _customEnd = InitialRange.End;
-    }
-
-    private bool IsActive(DateRange range) =>
-        !_isCustom && range == _current;
-
-    private async Task SelectPreset(DateRange range)
-    {
-        _isCustom = false;
-        _current = range;
-        await OnRangeChanged.InvokeAsync(range);
-    }
-
-    private void ToggleCustom() => _isCustom = !_isCustom;
-
-    private async Task OnCustomStartChanged(string? value)
-    {
-        if (DateOnly.TryParse(value, out var date))
+        get
         {
-            _customStart = date;
-            await EmitCustomRange();
+            var (from, to) = GetRange(ActivePeriod);
+            return $"{from:MMM d, yyyy} – {to:MMM d, yyyy}";
         }
     }
 
-    private async Task OnCustomEndChanged(string? value)
+    private static string PeriodLabel(Period p) => p switch
     {
-        if (DateOnly.TryParse(value, out var date))
+        Period.Days7  => "7d",
+        Period.Days30 => "30d",
+        Period.Days90 => "90d",
+        Period.Custom => "Custom",
+        _             => "30d"
+    };
+
+    private static (DateOnly From, DateOnly To) GetRange(Period p)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        return p switch
         {
-            _customEnd = date;
-            await EmitCustomRange();
-        }
+            Period.Days7  => (today.AddDays(-7),  today),
+            Period.Days30 => (today.AddDays(-30), today),
+            Period.Days90 => (today.AddDays(-90), today),
+            _             => (today.AddDays(-30), today)
+        };
     }
 
-    private async Task EmitCustomRange()
+    private async Task SelectPeriod(Period p)
     {
-        if (_customStart >= _customEnd) return;
-        _current = new DateRange(_customStart, _customEnd);
-        await OnRangeChanged.InvokeAsync(_current);
+        ActivePeriod = p;
+        if (p != Period.Custom)
+        {
+            (CustomFrom, CustomTo) = GetRange(p);
+        }
+        await NotifyChanged();
+    }
+
+    private async Task NotifyChanged()
+    {
+        await OnChanged.InvokeAsync((ActivePeriod, CustomFrom, CustomTo));
     }
 }

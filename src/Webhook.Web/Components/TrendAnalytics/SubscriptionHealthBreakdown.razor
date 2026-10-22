@@ -1,0 +1,76 @@
+@* Components/Analytics/User/SubscriptionHealthBreakdown.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">📡</span>
+            <div>
+                <div class="analytics-card__title">Subscription Health</div>
+                <div class="analytics-card__subtitle">Per-subscription delivery stats</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--table"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">📡</div>
+            <div>No subscriptions found</div>
+        </div>
+    }
+    else
+    {
+        <div class="analytics-sub-health-list">
+            @foreach (var item in Items)
+            {
+                <div class="analytics-sub-health-item">
+                    <div class="analytics-sub-health-item__name">@item.Name</div>
+                    <div class="analytics-sub-health-item__stats">
+                        <div class="analytics-sub-stat">
+                            <div class="analytics-sub-stat__value">
+                                @item.Total.ToString("N0")
+                            </div>
+                            <div class="analytics-sub-stat__label">Total</div>
+                        </div>
+                        <div class="analytics-sub-stat">
+                            <div class="analytics-sub-stat__value"
+                                 style="color:@RateColor(item.SuccessRate)">
+                                @item.SuccessRate.ToString("0.0")%
+                            </div>
+                            <div class="analytics-sub-stat__label">Success</div>
+                        </div>
+                        <div class="analytics-sub-stat">
+                            <div class="analytics-sub-stat__value"
+                                 style="color:@(item.DeadLetters > 0 ? "#ef4444" : "var(--text-muted)")">
+                                @item.DeadLetters
+                            </div>
+                            <div class="analytics-sub-stat__label">Dead Letters</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    public record SubscriptionHealthRow(
+        string  Name,
+        int     Total,
+        decimal SuccessRate,
+        int     DeadLetters);
+
+    [Parameter] public List<SubscriptionHealthRow> Items     { get; set; } = [];
+    [Parameter] public bool                        IsLoading  { get; set; }
+
+    private static string RateColor(decimal rate) => rate switch
+    {
+        >= 98 => "#10b981",
+        >= 90 => "#f59e0b",
+        _     => "#ef4444"
+    };
+}

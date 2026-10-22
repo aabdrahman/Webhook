@@ -1,0 +1,53 @@
+@* Components/Analytics/Charts/DeliveryFailuresByResponse.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">🔄</span>
+            <div>
+                <div class="analytics-card__title">Delivery Failures by Response</div>
+                <div class="analytics-card__subtitle">Distribution across error categories</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--chart"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">✅</div>
+            <div>No failures in this period</div>
+        </div>
+    }
+    else
+    {
+        var max = Items.Max(i => i.Count);
+
+        <div class="analytics-failure-list">
+            @foreach (var item in Items.OrderByDescending(i => i.Count))
+            {
+                <div class="analytics-failure-row">
+                    <div class="analytics-failure-row__label">@item.Label</div>
+                    <div class="analytics-failure-row__bar-wrap">
+                        <div class="analytics-failure-row__bar"
+                             style="width:@(max > 0 ? item.Count * 100 / max : 0)%;
+                                    background:@item.Color">
+                        </div>
+                    </div>
+                    <div class="analytics-failure-row__count">@item.Count.ToString("N0")</div>
+                    <div class="analytics-failure-row__pct">@item.Percentage.ToString("0.0")%</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    public record FailureItem(string Label, int Count, decimal Percentage, string Color);
+
+    [Parameter] public List<FailureItem> Items     { get; set; } = [];
+    [Parameter] public bool              IsLoading  { get; set; }
+}

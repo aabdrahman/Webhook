@@ -1,0 +1,263 @@
+
+@page "/user/trend/analytics"
+@attribute [Authorize(Roles = "USER,User")]
+
+<PageTitle>My Deliveries — Analytics</PageTitle>
+
+<div class="analytics-page">
+
+    @* ── Top Bar ──────────────────────────────────────────── *@
+    <div class="analytics-topbar">
+        <div class="analytics-topbar__left" style="flex-direction:row;align-items:center;gap:0.75rem">
+            <span style="font-size:1.375rem">👤</span>
+            <div>
+                <h1 class="analytics-topbar__title">My Deliveries</h1>
+                <p class="analytics-topbar__subtitle">
+                    Track the delivery status and performance of your webhook events.
+                </p>
+            </div>
+        </div>
+        <DateRangeFilter ActivePeriod="DateRangeFilter.Period.Days7"
+                         OnChanged="HandleDateChanged" />
+    </div>
+
+    @* ── Filter Bar ───────────────────────────────────────── *@
+    <FilterBar Events="_events"
+               Subscriptions="_subscriptions"
+               StatusLabel="Delivery Status"
+               OnApply="HandleFilterApply"
+               OnReset="HandleFilterReset" />
+
+    @* ── Page Body ────────────────────────────────────────── *@
+    <div class="analytics-body">
+
+        @* ── KPI Row ─────────────────────────────────────── *@
+        <div class="analytics-kpi-grid">
+            <KpiTile Label="Total Deliveries"
+                     Value="12,482"
+                     Icon="✈️"
+                     Accent="KpiTile.KpiAccent.Blue"
+                     Trend="8%"
+                     TrendUp="true"
+                     TrendNote="vs previous 7 days"
+                     IsLoading="_loading" />
+
+            <KpiTile Label="Success Rate"
+                     Value="98.7%"
+                     Icon="✅"
+                     Accent="KpiTile.KpiAccent.Green"
+                     Trend="0.6pp"
+                     TrendUp="true"
+                     TrendNote="vs previous 7 days"
+                     IsLoading="_loading" />
+
+            <KpiTile Label="Failed Deliveries"
+                     Value="163"
+                     Icon="⚠️"
+                     Accent="KpiTile.KpiAccent.Red"
+                     Trend="5%"
+                     TrendUp="true"
+                     TrendNote="vs previous 7 days"
+                     IsLoading="_loading" />
+
+            <KpiTile Label="Dead Letters"
+                     Value="5"
+                     Icon="🔔"
+                     Accent="KpiTile.KpiAccent.Amber"
+                     Trend="17%"
+                     TrendUp="true"
+                     TrendNote="vs previous 7 days"
+                     IsLoading="_loading" />
+
+            <KpiTile Label="Active Subscriptions"
+                     Value="5"
+                     Icon="👥"
+                     Accent="KpiTile.KpiAccent.Purple"
+                     Trend="+1"
+                     TrendUp="true"
+                     TrendNote="vs previous 7 days"
+                     IsLoading="_loading" />
+        </div>
+
+        @* ── Row 1: Volume + Success Rate ────────────────── *@
+        <div class="analytics-panel-row">
+            <DeliveryVolumeChart TotalData="_volumeTotal"
+                                 SuccessfulData="_volumeSuccess"
+                                 IsLoading="_loading" />
+
+            <SuccessRateTrendChart Data="_successRate"
+                                   IsLoading="_loading" />
+        </div>
+
+        @* ── Row 2: Latency + Failures by Response ───────── *@
+        <div class="analytics-panel-row">
+            <DeliveryLatencyCard P50Data="_latP50"
+                                 P95Data="_latP95"
+                                 P99Data="_latP99"
+                                 IsLoading="_loading" />
+
+            <DeliveryFailuresByResponse Items="_failuresByResponse"
+                                        IsLoading="_loading" />
+        </div>
+
+        @* ── Row 3: Event Distribution + Recent Deliveries ── *@
+        <div class="analytics-panel-row">
+            <EventTypeDistribution Items="_eventTypes"
+                                   IsLoading="_loading" />
+
+            <RecentDeliveries Items="_recentDeliveries"
+                              IsLoading="_loading"
+                              OnViewAll="HandleViewAll" />
+        </div>
+
+        @* ── Row 4: Subscription Health + Failed Deliveries ─ *@
+        <div class="analytics-panel-row">
+            <SubscriptionHealthBreakdown Items="_subHealth"
+                                         IsLoading="_loading" />
+
+            <FailedDeliveriesList Items="_failedDeliveries"
+                                  IsLoading="_loading"
+                                  OnViewAll="HandleViewAll"
+                                  OnRetry="HandleRetry" />
+        </div>
+
+        @* ── Row 5: Delivery Health (full width) ─────────── *@
+        <div class="analytics-panel-row analytics-panel-row--full">
+            <DeliveryHealthCard SuccessRate="98.7m"
+                                ActiveSubscriptions="5"
+                                SubscriptionsWithFailures="1"
+                                DeadLetterCount="5"
+                                SubscriptionsTrend="+1 vs last period"
+                                FailuresTrend="↓ 1 vs last period"
+                                DeadLetterTrend="↓ 17% vs last period"
+                                IsLoading="_loading" />
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private bool _loading = false;
+
+    // ── filter source lists ───────────────────────────────────
+    private List<string> _events = [
+        "user.created", "order.paid", "order.refunded",
+        "customer.updated", "payment.failed"
+    ];
+
+    private List<string> _subscriptions = [
+        "Payment Webhook", "Customer Events",
+        "Order Events", "User Events"
+    ];
+
+    // ── shared label set — last 7 days ────────────────────────
+    private static readonly List<string> _days = Enumerable
+        .Range(0, 7)
+        .Select(i => DateTime.Today.AddDays(i - 6).ToString("MMM d"))
+        .ToList();
+
+    // ── chart data ────────────────────────────────────────────
+    private List<DeliveryVolumeChart.VolumePoint> _volumeTotal = _days
+        .Select(d => new DeliveryVolumeChart.VolumePoint(d, Random.Shared.Next(1400, 2100)))
+        .ToList();
+
+    private List<DeliveryVolumeChart.VolumePoint> _volumeSuccess = [];
+
+    private List<SuccessRateTrendChart.RatePoint> _successRate = _days
+        .Select(d => new SuccessRateTrendChart.RatePoint(d, Math.Round((decimal)(96.5 + Random.Shared.NextDouble() * 2.5), 1)))
+        .ToList();
+
+    private List<DeliveryLatencyCard.LatencyPoint> _latP50 = _days
+        .Select(d => new DeliveryLatencyCard.LatencyPoint(d, Random.Shared.Next(110, 160)))
+        .ToList();
+
+    private List<DeliveryLatencyCard.LatencyPoint> _latP95 = _days
+        .Select(d => new DeliveryLatencyCard.LatencyPoint(d, Random.Shared.Next(700, 1100)))
+        .ToList();
+
+    private List<DeliveryLatencyCard.LatencyPoint> _latP99 = _days
+        .Select(d => new DeliveryLatencyCard.LatencyPoint(d, Random.Shared.Next(2500, 4000)))
+        .ToList();
+
+    private List<DeliveryFailuresByResponse.FailureItem> _failuresByResponse =
+    [
+        new("5xx (Server Error)",  63, 38.7m, "#ef4444"),
+        new("4xx (Client Error)",  39, 23.9m, "#f59e0b"),
+        new("Timeout",             26, 16.0m, "#8b5cf6"),
+        new("Connection Error",    16,  9.8m, "#6366f1"),
+        new("TLS / DNS Error",     10,  6.1m, "#06b6d4"),
+        new("Other",                9,  5.5m, "#5a6a85"),
+    ];
+
+    private List<EventTypeDistribution.EventTypeItem> _eventTypes =
+    [
+        new("user.created",     31.2m, "#3b82f6"),
+        new("order.paid",       24.8m, "#10b981"),
+        new("order.refunded",   16.1m, "#f59e0b"),
+        new("customer.updated", 13.4m, "#8b5cf6"),
+        new("payment.failed",   14.5m, "#ec4899"),
+    ];
+
+    private List<RecentDeliveries.DeliveryRow> _recentDeliveries =
+    [
+        new("May 25, 10:42 AM", "order.paid",       "Payment Webhook", true,  1),
+        new("May 25, 09:18 AM", "user.created",     "Customer Events", true,  1),
+        new("May 25, 08:03 AM", "order.refunded",   "Order Events",    false, 3),
+        new("May 24, 06:47 PM", "payment.failed",   "User Events",     true,  1),
+        new("May 24, 04:12 PM", "customer.updated", "Customer Events", true,  1),
+    ];
+
+    private List<SubscriptionHealthBreakdown.SubscriptionHealthRow> _subHealth =
+    [
+        new("Payment Webhook", 4821, 98.2m, 0),
+        new("Customer Events", 3210, 94.3m, 2),
+        new("Order Events",    2840, 99.0m, 0),
+        new("User Events",     1611, 98.9m, 3),
+    ];
+
+    private List<FailedDeliveriesList.FailedDeliveryRow> _failedDeliveries =
+    [
+        new("dlv_001", "order.refunded",   "Order Events",    "503", "2h ago"),
+        new("dlv_002", "payment.failed",   "Payment Webhook", "500", "5h ago"),
+        new("dlv_003", "user.created",     "Customer Events", "429", "8h ago"),
+        new("dlv_004", "customer.updated", "Customer Events", "503", "12h ago"),
+        new("dlv_005", "order.paid",       "Order Events",    "500", "1d ago"),
+    ];
+
+    // ── lifecycle ─────────────────────────────────────────────
+    protected override void OnInitialized()
+    {
+        _volumeSuccess = _volumeTotal
+            .Select(p => new DeliveryVolumeChart.VolumePoint(
+                p.Date,
+                (int)(p.Value * (decimal)(0.97 + Random.Shared.NextDouble() * 0.02))))
+            .ToList();
+    }
+
+    // ── event handlers ────────────────────────────────────────
+    private void HandleDateChanged((DateRangeFilter.Period Period, DateOnly From, DateOnly To) args)
+    {
+        // TODO: reload data for the selected range
+    }
+
+    private void HandleFilterApply(FilterBar.FilterBarValues values)
+    {
+        // TODO: reload data filtered by Event, Subscription, Status
+    }
+
+    private void HandleFilterReset()
+    {
+        // TODO: reload unfiltered data
+    }
+
+    private void HandleViewAll()
+    {
+        // TODO: navigate to full deliveries list
+    }
+
+    private async Task HandleRetry(string deliveryId)
+    {
+        // TODO: call retry API endpoint for deliveryId
+        await Task.CompletedTask;
+    }
+}

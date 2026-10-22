@@ -1,0 +1,76 @@
+@* Components/Analytics/Shared/FilterBar.razor *@
+
+<div class="analytics-filter-bar">
+    <div class="analytics-filter-group">
+        <div class="analytics-filter-label">Event</div>
+        <select class="analytics-filter-select" @bind="SelectedEvent">
+            <option value="">All events</option>
+            @foreach (var e in Events)
+            {
+                <option value="@e">@e</option>
+            }
+        </select>
+    </div>
+
+    <div class="analytics-filter-group">
+        <div class="analytics-filter-label">Subscription</div>
+        <select class="analytics-filter-select" @bind="SelectedSubscription">
+            <option value="">All subscriptions</option>
+            @foreach (var s in Subscriptions)
+            {
+                <option value="@s">@s</option>
+            }
+        </select>
+    </div>
+
+    <div class="analytics-filter-group">
+        <div class="analytics-filter-label">@StatusLabel</div>
+        <select class="analytics-filter-select" @bind="SelectedStatus">
+            <option value="">All statuses</option>
+            @foreach (var s in Statuses)
+            {
+                <option value="@s">@s</option>
+            }
+        </select>
+    </div>
+
+    @if (AdditionalFilters != null)
+    {
+        @AdditionalFilters
+    }
+
+    <div class="analytics-filter-actions">
+        <button class="analytics-btn analytics-btn--ghost" @onclick="Reset">Reset</button>
+        <button class="analytics-btn analytics-btn--primary" @onclick="Apply">Apply</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<string> Events        { get; set; } = [];
+    [Parameter] public List<string> Subscriptions { get; set; } = [];
+    [Parameter] public List<string> Statuses      { get; set; } = ["Success", "Failed", "Pending"];
+    [Parameter] public string       StatusLabel   { get; set; } = "Status";
+    [Parameter] public RenderFragment? AdditionalFilters { get; set; }
+
+    [Parameter] public EventCallback<FilterBarValues> OnApply { get; set; }
+    [Parameter] public EventCallback               OnReset { get; set; }
+
+    private string SelectedEvent        { get; set; } = "";
+    private string SelectedSubscription { get; set; } = "";
+    private string SelectedStatus       { get; set; } = "";
+
+    private async Task Apply()
+    {
+        await OnApply.InvokeAsync(new FilterBarValues(SelectedEvent, SelectedSubscription, SelectedStatus));
+    }
+
+    private async Task Reset()
+    {
+        SelectedEvent        = "";
+        SelectedSubscription = "";
+        SelectedStatus       = "";
+        await OnReset.InvokeAsync();
+    }
+
+    public record FilterBarValues(string Event, string Subscription, string Status);
+}

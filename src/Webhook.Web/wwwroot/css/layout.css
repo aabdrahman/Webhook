@@ -314,7 +314,7 @@
 
 .page-container {
     max-width: var(--content-max-width);
-    padding: var(--space-4) var(--content-padding);
+    padding: var(--space-2) var(--content-padding);
     margin: 0 auto;
 }
 

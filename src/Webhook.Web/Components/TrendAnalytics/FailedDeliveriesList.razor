@@ -1,0 +1,67 @@
+@* Components/Analytics/User/FailedDeliveriesList.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">❌</span>
+            <div>
+                <div class="analytics-card__title">Failed Deliveries</div>
+                <div class="analytics-card__subtitle">Recent failures with retry action</div>
+            </div>
+        </div>
+        @if (OnViewAll.HasDelegate)
+        {
+            <button class="analytics-view-all" @onclick="() => OnViewAll.InvokeAsync()">
+                View all →
+            </button>
+        }
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--table"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">✅</div>
+            <div>No failed deliveries in this period</div>
+        </div>
+    }
+    else
+    {
+        <div class="analytics-failed-list">
+            @foreach (var item in Items)
+            {
+                <div class="analytics-failed-item">
+                    <div class="analytics-failed-item__dot"></div>
+                    <div class="analytics-failed-item__event">@item.EventType</div>
+                    <div class="analytics-failed-item__sub">@item.Subscription</div>
+                    <div class="analytics-failed-item__code">@item.StatusCode</div>
+                    <div class="analytics-failed-item__time">@item.TimeAgo</div>
+                    @if (OnRetry.HasDelegate)
+                    {
+                        <button class="analytics-retry-btn"
+                                @onclick="() => OnRetry.InvokeAsync(item.DeliveryId)">
+                            Retry
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    public record FailedDeliveryRow(
+        string DeliveryId,
+        string EventType,
+        string Subscription,
+        string StatusCode,
+        string TimeAgo);
+
+    [Parameter] public List<FailedDeliveryRow> Items     { get; set; } = [];
+    [Parameter] public bool                    IsLoading  { get; set; }
+    [Parameter] public EventCallback           OnViewAll  { get; set; }
+    [Parameter] public EventCallback<string>   OnRetry    { get; set; }
+}

@@ -1,0 +1,160 @@
+@* Components/Analytics/Charts/DeliveryLatencyCard.razor *@
+@using ApexCharts
+
+@if (IsLoading)
+{
+    <TableSkeleton Rows="5" Columns="5" ShowHeader="false" />
+}
+else
+{
+
+    <div class="analytics-card">
+        <div class="analytics-card__header">
+            <div class="analytics-card__title-group">
+                <span class="analytics-card__icon">⏱</span>
+                <div>
+                    <div class="analytics-card__title">Delivery Latency</div>
+                    <div class="analytics-card__subtitle">End-to-end delivery time</div>
+                </div>
+            </div>
+            <div class="analytics-legend">
+                <div class="analytics-legend__item">
+                    <div class="analytics-legend__dot" style="background:#10b981"></div>P50
+                </div>
+                <div class="analytics-legend__item">
+                    <div class="analytics-legend__dot" style="background:#3b82f6"></div>P95
+                </div>
+                <div class="analytics-legend__item">
+                    <div class="analytics-legend__dot" style="background:#8b5cf6"></div>P99
+                </div>
+            </div>
+        </div>
+
+        @* Stat row — latest values *@
+        @if (!IsLoading && P50Data.Count > 0)
+        {
+            <div class="analytics-latency-stats">
+                <div class="analytics-latency-stat">
+                    <div class="analytics-latency-stat__label">P50</div>
+                    <div class="analytics-latency-stat__value" style="color:#10b981">
+                        @FormatMs(P50Data.Last().Ms)
+                    </div>
+                </div>
+                <div class="analytics-latency-stat">
+                    <div class="analytics-latency-stat__label">P95</div>
+                    <div class="analytics-latency-stat__value" style="color:#3b82f6">
+                        @FormatMs(P95Data.Last().Ms)
+                    </div>
+                </div>
+                <div class="analytics-latency-stat">
+                    <div class="analytics-latency-stat__label">P99</div>
+                    <div class="analytics-latency-stat__value" style="color:#8b5cf6">
+                        @FormatMs(P99Data.Last().Ms)
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="analytics-chart-area">
+            <ApexChart TItem="LatencyPoint"
+            Options="_options"
+            Height="140">
+
+                <ApexPointSeries TItem="LatencyPoint"
+                Items="P50Data"
+                Name="P50"
+                SeriesType="SeriesType.Line"
+                XValue="p => p.Date"
+                YValue="p => p.Ms"
+                OrderBy="p => p.X" />
+
+                <ApexPointSeries TItem="LatencyPoint"
+                Items="P95Data"
+                Name="P95"
+                SeriesType="SeriesType.Line"
+                XValue="p => p.Date"
+                YValue="p => p.Ms"
+                OrderBy="p => p.X" />
+
+                <ApexPointSeries TItem="LatencyPoint"
+                Items="P99Data"
+                Name="P99"
+                SeriesType="SeriesType.Line"
+                XValue="p => p.Date"
+                YValue="p => p.Ms"
+                OrderBy="p => p.X" />
+
+            </ApexChart>
+        </div>
+    </div>
+}
+@code {
+    public record LatencyPoint(string Date, decimal Ms);
+
+    [Parameter] public List<LatencyPoint> P50Data   { get; set; } = [];
+    [Parameter] public List<LatencyPoint> P95Data   { get; set; } = [];
+    [Parameter] public List<LatencyPoint> P99Data   { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; } = false;
+
+    private static string FormatMs(decimal ms) =>
+        ms >= 1000 ? $"{ms / 1000:0.0}s" : $"{ms:0}ms";
+
+    private ApexChartOptions<LatencyPoint> _options = new()
+    {
+        Chart = new Chart
+        {
+            Background   = "transparent",
+            Toolbar      = new Toolbar { Show = false },
+            Zoom         = new Zoom   { Enabled = false },
+            Animations = new Animations
+            {
+                Easing = Easing.Easeinout,
+                Speed = 800
+            }
+        },
+        Colors = ["#10b981", "#3b82f6", "#8b5cf6"],
+        Stroke = new Stroke
+        {
+            Curve = [Curve.Smooth, Curve.Smooth, Curve.Smooth],
+            Width = [2, 2, 2]
+        },
+        Grid = new Grid
+        {
+            BorderColor     = "#222e47",
+            StrokeDashArray = 3,
+            Yaxis = new GridYAxis { Lines = new Lines { Show = true } },
+            Xaxis = new GridXAxis { Lines = new Lines { Show = false } }
+        },
+        Xaxis = new XAxis
+        {
+            Type   = XAxisType.Category,
+            Labels = new XAxisLabels
+            {
+                Style = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" }
+            },
+            AxisBorder = new AxisBorder { Show = false },
+            AxisTicks  = new AxisTicks  { Show = false }
+        },
+        Yaxis =
+        [
+            new YAxis
+            {
+                Labels = new YAxisLabels
+                {
+                    Style     = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" },
+                    Formatter = "function(v){ return v >= 1000 ? (v/1000).toFixed(1)+'s' : v+'ms' }"
+                }
+            }
+        ],
+        Tooltip = new Tooltip
+        {
+            Theme = Mode.Dark,
+            Y     = new TooltipY
+            {
+                Formatter = "function(v){ return v >= 1000 ? (v/1000).toFixed(1)+'s' : v+'ms' }"
+            }
+        },
+        Legend     = new Legend     { Show    = false },
+        DataLabels = new DataLabels { Enabled = false }
+    };
+}

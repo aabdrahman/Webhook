@@ -1,0 +1,156 @@
+@* Components/Analytics/Admin/PlatformHealthCard.razor *@
+@using ApexCharts
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">💚</span>
+            <div>
+                <div class="analytics-card__title">Platform Health</div>
+            </div>
+        </div>
+        <span class="analytics-badge analytics-badge--healthy">
+            💚 @StatusLabel
+        </span>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--health"></div>
+    }
+    else
+    {
+        <div class="analytics-health-body">
+            @* Gauge *@
+            <ApexChart TItem="GaugePoint"
+                       Options="_gaugeOptions"
+                       Width="120"
+                       Height="120">
+                <ApexPointSeries TItem="GaugePoint"
+                                 Items="_gaugeData"
+                                 Name="Success Rate"
+                                 SeriesType="SeriesType.RadialBar"
+                                 XValue="p => p.Label"
+                                 YValue="p => p.Value" />
+            </ApexChart>
+
+            @* Stat grid *@
+            <div class="analytics-health-stats">
+                <div class="analytics-health-stat">
+                    <div class="analytics-health-stat__label">Success Rate</div>
+                    <div class="analytics-health-stat__value">@SuccessRate.ToString("0.0")%</div>
+                    @if (!string.IsNullOrEmpty(SuccessRateTrend))
+                    {
+                        <div class="analytics-health-stat__trend analytics-health-stat__trend--good">
+                            @SuccessRateTrend
+                        </div>
+                    }
+                </div>
+                <div class="analytics-health-stat">
+                    <div class="analytics-health-stat__label">Subs w/ Failures</div>
+                    <div class="analytics-health-stat__value">@SubscriptionsWithFailures</div>
+                    @if (!string.IsNullOrEmpty(FailuresTrend))
+                    {
+                        <div class="analytics-health-stat__trend analytics-health-stat__trend--up">
+                            @FailuresTrend
+                        </div>
+                    }
+                </div>
+                <div class="analytics-health-stat">
+                    <div class="analytics-health-stat__label">&gt;10% Failure Rate</div>
+                    <div class="analytics-health-stat__value">@HighFailureCount</div>
+                    @if (!string.IsNullOrEmpty(HighFailureTrend))
+                    {
+                        <div class="analytics-health-stat__trend analytics-health-stat__trend--up">
+                            @HighFailureTrend
+                        </div>
+                    }
+                </div>
+                <div class="analytics-health-stat">
+                    <div class="analytics-health-stat__label">Dead Letter Queue</div>
+                    <div class="analytics-health-stat__value">@DeadLetterCount.ToString("N0")</div>
+                    @if (!string.IsNullOrEmpty(DeadLetterTrend))
+                    {
+                        <div class="analytics-health-stat__trend analytics-health-stat__trend--up">
+                            @DeadLetterTrend
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (SubscriptionsWithFailures > 0)
+        {
+            <div class="analytics-attention-bar">
+                <span>ℹ️ @SubscriptionsWithFailures subscription@(SubscriptionsWithFailures == 1 ? "" : "s") require attention</span>
+                <a href="#">View details →</a>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private record GaugePoint(string Label, decimal Value);
+
+    [Parameter] public decimal SuccessRate              { get; set; }
+    [Parameter] public int     SubscriptionsWithFailures { get; set; }
+    [Parameter] public int     HighFailureCount          { get; set; }
+    [Parameter] public int     DeadLetterCount           { get; set; }
+
+    [Parameter] public string? SuccessRateTrend  { get; set; }
+    [Parameter] public string? FailuresTrend     { get; set; }
+    [Parameter] public string? HighFailureTrend  { get; set; }
+    [Parameter] public string? DeadLetterTrend   { get; set; }
+
+    [Parameter] public bool   IsLoading   { get; set; }
+
+    private string StatusLabel => SuccessRate >= 95 ? "Healthy"
+                                : SuccessRate >= 85 ? "Degraded"
+                                : "Critical";
+
+    private List<GaugePoint> _gaugeData => [new("Success Rate", SuccessRate)];
+
+    private string GaugeColor => SuccessRate >= 95 ? "#10b981"
+                               : SuccessRate >= 85 ? "#f59e0b"
+                               : "#ef4444";
+
+    private ApexChartOptions<GaugePoint> _gaugeOptions => new()
+    {
+        Chart = new Chart
+        {
+            Background = "transparent",
+            Toolbar    = new Toolbar { Show = false },
+            Animations = new Animations
+            {
+                Enabled = true,
+                Easing = Easing.Easeinout,
+                Speed = 800
+            }
+        },
+        Colors = [GaugeColor],
+        PlotOptions = new PlotOptions
+        {
+            RadialBar = new PlotOptionsRadialBar
+            {
+                StartAngle = -135,
+                EndAngle   = 135,
+                Hollow     = new Hollow { Size = "65%" },
+                Track      = new Track  { Background = "#222e47", StrokeWidth = "100%" },
+                DataLabels = new RadialBarDataLabels
+                {
+                    Name  = new RadialBarDataLabelsName  { Show = false },
+                    Value = new RadialBarDataLabelsValue
+                    {
+                        Show      = true,
+                        FontSize  = "16px",
+                        FontWeight = "700",
+                        Color     = "#e8edf5",
+                        Formatter = "function(v){ return v.toFixed(0)+'%' }"
+                    }
+                }
+            }
+        },
+        Legend     = new Legend     { Show    = false },
+        DataLabels = new DataLabels { Enabled = false }
+    };
+}

@@ -1,0 +1,135 @@
+@* Components/Analytics/Admin/DeadLetterRateCard.razor *@
+@using ApexCharts
+
+@if (IsLoading)
+{
+    <TableSkeleton Rows="5" Columns="5" ShowHeader="false" />
+}
+else
+{
+
+    <div class="analytics-card">
+        <div class="analytics-card__header">
+            <div class="analytics-card__title-group">
+                <span class="analytics-card__icon">⚠️</span>
+                <div>
+                    <div class="analytics-card__title">Dead Letter Rate</div>
+                    <div class="analytics-card__subtitle">Messages exhausting all retries</div>
+                </div>
+            </div>
+            @if (Data.Count > 0)
+            {
+                <div class="analytics-card__headline" style="color:#8b5cf6">
+                    @Data.Last().Value.ToString("0.0")%
+                </div>
+            }
+        </div>
+
+        <div class="analytics-dead-letter-body">
+            <div class="analytics-dead-letter-chart">
+                <ApexChart TItem="RatePoint"
+                Options="_options"
+                Height="130">
+                    <ApexPointSeries TItem="RatePoint"
+                    Items="Data"
+                    Name="Dead Letter Rate"
+                    SeriesType="SeriesType.Area"
+                    XValue="p => p.Date"
+                    YValue="p => p.Value"
+                    OrderBy="p => p.X" />
+                </ApexChart>
+            </div>
+
+            @if (!IsLoading && Reasons.Any())
+            {
+                <div class="analytics-dead-letter-reasons">
+                    <div class="analytics-dead-letter-reasons__title">Failure Reasons</div>
+                    @foreach (var r in Reasons)
+                    {
+                        <div class="analytics-dead-letter-reasons__item">
+                            <div class="analytics-legend__dot" style="background:@r.Color"></div>
+                            <span>@r.Label</span>
+                            <span class="analytics-dead-letter-reasons__pct">@r.Percentage.ToString("0")%</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+@code {
+    public record RatePoint(string Date, decimal Value);
+    public record ReasonItem(string Label, decimal Percentage, string Color);
+
+    [Parameter] public List<RatePoint>  Data      { get; set; } = [];
+    [Parameter] public List<ReasonItem> Reasons   { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; } = true;
+
+    private ApexChartOptions<RatePoint> _options = new()
+    {
+        Chart = new Chart
+        {
+            Background   = "transparent",
+            Toolbar      = new Toolbar { Show = false },
+            Zoom         = new Zoom   { Enabled = false },
+            Animations = new Animations
+            {
+                Easing = Easing.Easeinout,
+                Speed = 800,
+                AnimateGradually = new AnimateGradually { Enabled = true, Delay = 150 }
+            }
+        },
+        Colors = ["#8b5cf6"],
+        Fill = new Fill
+        {
+            Type    = [FillType.Gradient],
+            Gradient = new FillGradient
+            {
+                ShadeIntensity = 1,
+                OpacityFrom    = new Opacity(0.3d),
+                OpacityTo      = new Opacity(0.0d),
+                Stops          = [0, 100]
+            }
+        },
+        Stroke = new Stroke
+        {
+            Curve = [Curve.Smooth],
+            Width = [2]
+        },
+        Grid = new Grid
+        {
+            BorderColor     = "#222e47",
+            StrokeDashArray = 3,
+            Yaxis = new GridYAxis { Lines = new Lines { Show = true } },
+            Xaxis = new GridXAxis { Lines = new Lines { Show = false } }
+        },
+        Xaxis = new XAxis
+        {
+            Type   = XAxisType.Category,
+            Labels = new XAxisLabels
+            {
+                Style = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" }
+            },
+            AxisBorder = new AxisBorder { Show = false },
+            AxisTicks  = new AxisTicks  { Show = false }
+        },
+        Yaxis =
+        [
+            new YAxis
+            {
+                Labels = new YAxisLabels
+                {
+                    Style     = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" },
+                    Formatter = "function(v){ return v.toFixed(1)+'%' }"
+                }
+            }
+        ],
+        Tooltip = new Tooltip
+        {
+            Theme = Mode.Dark,
+            Y     = new TooltipY { Formatter = "function(v){ return v.toFixed(2)+'%' }" }
+        },
+        Legend     = new Legend     { Show    = false },
+        DataLabels = new DataLabels { Enabled = false }
+    };
+}

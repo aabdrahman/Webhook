@@ -1,0 +1,94 @@
+@* Components/Analytics/Admin/RetryHeatmap.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">🗓</span>
+            <div>
+                <div class="analytics-card__title">Retry Heatmap</div>
+                <div class="analytics-card__subtitle">Daily retry volume — darker = more retries</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--heatmap"></div>
+    }
+    else if (!Cells.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">🗓</div>
+            <div>No retry data available</div>
+        </div>
+    }
+    else
+    {
+        <div class="analytics-heatmap">
+            @* Month labels *@
+            <div class="analytics-heatmap__month-labels">
+                @foreach (var m in MonthLabels)
+                {
+                    <span>@m</span>
+                }
+            </div>
+
+            @* Grid: day labels + cells *@
+            <div class="analytics-heatmap__grid">
+                <div class="analytics-heatmap__day-labels">
+                    @foreach (var d in _dayLabels)
+                    {
+                        <div class="analytics-heatmap__day-label">@d</div>
+                    }
+                </div>
+                <div class="analytics-heatmap__cells">
+                    @foreach (var cell in Cells)
+                    {
+                        <div class="analytics-heatmap__cell analytics-heatmap__cell--l@(cell.Level)"
+                             title="@cell.Date.ToString("MMM d"): @cell.Count retries">
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* Legend *@
+            <div class="analytics-heatmap__legend">
+                <span class="analytics-heatmap__legend-label">Less</span>
+                @for (int i = 0; i <= 4; i++)
+                {
+                    <div class="analytics-heatmap__legend-cell analytics-heatmap__cell--l@i"></div>
+                }
+                <span class="analytics-heatmap__legend-label">More</span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    public record HeatmapCell(DateOnly Date, int Count, int Level);
+
+    [Parameter] public List<HeatmapCell> Cells       { get; set; } = [];
+    [Parameter] public List<string>      MonthLabels { get; set; } = [];
+    [Parameter] public bool              IsLoading    { get; set; }
+
+    private static readonly string[] _dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+
+    /// <summary>
+    /// Helper: build HeatmapCell list from a flat count-per-day dictionary.
+    /// Quantiles the counts into 5 levels (0–4).
+    /// </summary>
+    public static List<HeatmapCell> BuildCells(Dictionary<DateOnly, int> data)
+    {
+        if (data.Count == 0) return [];
+
+        var max = data.Values.Max();
+        return data
+            .OrderBy(kv => kv.Key)
+            .Select(kv =>
+            {
+                var level = max == 0 ? 0 : (int)Math.Round((double)kv.Value / max * 4);
+                return new HeatmapCell(kv.Key, kv.Value, level);
+            })
+            .ToList();
+    }
+}

@@ -1,0 +1,133 @@
+ @* Components/Analytics/Charts/DeliveryVolumeChart.razor *@
+@using ApexCharts
+
+@if (IsLoading)
+{
+    <TableSkeleton Rows="5" Columns="5" ShowHeader="false" />
+}
+else
+{
+
+    <div class="analytics-card">
+        <div class="analytics-card__header">
+            <div class="analytics-card__title-group">
+                <span class="analytics-card__icon">📊</span>
+                <div>
+                    <div class="analytics-card__title">Delivery Volume</div>
+                    <div class="analytics-card__subtitle">Total vs Successful deliveries</div>
+                </div>
+            </div>
+            <div class="analytics-legend">
+                <div class="analytics-legend__item">
+                    <div class="analytics-legend__dot" style="background:#3b82f6"></div>
+                    Total
+                </div>
+                <div class="analytics-legend__item">
+                    <div class="analytics-legend__dot" style="background:#10b981"></div>
+                    Successful
+                </div>
+            </div>
+        </div>
+
+        <div class="analytics-chart-area">
+            <ApexChart TItem="VolumePoint"
+            Options="_options"
+            Height="180">
+
+                <ApexPointSeries TItem="VolumePoint"
+                Items="_total"
+                Name="Total"
+                SeriesType="SeriesType.Area"
+                XValue="p => p.Date"
+                YValue="p => p.Value"
+                OrderBy="p => p.X" />
+
+                <ApexPointSeries TItem="VolumePoint"
+                Items="_successful"
+                Name="Successful"
+                SeriesType="SeriesType.Area"
+                XValue="p => p.Date"
+                YValue="p => p.Value"
+                OrderBy="p => p.X" />
+
+            </ApexChart>
+        </div>
+    </div>
+}
+@code {
+    public record VolumePoint(string Date, decimal Value);
+
+    [Parameter] public List<VolumePoint> TotalData      { get; set; } = [];
+    [Parameter] public List<VolumePoint> SuccessfulData { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; } = false;
+
+    private List<VolumePoint> _total      => TotalData;
+    private List<VolumePoint> _successful => SuccessfulData;
+
+    private ApexChartOptions<VolumePoint> _options = new()
+    {
+        Chart = new Chart
+        {
+            Background   = "transparent",
+            Toolbar      = new Toolbar { Show = false },
+            Zoom         = new Zoom   { Enabled = false },
+            Animations = new Animations
+            {
+                Easing = Easing.Easeinout,
+                Speed = 800
+            }
+        },
+        Colors = ["#3b82f6", "#10b981"],
+        Fill = new Fill
+        {
+            Type    = [FillType.Gradient, FillType.Gradient],
+            Gradient = new FillGradient
+            {
+                ShadeIntensity  = 1,
+                OpacityFrom     = new Opacity(0.3d),
+                OpacityTo       = new Opacity(0.0d),
+                Stops           = [0, 100]
+            }
+        },
+        Stroke = new Stroke
+        {
+            Curve = [Curve.Smooth, Curve.Smooth],
+            Width = [2, 2]
+        },
+        Grid = new Grid
+        {
+            BorderColor = "#222e47",
+            StrokeDashArray = 3,
+            Yaxis = new GridYAxis { Lines = new Lines { Show = true } },
+            Xaxis = new GridXAxis { Lines = new Lines { Show = false } }
+        },
+        Xaxis = new XAxis
+        {
+            Type   = XAxisType.Category,
+            Labels = new XAxisLabels
+            {
+                Style = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" }
+            },
+            AxisBorder = new AxisBorder { Show = false },
+            AxisTicks  = new AxisTicks  { Show = false }
+        },
+        Yaxis =
+        [
+            new YAxis
+            {
+                Labels = new YAxisLabels
+                {
+                    Style     = new AxisLabelStyle { Colors = "#5a6a85", FontSize = "11px" },
+                    Formatter = "function(v){ return v >= 1000 ? (v/1000).toFixed(1)+'k' : v }"
+                }
+            }
+        ],
+        Tooltip = new Tooltip
+        {
+            Theme = Mode.Dark,
+            X     = new TooltipX { Show = true }
+        },
+        Legend = new Legend { Show = false },
+        DataLabels = new DataLabels { Enabled = false }
+    };
+}

@@ -1,0 +1,87 @@
+@* Components/Analytics/Admin/TenantLeaderboard.razor *@
+
+<div class="analytics-card">
+    <div class="analytics-card__header">
+        <div class="analytics-card__title-group">
+            <span class="analytics-card__icon">🏆</span>
+            <div>
+                <div class="analytics-card__title">Tenant Leaderboard</div>
+                <div class="analytics-card__subtitle">Top tenants by delivery volume</div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="analytics-skeleton analytics-skeleton--table"></div>
+    }
+    else if (!Items.Any())
+    {
+        <div class="analytics-empty">
+            <div class="analytics-empty__icon">🏆</div>
+            <div>No tenant data available</div>
+        </div>
+    }
+    else
+    {
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Tenant</th>
+                    <th>Volume</th>
+                    <th>Failure Rate</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{int rank = 1;}
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <td>
+                            <span class="analytics-table__rank">@(rank++)</span>
+                            <span class="analytics-table__name">@item.TenantName</span>
+                        </td>
+                        <td>@item.Volume.ToString("N0")</td>
+                        <td style="color:@RateColor(item.FailureRate)">
+                            @item.FailureRate.ToString("0.0")%
+                        </td>
+                        <td>
+                            <span class="analytics-badge @BadgeClass(item.FailureRate)">
+                                @BadgeLabel(item.FailureRate)
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    public record TenantRow(string TenantName, int Volume, decimal FailureRate);
+
+    [Parameter] public List<TenantRow> Items     { get; set; } = [];
+    [Parameter] public bool            IsLoading  { get; set; }
+
+    private static string RateColor(decimal rate) => rate switch
+    {
+        >= 10 => "#ef4444",
+        >= 5  => "#f59e0b",
+        _     => "var(--text-muted)"
+    };
+
+    private static string BadgeClass(decimal rate) => rate switch
+    {
+        >= 10 => "analytics-badge--failed",
+        >= 5  => "analytics-badge--warn",
+        _     => "analytics-badge--success"
+    };
+
+    private static string BadgeLabel(decimal rate) => rate switch
+    {
+        >= 10 => "High",
+        >= 5  => "Warn",
+        _     => "✓ OK"
+    };
+}
