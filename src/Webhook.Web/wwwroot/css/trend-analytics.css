@@ -195,7 +195,7 @@
 /* ── Page Body ───────────────────────────────────────────── */
 
 .analytics-body {
-    padding: 1.25rem 1.5rem;
+    padding: 1rem 0rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;

@@ -133,7 +133,17 @@ public static class ApplicationServiceExtensions
         {
             opts.GlobalOptions = new ApexChartBaseOptions()
             {
-                Debug = true
+                Debug = true,
+               Xaxis = new ApexCharts.XAxis()
+               {
+                   Labels = new ApexCharts.XAxisLabels()
+                   {
+                       Show = false,
+                       RotateAlways = true,
+                       Rotate = -45
+                   }
+               },
+
                 //Theme = new Theme() { Palette = PaletteType.Palette10, Mode = Mode.Light }
             };
         });
