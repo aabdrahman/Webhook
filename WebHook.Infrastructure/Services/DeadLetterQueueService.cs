@@ -121,7 +121,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
         {
             _logger.Information("Fetching dead letter queue record for delivery - {0} for user - {1}", deliveryId, _authenticatedUserDetails.userId);
 
-            var deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.Id == deliveryId);
+            var deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.WebhookDeliveryId == deliveryId);
 
             if (!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
             {
@@ -131,7 +131,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
                     return GenericResponse<IReadOnlyList<DeadLetterQueueDto>>.Failure(null, "An error occurred while performing operation", HttpStatusCode.BadRequest);
                 }
                 
-                deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.webhookDelivery.WebhookSubscriptionEvent.webhookSubscription.CreatedByUserId == authUserId && x.Id == deliveryId);
+                deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.webhookDelivery.WebhookSubscriptionEvent.webhookSubscription.CreatedByUserId == authUserId && x.WebhookDeliveryId == deliveryId);
 
             }
 

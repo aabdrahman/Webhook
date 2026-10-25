@@ -227,6 +227,46 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         return new WebhookDeliveryService(_serviceProvider.GetRequiredService<RepositoryContext>(), authenticatedUserDetails);
     }
 
+    //-----------------------------
+    // GetDeliveryDetailsAsync
+    //-----------------------------
+
+    private static IAuthenticatedUserDetails BuildAuthenticatedUser(string role, string userId)
+    {
+        var authenticatedUser = new Mock<IAuthenticatedUserDetails>();
+        authenticatedUser.Setup(x => x.assignedRole).Returns(role);
+        authenticatedUser.Setup(x => x.userId).Returns(userId);
+        authenticatedUser.Setup(x => x.emailAddress).Returns(string.Empty);
+        return authenticatedUser.Object;
+    }
+
+    /// <summary>
+    /// Seeds a user and makes them the owner of the subscription used by <see cref="BuildDeliveryEntity"/> by default.
+    /// </summary>
+    private async Task<Guid> SeedDeliveryOwnerAsync(RepositoryContext ctx, string email = "owner@test.com", string userName = "owner")
+    {
+        var seededUser = await TestDataSeeder.SeedUserAsync(ctx, email: email, userName: userName);
+        Guid subscriptionId = _webhookSubscriptions.OrderBy(x => x.Id).First().Id;
+
+        await ctx.WebhookSubscriptions
+            .Where(x => x.Id == subscriptionId)
+            .ExecuteUpdateAsync(setter => setter.SetProperty(x => x.CreatedByUserId, seededUser.Id));
+
+        return seededUser.Id;
+    }
+
+    private async Task<Guid> SeedDeliveryAsync()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var deliveryToCreate = BuildDeliveryEntity();
+
+        await arrangeCtx.AddAsync(deliveryToCreate);
+        await arrangeCtx.SaveChangesAsync();
+
+        return deliveryToCreate.Id;
+    }
+
     [Fact]
     public async Task GetDeliveryDetailsAsync_CancellationRequested_Returns500InternalServerError()
     {
@@ -234,9 +274,7 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
-
-        var sut = CreateSut(_authenticatedUserMock.Object);
+        var sut = CreateSut(BuildAuthenticatedUser("Admin", defaultUserId.ToString()));
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(Guid.NewGuid(), cts.Token);
@@ -249,13 +287,29 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveryDetailsAsync_DeliveryIdNotExists_Returns404NotFound()
+    public async Task GetDeliveryDetailsAsync_NonAdminWithInvalidUserId_Returns400BadRequest()
     {
         //Arrange
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
-        Guid deliveryId = Guid.NewGuid();
-        var sut = CreateSut(_authenticatedUserMock.Object);
+        Guid deliveryId = await SeedDeliveryAsync();
+        var sut = CreateSut(BuildAuthenticatedUser("User", "not-a-guid"));
 
+        //Act
+        var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("An error occurred while performing operation", result.ResponseMessage, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDetailsAsync_Admin_DeliveryIdNotExists_Returns404NotFound()
+    {
+        //Arrange
+        Guid deliveryId = Guid.NewGuid();
+        var sut = CreateSut(BuildAuthenticatedUser("Admin", defaultUserId.ToString()));
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
@@ -270,22 +324,34 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveryDetailsAsync_DeliveryIdExists_Returns200OK()
+    public async Task GetDeliveryDetailsAsync_Admin_UnknownIdWhileOtherDeliveriesExist_Returns404NotFound()
     {
         //Arrange
+        await SeedDeliveryAsync();
         Guid deliveryId = Guid.NewGuid();
+        var sut = CreateSut(BuildAuthenticatedUser("Admin", defaultUserId.ToString()));
+
+        //Act
+        var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.EndsWith(deliveryId.ToString(), result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDetailsAsync_Admin_DeliveryOwnedByAnyUser_Returns200OK()
+    {
+        //Arrange
+        Guid deliveryId = await SeedDeliveryAsync();
         using (var scope = _serviceProvider.CreateScope())
         {
-            var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-            var deliveryToCreate = BuildDeliveryEntity();
-
-            await arrangeCtx.AddAsync(deliveryToCreate);
-            await arrangeCtx.SaveChangesAsync();
-
-            deliveryId = deliveryToCreate.Id;
+            await SeedDeliveryOwnerAsync(scope.ServiceProvider.GetRequiredService<RepositoryContext>());
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
-        var sut = CreateSut(_authenticatedUserMock.Object);
+
+        var sut = CreateSut(BuildAuthenticatedUser("Admin", defaultUserId.ToString()));
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
@@ -296,36 +362,73 @@ public class WebhookDeliveryServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         Assert.NotNull(result.ResponseData);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.Equal("Webhook delivery details fetched successfully.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(deliveryId, result.ResponseData.Id);
     }
 
     [Fact]
-    public async Task GetDeliveryDetailsAsync_InvalidDeliveryId_Returns404NotFound()
+    public async Task GetDeliveryDetailsAsync_User_OwnsDelivery_Returns200OK()
     {
         //Arrange
-
-        Guid deliveryId = Guid.NewGuid();
+        Guid deliveryId = await SeedDeliveryAsync();
+        Guid ownerId;
         using (var scope = _serviceProvider.CreateScope())
         {
-            var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-            var deliveryToCreate = BuildDeliveryEntity(eventName: _webhookEvents.OrderBy(x => Guid.NewGuid()).First().EventType);
-
-            await arrangeCtx.AddAsync(deliveryToCreate);
-            await arrangeCtx.SaveChangesAsync();
-
+            ownerId = await SeedDeliveryOwnerAsync(scope.ServiceProvider.GetRequiredService<RepositoryContext>());
         }
-        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
-        var sut = CreateSut(_authenticatedUserMock.Object);
+
+        var sut = CreateSut(BuildAuthenticatedUser("User", ownerId.ToString()));
 
         //Act
         var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
 
         //Assert
         Assert.NotNull(result);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
+        Assert.NotNull(result.ResponseData);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Equal(deliveryId, result.ResponseData.Id);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDetailsAsync_User_DeliveryOwnedByAnotherUser_Returns404NotFound()
+    {
+        //Arrange
+        Guid deliveryId = await SeedDeliveryAsync();
+        Guid otherUserId;
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var arrangeCtx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+            await SeedDeliveryOwnerAsync(arrangeCtx);
+            otherUserId = (await TestDataSeeder.SeedUserAsync(arrangeCtx, email: "other@test.com", userName: "other")).Id;
+        }
+
+        var sut = CreateSut(BuildAuthenticatedUser("User", otherUserId.ToString()));
+
+        //Act
+        var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
+
+        //Assert — the delivery is hidden rather than reported as forbidden
+        Assert.NotNull(result);
         Assert.False(result.IsSuccessful);
         Assert.Null(result.ResponseData);
         Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
-        Assert.StartsWith("Webhook delivery does not exst -", result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith(deliveryId.ToString(), result.ResponseMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDetailsAsync_User_SubscriptionHasNoOwner_Returns404NotFound()
+    {
+        //Arrange
+        Guid deliveryId = await SeedDeliveryAsync();
+        var sut = CreateSut(BuildAuthenticatedUser("User", Guid.NewGuid().ToString()));
+
+        //Act
+        var result = await sut.GetDeliveryDetailsAsync(deliveryId, CancellationToken.None);
+
+        //Assert
+        Assert.NotNull(result);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using System.Net;
 using WebHook.Core.Constants;
+using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -688,15 +689,57 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     // -------------------------------------------------------------------------
-    // GetDeliveryDeadLetterAsync — not found
+    // GetDeliveryDeadLetterAsync — helpers
+    // -------------------------------------------------------------------------
+
+    private static IAuthenticatedUserDetails BuildAuthenticatedUser(string role, string userId)
+    {
+        var authenticatedUser = new Mock<IAuthenticatedUserDetails>();
+        authenticatedUser.Setup(x => x.assignedRole).Returns(role);
+        authenticatedUser.Setup(x => x.userId).Returns(userId);
+        authenticatedUser.Setup(x => x.emailAddress).Returns(string.Empty);
+        return authenticatedUser.Object;
+    }
+
+    private static IAuthenticatedUserDetails AdminUser() => BuildAuthenticatedUser("Admin", Guid.NewGuid().ToString());
+
+    /// <summary>
+    /// Seeds a user and makes them the owner of the subscription used by <see cref="BuildDelivery"/> by default.
+    /// </summary>
+    private async Task<Guid> SeedDeliveryOwnerAsync(RepositoryContext ctx, string email = "owner@test.com", string userName = "owner")
+    {
+        var seededUser = await TestDataSeeder.SeedUserAsync(ctx, email: email, userName: userName);
+        Guid subscriptionId = _webhookSubscriptions.First(x => x.WebhookEvents.Any()).Id;
+
+        await ctx.WebhookSubscriptions
+            .Where(x => x.Id == subscriptionId)
+            .ExecuteUpdateAsync(setter => setter.SetProperty(x => x.CreatedByUserId, seededUser.Id));
+
+        return seededUser.Id;
+    }
+
+    private async Task<(WebhookDelivery Delivery, WebhookDeadLetterQueue Entry)> SeedDeadLetteredDeliveryAsync(RepositoryContext ctx)
+    {
+        var delivery = BuildDelivery();
+        var dlqEntry = BuildDlqEntry(delivery.Id);
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.WebhookDeadLetterQueues.AddAsync(dlqEntry);
+        await ctx.SaveChangesAsync();
+
+        return (delivery, dlqEntry);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetDeliveryDeadLetterAsync — admin
     // -------------------------------------------------------------------------
 
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_NoRecordsForDelivery_Returns404()
+    public async Task GetDeliveryDeadLetterAsync_Admin_NoRecordsForDelivery_Returns404()
     {
         // Arrange — no DLQ entries for this delivery ID
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, AdminUser());
 
         // Act
         var result = await sut.GetDeliveryDeadLetterAsync(Guid.NewGuid());
@@ -707,39 +750,46 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         Assert.Null(result.ResponseData);
     }
 
-    // -------------------------------------------------------------------------
-    // GetDeliveryDeadLetterAsync — found
-    // -------------------------------------------------------------------------
-
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_RecordsExist_Returns200WithData()
+    public async Task GetDeliveryDeadLetterAsync_Admin_RecordsExist_Returns200WithData()
     {
         // Arrange
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
-        var delivery = BuildDelivery();
-        var dlqEntry = BuildDlqEntry(delivery.Id);
-
-        await ctx.WebhookDeliveries.AddAsync(delivery);
-        await ctx.WebhookDeadLetterQueues.AddAsync(dlqEntry);
-        await ctx.SaveChangesAsync();
+        var sut = CreateSut(ctx, AdminUser());
+        var (delivery, _) = await SeedDeadLetteredDeliveryAsync(ctx);
 
         // Act
         var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.NotNull(result.ResponseData);
         Assert.Single(result.ResponseData);
     }
 
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_RecordsExist_CorrectDeliveryIdReturned()
+    public async Task GetDeliveryDeadLetterAsync_Admin_LookupIsByDeliveryIdNotDeadLetterId()
+    {
+        // Arrange — passing the dead-letter entry's own ID must not match
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var sut = CreateSut(ctx, AdminUser());
+        var (_, dlqEntry) = await SeedDeadLetteredDeliveryAsync(ctx);
+
+        // Act
+        var result = await sut.GetDeliveryDeadLetterAsync(dlqEntry.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDeadLetterAsync_Admin_RecordsExist_FieldsMappedCorrectly()
     {
         // Arrange
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, AdminUser());
         var delivery = BuildDelivery();
         var dlqEntry = BuildDlqEntry(
             delivery.Id,
@@ -765,11 +815,11 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     }
 
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_MultipleEntries_AllReturned()
+    public async Task GetDeliveryDeadLetterAsync_Admin_MultipleEntries_AllReturned()
     {
-        // Arrange — two DLQ entries for same delivery (retried twice)
+        // Arrange — two DLQ entries for same delivery (dead-lettered twice)
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, AdminUser());
         var delivery = BuildDelivery();
         var entry1 = BuildDlqEntry(delivery.Id);
         var entry2 = BuildDlqEntry(delivery.Id);
@@ -782,19 +832,18 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.NotNull(result.ResponseData);
         Assert.Equal(2, result.ResponseData.Count);
     }
 
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_OnlyReturnsEntriesForRequestedDelivery()
+    public async Task GetDeliveryDeadLetterAsync_Admin_OnlyReturnsEntriesForRequestedDelivery()
     {
         // Arrange — two deliveries, each with a DLQ entry
-        _authenticatedUserDetailsMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString("N"));
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx, _authenticatedUserDetailsMock.Object);
-        WebhookDelivery deliveryA = BuildDelivery();
+        var sut = CreateSut(ctx, AdminUser());
+        var deliveryA = BuildDelivery();
         var deliveryB = BuildDelivery();
         var entryA = BuildDlqEntry(deliveryA.Id);
         var entryB = BuildDlqEntry(deliveryB.Id);
@@ -807,17 +856,17 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var result = await sut.GetDeliveryDeadLetterAsync(deliveryA.Id);
 
         // Assert — only delivery A's entry returned
-        Assert.True(result.IsSuccessful);
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
         Assert.Single(result.ResponseData!);
         Assert.Equal(entryA.Id, result.ResponseData!.First().id);
     }
 
     [Fact]
-    public async Task GetDeliveryDeadLetterAsync_NotRetriedEntry_RetriedAtIsNull()
+    public async Task GetDeliveryDeadLetterAsync_Admin_NotRetriedEntry_RetriedAtIsNull()
     {
         // Arrange — entry has never been retried
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, AdminUser());
         var delivery = BuildDelivery();
         var dlqEntry = BuildDlqEntry(delivery.Id, retriedAt: null);
 
@@ -829,7 +878,85 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
         var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
 
         // Assert
-        Assert.Null(result.ResponseData!.First().RetriedAt);
+        Assert.NotNull(result.ResponseData);
+        Assert.Null(result.ResponseData.First().RetriedAt);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetDeliveryDeadLetterAsync — non-admin ownership
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetDeliveryDeadLetterAsync_User_OwnsDelivery_Returns200WithData()
+    {
+        // Arrange
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var (delivery, dlqEntry) = await SeedDeadLetteredDeliveryAsync(ctx);
+        Guid ownerId = await SeedDeliveryOwnerAsync(ctx);
+        var sut = CreateSut(ctx, BuildAuthenticatedUser("User", ownerId.ToString()));
+
+        // Act
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
+
+        // Assert
+        Assert.True(result.IsSuccessful, result.ResponseMessage);
+        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Single(result.ResponseData!);
+        Assert.Equal(dlqEntry.Id, result.ResponseData!.First().id);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDeadLetterAsync_User_DeliveryOwnedByAnotherUser_Returns404()
+    {
+        // Arrange
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var (delivery, _) = await SeedDeadLetteredDeliveryAsync(ctx);
+        await SeedDeliveryOwnerAsync(ctx);
+        Guid otherUserId = (await TestDataSeeder.SeedUserAsync(ctx, email: "other@test.com", userName: "other")).Id;
+        var sut = CreateSut(ctx, BuildAuthenticatedUser("User", otherUserId.ToString()));
+
+        // Act
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
+
+        // Assert — the entries are hidden rather than reported as forbidden
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDeadLetterAsync_User_SubscriptionHasNoOwner_Returns404()
+    {
+        // Arrange
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var (delivery, _) = await SeedDeadLetteredDeliveryAsync(ctx);
+        var sut = CreateSut(ctx, BuildAuthenticatedUser("User", Guid.NewGuid().ToString()));
+
+        // Act
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+    }
+
+    [Fact]
+    public async Task GetDeliveryDeadLetterAsync_NonAdminWithInvalidUserId_Returns400()
+    {
+        // Arrange
+        var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
+        var (delivery, _) = await SeedDeadLetteredDeliveryAsync(ctx);
+        var sut = CreateSut(ctx, BuildAuthenticatedUser("User", "not-a-guid"));
+
+        // Act
+        var result = await sut.GetDeliveryDeadLetterAsync(delivery.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
+        Assert.Equal("An error occurred while performing operation", result.ResponseMessage, ignoreCase: true);
+        Assert.Null(result.ResponseData);
     }
 
     // -------------------------------------------------------------------------
@@ -841,14 +968,17 @@ public class DeadLetterQueueServiceTests : IClassFixture<PostgreSqlFixture>, IAs
     {
         // Arrange
         var ctx = _serviceProvider.GetRequiredService<RepositoryContext>();
-        var sut = CreateSut(ctx);
+        var sut = CreateSut(ctx, AdminUser());
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        // Act & Assert
-        var ex = await Record.ExceptionAsync(
-            () => sut.GetDeliveryDeadLetterAsync(Guid.NewGuid(), cts.Token));
+        // Act
+        GenericResponse<IReadOnlyList<DeadLetterQueueDto>>? result = null;
+        var ex = await Record.ExceptionAsync(async () => result = await sut.GetDeliveryDeadLetterAsync(Guid.NewGuid(), cts.Token));
 
+        // Assert
         Assert.Null(ex);
+        Assert.NotNull(result);
+        Assert.Equal(HttpStatusCode.InternalServerError, result.HttpStatusCode);
     }
 }
