@@ -1,6 +1,6 @@
 # WebhookHub
 
-A production-grade webhook notification service built with .NET 10. WebhookHub allows internal business applications to publish events that are reliably delivered as signed HTTP POST requests to registered subscriber callback URLs — with automatic retry, dead-lettering, escalation notifications, and full audit trails.
+A production-grade webhook notification service built with .NET 10. WebhookHub allows internal business applications to publish events that are reliably delivered as signed HTTP POST requests to registered subscriber callback URLs — with automatic retry, dead-lettering, escalation notifications, and full audit trails. It ships with a Blazor WebAssembly portal for subscribers and administrators.
 
 Open source and free to use.
 
@@ -13,6 +13,8 @@ Open source and free to use.
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
+- [Web Portal](#web-portal)
+- [Service Client Onboarding](#service-client-onboarding)
 - [Delivery Pipeline](#delivery-pipeline)
 - [Background Workers](#background-workers)
 - [Security](#security)
@@ -28,13 +30,13 @@ Open source and free to use.
 
 ## Overview
 
-WebhookHub sits between your internal services and your subscribers. An internal application raises an event — WebhookHub validates it, fans it out to every subscriber registered for that event type, and handles the full delivery lifecycle: retry on failure, escalation emails when an endpoint is slow, dead-lettering when all retries are exhausted, and admin-initiated manual retry for dead-lettered deliveries.
+WebhookHub sits between your internal services and your subscribers. An internal application raises an event — WebhookHub validates it, fans it out to every active subscription registered for that event type, and handles the full delivery lifecycle: retry on failure, escalation emails when an endpoint is slow, dead-lettering when all retries are exhausted, and admin-initiated manual retry for dead-lettered deliveries.
 
 ```
 Internal Service (onboarded with ClientId + ClientKey)
       │
       ▼
-POST /api/webhookevent
+POST /api/WebhookEvent
 X-Client-Id: order-service-prod
 X-Client-Key: <raw key>
       │
@@ -42,60 +44,59 @@ X-Client-Key: <raw key>
 Client credential validation → Event type authorization
       │
       ▼
-Validation → Persist → Raise to Channel
+Validation → Persist (Pending) → Write to EventRaised channel
       │                       │
       │                       ▼
-      │             EventRaisedWorker
-      │                       │
-      │    ┌──────────────────┘
-      │    │  PendingRaisedEventWorker
-      │    │  (recovers events not picked
-      │    │   up from channel — polls DB
-      │    │   for Pending events past threshold)
-      │    └──────────────────┐
+      │             EventRaisedWorker ◄──────────────┐
+      │                       │                      │
+      │                       │       PendingRaisedEventsWorker
+      │                       │       (re-queues events still Pending
+      │                       │        past the threshold)
       │                       ▼
-      │              Create Delivery Records
+      │          Create one delivery per active subscription
       │                       │
       │                       ▼
-      │             DeliveryWorker (two-phase claim)
+      │      WebhookDeliveryProcessorWorker (first attempt, two-phase claim)
       │                       │
       │       ┌───────────────┴───────────────┐
       │       ▼                               ▼
-      │  Delivered                         Failed
+      │  Delivered                         Failed ◄──── StaleClaimedDeliverReleaseWorker
+      │                                       │         (releases claims whose lock expired)
+      │                                       ▼
+      │                        RetryPendingDeliveriesWorker
       │                                       │
-      │                             ┌─────────┴──────────┐
-      │                             ▼                     ▼
-      │                        Retry Queue         Max Retries Exceeded
-      │                             │                     │
-      │           StaleClaimedDeliveryReleaseWorker        ▼
-      │           (releases locked-past-lease        Dead Letter Queue
-      │            deliveries back to Failed)              │
-      │                                                    ▼
-      │                                       Escalation Email
-      │                                                    │
-      │                                                    ▼
-      └─────────────────────────────────── Admin Manual Retry
+      │                            ┌──────────┴──────────┐
+      │                            ▼                     ▼
+      │                      Delivered            Max attempts exceeded
+      │                                                  │
+      │                                                  ▼
+      │                                         Dead Letter Queue
+      │                                                  │
+      │                                                  ▼
+      │                                          Escalation Email
+      │                                                  │
+      │                                                  ▼
+      └────────────────────────────────────── Admin Manual Retry (back to Pending)
 ```
 
 ---
 
 ## Architecture
 
-WebhookHub uses a clean three-project architecture:
+WebhookHub is a .NET solution (`Webhook.slnx`) with three back-end projects, a Blazor front end and one test project:
 
 ```
-WebhookHub.Api             — ASP.NET Core 10 Web API
-                             Controllers, filters, middleware, health checks
-WebhookHub.Core            — Domain entities, DTOs, interfaces, constants
-WebhookHub.Infrastructure  — EF Core, Identity, background workers, services, security
+WebHook.Api             — ASP.NET Core 10 Web API
+                          Controllers, filters, middleware, service registration, health endpoints
+WebHook.Core            — Domain entities, DTOs, interfaces, constants, mappers, configuration models
+WebHook.Infrastructure  — EF Core (PostgreSQL), Identity, background workers, services, security,
+                          health checks, migrations
+src/Webhook.Web         — Blazor WebAssembly portal for subscribers and administrators
+tests/WebHook.Tests     — Unit and integration tests (xUnit, Moq, Testcontainers PostgreSQL,
+                          WebApplicationFactory)
 ```
 
-Test projects:
-
-```
-WebHook.UnitTests          — Service-level tests with xUnit, Moq, and Testcontainers PostgreSQL
-WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and Moq
-```
+All public types in Core, Infrastructure and Api carry XML documentation comments, and the build generates the documentation files so they show in IntelliSense and the OpenAPI document.
 
 ---
 
@@ -103,38 +104,40 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 
 ### Service Client Onboarding
 - Internal services are onboarded by an Admin before they can publish events
-- Each client is issued a unique `ClientId` (Admin-defined) and a cryptographically random `ClientKey` shown once at onboarding and never stored in plaintext
+- Each client is issued a unique `ClientId` (Admin-defined) and a cryptographically random `ClientKey` shown once at onboarding and stored only as a PBKDF2 hash
 - Clients present `X-Client-Id` and `X-Client-Key` headers on every publish request
-- Each client is authorised to publish only the event types assigned to it at onboarding — attempts to publish unauthorised event types are rejected with `403 Forbidden`
+- Each client is authorised to publish only the event types assigned to it — attempts to publish unauthorised event types are rejected with `403 Forbidden`
 - Admins can assign or remove event catalog entries per client at any time without re-onboarding
 - Client keys can be rotated on demand — the previous key is invalidated immediately
-- Clients can be deactivated and reactivated independently of their event catalog assignments
+- Clients can be deactivated and reactivated. Deactivation also removes the client's event type assignments; they are not restored on reactivation
 
 ### Event Publishing
 - Internal services raise events via a simple POST endpoint — authenticated by `ClientId` and `ClientKey`
 - Events are validated against a catalog of known event types with declared field schemas
 - JSON payloads are validated against the catalog schema at publish time — missing or invalid fields are rejected with a descriptive error identifying each failing field
-- Correlation IDs group related events from a single business transaction
+- Correlation IDs group related events from a single business transaction; the correlation ID and event type are unique together, so the same event cannot be raised twice
 
 ### Reliable Delivery
-- Automatic fan-out to every subscriber registered for the raised event type
+- Automatic fan-out to every active subscription registered for the raised event type
 - **Two-phase claim/process pattern** — deliveries are locked with a worker identity and expiry timestamp before any HTTP attempt, preventing duplicate delivery when multiple worker instances run concurrently
-- Configurable retry with computed `nextRetryAt` timestamps
-- Slow endpoint detection — if delivery duration exceeds the configured threshold an email notification is sent to the subscriber
-- Dead-lettering when a delivery exhausts its maximum retry count
-- Escalation email to the subscriber contact on dead-letter transition
-- Admin-initiated manual retry for dead-lettered deliveries with justification
+- Linear retry back-off with computed `NextRetryAt` timestamps
+- Request timeouts are recorded as failed attempts (`408`) without interrupting the rest of the batch
+- Slow endpoint detection — if an attempt takes longer than the configured threshold, a notification email is sent to the subscription contact
+- Dead-lettering when a delivery exhausts its attempts for the current retry cycle
+- Escalation email to the subscription contact on dead-letter transition
+- Admin-initiated manual retry for dead-lettered deliveries, with a justification recorded for audit and a configurable limit on retry cycles
 
 ### Event Recovery
-- If an event is published to the in-memory channel but the `EventRaisedWorker` does not process it — due to a crash, restart, or channel overflow — the `PendingRaisedEventWorker` periodically polls the database for events that remain in `Pending` status beyond a configured threshold and re-queues them for fan-out, ensuring no published event is silently lost
+- If an event is persisted but the `EventRaisedWorker` never processes it — due to a crash, restart, or a lost channel message — the `PendingRaisedEventsWorker` periodically finds events still in `Pending` status beyond a configured threshold and writes them back to the channel, so no published event is silently lost
 
 ### Stale Delivery Recovery
-- A dedicated background worker monitors deliveries locked beyond their `LockedUntil` timestamp — indicating a crashed worker — and releases them back to the failed queue for reprocessing
+- A dedicated background worker finds deliveries still `Processing` well after their `LockedUntil` timestamp — indicating a crashed worker — and releases them as `Failed` so the retry worker picks them up
 
 ### Webhook Signatures
-- Every delivery includes `X-Webhook-Timestamp` (Unix seconds) and `X-Webhook-Signature: sha256=<hmac>` headers
+- Every delivery includes `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Event` and `X-Webhook-Signature: sha256=<hmac>` headers
 - The signature is `HMAC-SHA256("{timestamp}.{body}")`, keyed with the UTF-8 bytes of the subscription secret, so a captured request cannot be replayed with a new timestamp
-- The secret is shown on the subscription's detail page (`GET` by ID); it is rotated when a subscription is reactivated
+- The secret is shown on the subscription's detail page (`GET` by ID); it is never included in list responses and is rotated when a subscription is reactivated
+- Secrets are encrypted at rest with AES-GCM
 
 To verify a delivery, a subscriber should:
 1. Read the raw request body and the `X-Webhook-Timestamp` and `X-Webhook-Signature` headers.
@@ -143,17 +146,23 @@ To verify a delivery, a subscriber should:
 4. Reject the request if the timestamp is more than a few minutes from the current time.
 
 ### Identity and Access
-- JWT authentication with refresh token support
-- OTP flow for sensitive self-service operations — users must complete OTP verification to obtain an operation token before deactivating their own account
-- Admin bypass — Admins can perform account operations directly without an OTP token
-- Role-based access — `USER` and `Admin` roles enforced per endpoint
+- JWT authentication with rotating refresh tokens (refresh before the access token expires)
+- OTP flow for sensitive self-service operations — password reset and self-deactivation require a verified OTP and a short-lived, purpose-bound operation token sent in the `X-Operation-Token` header
+- Admin bypass — Admins can deactivate accounts directly without an OTP token
+- Role-based access — `User` and `Admin` roles enforced per endpoint
+- Data scoping — users only see their own subscriptions, deliveries, delivery attempts and dead-letter entries; admins see everything
 - Custom JTI cache validation on every authenticated request — revoked tokens are rejected immediately without waiting for expiry
-- Rate limiting on sensitive endpoints — OTP request and validation are rate limited per email address to prevent brute force
+- Rate limiting on sensitive endpoints — OTP request and validation are limited per email address, and selected endpoints are limited per user
 
 ### Event Catalog Management
-- Admins define subscribable event types with their available field schemas
+- Admins define subscribable event types with their available field schemas (`string`, `int`, `bool`, `guid`, `datetime`, `double`, `decimal`, `float`)
 - Event types can be activated or deactivated without deletion
 - Subscribers choose which events to subscribe to per subscription
+
+### Dashboards and Reporting
+- Admin dashboard — platform summary, most recent events, most-raised event types and top failing subscriptions
+- User dashboard — the user's recent deliveries, top failing subscriptions and a summary for a chosen date range
+- Trend analytics — in progress and currently hidden in the portal
 
 ---
 
@@ -163,6 +172,7 @@ To verify a delivery, a subscriber should:
 |---|---|
 | Runtime | .NET 10 |
 | Web framework | ASP.NET Core 10 |
+| Front end | Blazor WebAssembly |
 | ORM | EF Core 10 with Npgsql |
 | Database | PostgreSQL |
 | Identity | ASP.NET Core Identity |
@@ -170,12 +180,13 @@ To verify a delivery, a subscriber should:
 | Background workers | `BackgroundService` / `IHostedService` |
 | In-process messaging | `System.Threading.Channels` (bounded) |
 | Payload signing | HMAC-SHA256 |
+| Secret encryption | AES-GCM |
 | Data protection | ASP.NET Core Data Protection |
+| Caching | `IMemoryCache` |
 | Logging | Serilog |
 | Rate limiting | ASP.NET Core `RateLimiter` middleware |
-| API documentation | Scalar (`/scalar/v1`) |
-| Unit tests | xUnit, Moq, Testcontainers PostgreSQL |
-| Integration tests | xUnit, `WebApplicationFactory`, Moq |
+| API documentation | OpenAPI + Scalar (`/scalar/v1`, Development) and ReDoc (`/webhookapi/api-docs`) |
+| Tests | xUnit, Moq, Testcontainers PostgreSQL, `WebApplicationFactory` |
 
 ---
 
@@ -185,12 +196,18 @@ To verify a delivery, a subscriber should:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL 14+](https://www.postgresql.org/download/)
+- [Docker](https://www.docker.com/) — only needed to run the tests
 
 ### Environment Variables
 
-```bash
-webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
-```
+| Variable | Required | Purpose |
+|---|---|---|
+| `webhook_secret_key` | Yes | JWT signing key — at least 32 characters |
+| `env_webhook_encrypt_key` | Yes | Hex-encoded AES key (16, 24 or 32 bytes) used to encrypt subscription signing secrets |
+| `env_webhook_encrypt_iv` | Only for existing data | Hex-encoded IV used by the previous AES-CBC format. Needed only while secrets encrypted before the AES-GCM change remain in the database |
+| `SmtpClientPassword` | Yes, to send email | Password for the SMTP account in `EmailSmtpSettings` |
+
+Keep these out of source control. In production, prefer a secrets manager.
 
 ### Configuration (`appsettings.json`)
 
@@ -208,7 +225,7 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
   },
   "CorsPolicy": {
     "AllowedMethods": "POST,GET,PUT,DELETE,OPTIONS",
-    "AllowedOrigins": "https://localhost:<port>",
+    "AllowedOrigins": "https://localhost:<portal-port>",
     "AllowedHeaders": "X-Operation-Token"
   },
   "SignatureSecretKey": {
@@ -217,7 +234,8 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
   "WebhookDeliveryWorker": {
     "DeliveryProcessorIntervalSeconds": 60,
     "TotalBatchSize": 10,
-    "DeliveryLockDuration": 300
+    "DeliveryLockDuration": 300,
+    "ThresholdDuration": 125000
   },
   "RetryDeliveriesAfterFailed": {
     "ThresholdDuration": 125000,
@@ -232,9 +250,9 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
   },
   "EmailSmtpSettings": {
     "Host": "",
-    "Port": "",
+    "Port": 587,
     "Username": "",
-    "Password": ""
+    "SenderEmail": ""
   },
   "EmailProcessorWorker": {
     "ProcessingIntervalInSeconds": 10,
@@ -252,8 +270,8 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
     "MaximumAuthenticationAttempt": 3
   },
   "JwtSettings": {
-    "ValidIssuer": "https://localhost:<port>",
-    "ValidAudiences": "https://localhost:<port>",
+    "ValidIssuer": "https://localhost:<api-port>",
+    "ValidAudiences": "https://localhost:<portal-port>",
     "TokenExpirationAfterInSeconds": 600,
     "RefreshTokenExpirationAfterInSeconds": 60000
   },
@@ -268,29 +286,67 @@ webhook_secret_key=<your-JWT-signing-key-minimum-32-characters>
 }
 ```
 
+Notes:
+- Durations named `...Seconds` are in seconds; `DeliveryLockDuration` is in seconds and `ThresholdDuration` is in milliseconds.
+- `MaximumAttendedCount` is the number of attempts allowed per retry cycle.
+- `JwtSettings:ValidAudiences` is a `;`-separated list. The caller's `Origin` header must match one of them to sign in, so it must include the portal's origin.
+
 ### Apply Migrations
 
 WebhookHub does not run `Database.Migrate()` at startup. Migrations are scripted and applied before deployment:
 
 ```powershell
 dotnet ef migrations script <LastAppliedMigration> <NewMigration> `
+    --project WebHook.Infrastructure `
+    --startup-project WebHook.Api `
     --idempotent `
     --output ./scripts/delta.sql
 ```
 
-Run the generated script against your PostgreSQL database, then start the application.
+Run the generated script against your PostgreSQL database, then start the application. The analytics dashboards depend on database views and a function created by migrations, so apply every migration, including the SQL-only ones.
 
 ### Run the API
 
 ```bash
-dotnet run --project WebhookHub.Api
+dotnet run --project WebHook.Api
 ```
 
-API documentation available at:
+API documentation is available at:
 
 ```
-https://localhost:<port>/scalar/v1
+https://localhost:<api-port>/scalar/v1             (Development only)
+https://localhost:<api-port>/webhookapi/api-docs   (ReDoc)
 ```
+
+---
+
+## Web Portal
+
+`src/Webhook.Web` is a Blazor WebAssembly app that calls the API.
+
+| Area | Pages |
+|---|---|
+| Authentication | Login, register, request OTP, validate OTP, reset password |
+| User | Dashboard, subscriptions (list, create, detail with signing secret), deliveries and attempts, dead letters |
+| Admin | Dashboard, users, event catalog, service clients, health |
+| Trend analytics | In progress; hidden from the navigation for now |
+
+The API base URL is read at startup from `wwwroot/environment/config.json`:
+
+```json
+{
+  "AppBaseUrl": "https://localhost:<api-port>/",
+  "ApiTimeOutInSeconds": 30
+}
+```
+
+Run it with:
+
+```bash
+dotnet run --project src/Webhook.Web
+```
+
+Make sure the portal's origin is listed in both `CorsPolicy:AllowedOrigins` and `JwtSettings:ValidAudiences`.
 
 ---
 
@@ -312,7 +368,7 @@ Authorization: Bearer <admin-token>
 }
 ```
 
-The `clientId` must be unique, lowercase alphanumeric with hyphens only, and follow the convention `{service-name}-{environment}` — for example `order-service-prod` or `payment-gateway-staging`.
+The `clientId` must be unique, lowercase alphanumeric with hyphens only, and follow the convention `{service-name}-{environment}` — for example `order-service-prod` or `payment-gateway-staging`. Every event type in `allowedEventTypes` must exist and be active.
 
 The response includes the raw `ClientKey` — **store it securely, it will not be shown again**:
 
@@ -329,14 +385,14 @@ The response includes the raw `ClientKey` — **store it securely, it will not b
 The onboarded service passes its credentials in request headers:
 
 ```
-POST /api/webhookevent
+POST /api/WebhookEvent
 X-Client-Id:  order-service-prod
 X-Client-Key: <raw key>
 Content-Type: application/json
 
 {
   "eventType":     "OrderCreated",
-  "payload":       "{ ... }",
+  "payLoad":       "{ ... }",
   "source":        "order-service-prod",
   "correlationId": "..."
 }
@@ -353,19 +409,19 @@ PUT /api/WebhookServiceClients/request-new-key
 Authorization: Bearer <admin-token>
 
 {
-  "clientId":      "order-service-prod",
-  "justification": "Suspected key compromise."
+  "serviceName": "Order Management Service",
+  "clientId":    "order-service-prod"
 }
 ```
 
-The previous key is invalidated immediately. The consuming service must update its stored key before making further publish requests.
+The response contains the new raw key. The previous key is invalidated immediately, so the consuming service must update its stored key before making further publish requests.
 
 ### Managing Catalog Assignments
 
-Event type permissions can be adjusted after onboarding without re-issuing credentials:
+Event type permissions can be adjusted after onboarding without re-issuing credentials. `{id}` is the service client's internal ID:
 
 ```
-# Add a new event type
+# Add a new event type (restores a previously removed assignment if there is one)
 POST /api/WebhookServiceClients/{id}/eventcatalogs?catalogName=OrderShipped
 
 # Remove an event type
@@ -374,7 +430,7 @@ DELETE /api/WebhookServiceClients/{id}/eventcatalogs?catalogName=OrderCancelled
 
 ### CORS and Service-to-Service Calls
 
-Browser-based callers (the future v2 dashboard) are restricted by the CORS allowlist — only origins registered in `CorsPolicy:AllowedOrigins` can make cross-origin requests from a browser. Server-to-server callers (internal services publishing events) are not subject to CORS — the `X-Client-Id` / `X-Client-Key` credential pair is the authentication boundary for those callers.
+Browser-based callers (the web portal) are restricted by the CORS allowlist — only origins registered in `CorsPolicy:AllowedOrigins` can make cross-origin requests from a browser. Server-to-server callers (internal services publishing events) are not subject to CORS — the `X-Client-Id` / `X-Client-Key` credential pair is the authentication boundary for those callers.
 
 ---
 
@@ -382,85 +438,86 @@ Browser-based callers (the future v2 dashboard) are restricted by the CORS allow
 
 The delivery pipeline is split across multiple background workers communicating through an in-memory channel and the database.
 
+### Statuses
+
+| Event status | Meaning |
+|---|---|
+| `Pending` | Persisted; deliveries not yet created |
+| `Processing` | Deliveries created for every active subscription (the event stays in this status) |
+| `Processed` | Fanned out, but there were no active subscribers |
+
+| Delivery status | Meaning |
+|---|---|
+| `Pending` | Waiting for its first attempt (or re-queued by an admin manual retry) |
+| `Processing` | Claimed and locked by a worker; an HTTP attempt is in progress |
+| `Delivered` | The subscriber returned a 2xx response |
+| `Failed` | The last attempt failed; waiting for the retry worker |
+| `DeadLetter` | Attempts for the current retry cycle exhausted |
+
 ### Step 1 — Event Publishing
 
-An onboarded internal service calls:
-
-```
-POST /api/webhookevent
-```
-
-with `X-Client-Id` and `X-Client-Key` headers alongside the event payload.
+An onboarded internal service calls `POST /api/WebhookEvent` with `X-Client-Id` and `X-Client-Key` headers alongside the event payload.
 
 ### Step 2 — Validation and Persistence
 
 The system:
-1. Validates the `ClientId` and `ClientKey` against the `ServiceClients` table
+1. Validates the `ClientId` and `ClientKey` against the stored, hashed client key
 2. Checks the event type is in the client's authorised catalog
 3. Checks the correlation ID is unique for the event type
 4. Validates the JSON payload against the catalog's declared field schema — returns `400` with each failing field named if validation fails
 5. Persists the event with status `Pending`
-6. Publishes the new event ID to the `EventRaised` in-memory channel
+6. Writes the new event ID to the `EventRaised` in-memory channel
 
-### Step 3–7 — Fan-out (EventRaisedWorker)
+### Step 3 — Fan-out (EventRaisedWorker)
 
-The `EventRaisedWorker` listens to the channel. On receiving an event ID:
+The `EventRaisedWorker` reads the channel. For each event ID it:
 
-1. Confirms the event is still in `Pending` status in the database
-2. Queries the subscription-to-event-catalog join table to find all subscriptions registered for the event type
-3. Creates a `WebhookDelivery` record with status `Pending` for each matching subscription
-4. Saves all delivery records
-5. Marks the event as `Processed`
+1. Claims the event inside a transaction with `SELECT … FOR UPDATE SKIP LOCKED`, only while it is still `Pending`
+2. Finds every **active** subscription linked to the event type
+3. Creates a `WebhookDelivery` with status `Pending` for each one
+4. Marks the event `Processing` (or `Processed` if there were no subscribers) and commits
 
-### Event Recovery (PendingRaisedEventWorker)
+Events that fail to process are written back to the channel.
 
-The in-memory channel is not durable — if the application restarts, is redeployed, or the `EventRaisedWorker` crashes after an event was persisted but before it was read from the channel, the event ID is lost from the channel but the event remains in the database as `Pending`.
+### Event Recovery (PendingRaisedEventsWorker)
 
-The `PendingRaisedEventWorker` guards against this. On a configurable interval (default 300 seconds) it polls the database for events that:
-- Are still in `Pending` status
-- Have been pending longer than the configured threshold (default 30 minutes)
+The in-memory channel is not durable — if the application restarts or the `EventRaisedWorker` crashes after an event was persisted but before it was read, the event ID is lost from the channel while the event remains `Pending` in the database.
 
-Any such events are treated as missed by the channel and re-queued directly for fan-out — bypassing the channel entirely and driving the same fan-out logic the `EventRaisedWorker` would have run. This ensures no published event is silently dropped regardless of application lifecycle events.
+The `PendingRaisedEventsWorker` guards against this. On a configurable interval (default 300 seconds) it finds events that are still `Pending` and older than the configured threshold (default 30 minutes), and writes their IDs back to the channel for the `EventRaisedWorker` to fan out.
 
-### Step 8–11 — Delivery (DeliveryWorker)
+### Step 4 — First Attempt (WebhookDeliveryProcessorWorker)
 
-The `DeliveryWorker` polls the delivery table for `Pending` records on a configurable interval:
+The `WebhookDeliveryProcessorWorker` polls on a configurable interval:
 
-1. Selects up to the configured `TotalBatchSize` pending deliveries
-2. **Two-phase claim** — marks selected deliveries as `Processing` with `LockedBy = workerInstanceId` and `LockedUntil = now + DeliveryLockDuration` before any HTTP attempt, preventing duplicate delivery across worker instances
-3. For each claimed delivery, retrieves the subscriber callback URL and secret key
-4. Sends an HTTP POST with the event payload and an `X-Webhook-Signature` HMAC header
-5. Records a `DeliveryAttempt` with request payload, response body, HTTP status, and `DeliveredAt` timestamp
+1. **Claim** — in a transaction, selects up to `TotalBatchSize` `Pending` deliveries with no retry scheduled and no live lock (`FOR UPDATE SKIP LOCKED`), marks them `Processing` with `LockedBy = workerId` and `LockedUntil = now + DeliveryLockDuration`, and commits
+2. **Process** — for each claimed delivery, decrypts the subscription secret and sends an HTTP POST with the signature headers
+3. **Record** — saves a `WebhookDeliveryAttempt` with the response body, HTTP status code, duration and timestamp
 
-**On success:**
-- Marks delivery as `Delivered`
-- Checks delivery duration against the configured `ThresholdDuration` — if exceeded, sends a slow endpoint notification email to the subscriber
+**On success (2xx):** marks the delivery `Delivered` and clears the lock.
 
-**On failure:**
-- Increments `RetryCount`
-- Computes the next `RetryAt` timestamp based on configured backoff
-- Sets status to `Failed`
+**On failure (non-2xx, connection error, or timeout):** increments `RetryCount`, sets status `Failed`, computes `NextRetryAt` and clears the lock.
 
-**On max retries reached:**
-- Sets delivery status to `DeadLetter`
-- Creates a `DeadLetterQueue` record linked to the delivery
-- Sends an escalation notification email to the subscription contact
+**Slow endpoint:** if the attempt took longer than `ThresholdDuration` (milliseconds), a slow-endpoint email is queued to the subscription contact.
 
-### Step 12 — Retry Processing
+### Step 5 — Retry Processing (RetryPendingDeliveriesWorker)
 
-A background worker polls for `Failed` deliveries where `DateTimeOffset.UtcNow >= NextRetryAt` and reprocesses them through the same two-phase claim and delivery flow.
+The `RetryPendingDeliveriesWorker` claims `Failed` deliveries whose `NextRetryAt` has passed (or is unset, as after a stale release) using the same two-phase claim, and makes another attempt.
 
-### Step 13 — Stale Claim Recovery (StaleClaimedDeliveryReleaseWorker)
+- **Back-off** is linear: after the *n*-th failed attempt the next retry is scheduled *n + 1* minutes later.
+- **Dead-lettering** — when a delivery is still failing and its `RetryCount` exceeds `MaximumAttendedCount × RetryCycle`, it is marked `DeadLetter`, a dead-letter entry is created, and an escalation email is queued to the subscription contact.
 
-A dedicated worker polls on a configurable interval for deliveries in `Processing` status where `LockedUntil` has been exceeded — indicating the processing worker crashed or timed out before releasing its lock. These deliveries are released and their status reset to `Failed`, making them eligible for the retry worker on its next cycle.
+### Step 6 — Stale Claim Recovery (StaleClaimedDeliverReleaseWorker)
+
+On a configurable interval this worker finds deliveries still `Processing` whose lock expired more than `DeliveryLockDuration` ago — indicating the claiming worker crashed — clears the lock, increments `RetryCount` and sets them to `Failed` so the retry worker picks them up.
 
 ### Dead Letter Manual Retry
 
-An Admin may request a manual retry for any dead-lettered delivery:
+An Admin may request a manual retry for a dead-lettered delivery (`POST /api/WebhookDelivery/{deliveryId}/deadLetters`):
 
-1. The system checks the dead letter's retry cycle count against the configured `MaximumRetryCycle`
-2. If within the limit, the delivery is set back to `Processing`, the retry cycle is incremented by one, and the delivery re-enters the worker pipeline
-3. The request requires a justification stored against the dead letter record for audit purposes
+1. The dead-letter entry must not have been retried already, and the delivery must still be `DeadLetter`
+2. The delivery's retry cycle must be below `MaximumRetryCycle`
+3. The justification, time and admin are recorded on the dead-letter entry
+4. The retry cycle is incremented — granting another full set of automatic attempts — the lock and `NextRetryAt` are cleared, and the delivery is set back to `Pending` for the first-attempt worker
 
 ---
 
@@ -468,22 +525,22 @@ An Admin may request a manual retry for any dead-lettered delivery:
 
 | Worker | Trigger | Responsibility |
 |---|---|---|
-| `EventRaisedWorker` | Channel message | Fans out events to delivery records |
-| `PendingRaisedEventWorker` | DB poll | Recovers events that remained `Pending` beyond the threshold — missed by the channel due to restarts or crashes |
-| `DeliveryWorker` | DB poll | Claims and delivers pending webhooks to subscriber callback URLs |
-| `RetryWorker` | DB poll | Reprocesses failed deliveries past their `NextRetryAt` |
-| `StaleClaimedDeliveryReleaseWorker` | DB poll | Releases deliveries locked past their `LockedUntil` — returns them to `Failed` for retry |
-| `EmailProcessorWorker` | Channel + DB poll | Processes queued outbound emails — OTP delivery, slow endpoint notifications, escalation emails |
+| `EventRaisedWorker` | Channel | Fans events out into delivery records |
+| `PendingRaisedEventsWorker` | DB poll | Re-queues events still `Pending` beyond the threshold |
+| `WebhookDeliveryProcessorWorker` | DB poll | Claims `Pending` deliveries and makes the first attempt |
+| `RetryPendingDeliveriesWorker` | DB poll | Retries `Failed` deliveries and dead-letters those out of attempts |
+| `StaleClaimedDeliverReleaseWorker` | DB poll | Releases deliveries whose claim has expired, returning them to `Failed` |
+| `EmailProcessorWorker` | Channel | Sends queued emails — OTPs, slow-endpoint and dead-letter notifications. Remaining emails are flushed on shutdown |
 
 ### Two-Phase Claim Pattern
 
-The delivery worker uses a two-phase claim rather than optimistic locking. Optimistic locking detects conflicts after the fact but does not prevent multiple workers from attempting the same delivery concurrently. The two-phase approach:
+The delivery workers use a two-phase claim rather than optimistic locking. Optimistic locking detects conflicts after the fact but does not prevent multiple workers from attempting the same delivery concurrently. The two-phase approach:
 
-1. **Claim** — `UPDATE deliveries SET status = 'Processing', locked_by = @workerId, locked_until = @expiry WHERE status = 'Pending'` using `FOR UPDATE SKIP LOCKED` at the PostgreSQL level so concurrent workers skip already-claimed rows
-2. **Process** — only the worker that holds the lock makes the HTTP call
+1. **Claim** — `SELECT … FOR UPDATE SKIP LOCKED` inside a transaction, so concurrent workers skip rows already being claimed, then set `Processing`, `LockedBy` and `LockedUntil` and commit
+2. **Process** — only the worker that holds the claim makes the HTTP call
 3. **Release** — update status to `Delivered` or `Failed` and clear the lock fields
 
-If a worker crashes between claim and release, `StaleClaimedDeliveryReleaseWorker` detects that `locked_until` has passed and releases the lock, returning the delivery to `Failed` for the retry worker to pick up.
+If a worker crashes between claim and release, `StaleClaimedDeliverReleaseWorker` detects the expired lock and returns the delivery to `Failed` for the retry worker to pick up.
 
 ---
 
@@ -491,16 +548,18 @@ If a worker crashes between claim and release, `StaleClaimedDeliveryReleaseWorke
 
 | Mechanism | Implementation |
 |---|---|
-| JWT signing | HMAC-SHA256, secret from environment variable |
-| Token revocation | JTI stored in distributed cache on login; filter rejects any request whose JTI is missing or mismatched |
-| OTP tokens | Short-lived signed operation tokens using ASP.NET Core Data Protection, hash-validated on use |
-| Operation token purpose | Tokens are issued for a specific purpose (e.g. `DeactivateProfile`) and rejected if presented for any other operation |
-| Service client credentials | `ClientKey` hashed via `IApplicationHasher` — raw key never stored; validated on every publish request |
+| JWT signing | HMAC-SHA256, key from the `webhook_secret_key` environment variable; the token audience is the caller's origin |
+| Token revocation | The JTI of each user's current token is held in `IMemoryCache`; the filter rejects any request whose JTI is missing or mismatched. Changing a user's role evicts it |
+| Refresh tokens | Random 32-byte values, rotated on every login and refresh |
+| OTPs and operation tokens | OTPs are hashed; operation tokens are protected with ASP.NET Core Data Protection, hashed, purpose-bound and single-use |
+| Service client credentials | `ClientKey` generated with a cryptographic RNG and stored as a PBKDF2 hash; validated on every publish request |
 | Service client authorisation | Each client is restricted to publishing only its assigned event types |
+| Subscription secrets | Encrypted at rest with AES-GCM (random nonce per value, tamper-detecting); legacy AES-CBC values are still readable |
 | Webhook signatures | `X-Webhook-Signature: sha256=HMAC("{X-Webhook-Timestamp}.{payload}", subscriberSecretKey)` |
 | Password hashing | ASP.NET Core Identity default (PBKDF2) |
-| Account lockout | Configurable max failed attempts; indefinite lockout on deactivation |
-| Rate limiting | Per-email fixed window on OTP request and validation endpoints |
+| Account lockout | Configurable max failed attempts, then lockout until cleared by a password reset or reactivation; deactivated accounts are locked out |
+| Data scoping | Non-admin users can only read their own subscriptions, deliveries, attempts and dead-letter entries; other users' records return `404` |
+| Rate limiting | `request-otp-limit` — 3 per 10 minutes per email; `validate-otp-limit` — 5 per 10 minutes per email; `per-user-rating` — 10 per minute per user (or IP when anonymous) |
 
 ### Custom Authentication Filter
 
@@ -509,46 +568,56 @@ Every authenticated request passes through `CustomAuthenticationFilter`, an `IAs
 1. Endpoints marked `[AllowAnonymous]` — filter exits immediately
 2. `Authorization: Bearer <token>` header must be present
 3. JTI claim is extracted from `HttpContext.User` (populated by the authentication middleware)
-4. JTI is looked up in the distributed cache — must be non-default and match the claim
+4. JTI is looked up in the cache — must be non-default and match the claim
 5. Any failure returns `401 Unauthorized`
 
-This ensures that signing out a user (by evicting their JTI from the cache) takes effect immediately — their token is rejected on the next request even if it has not yet expired.
+This ensures that revoking a user's session (by evicting their JTI from the cache) takes effect immediately — their token is rejected on the next request even if it has not yet expired.
+
+### Deployment Notes
+
+- The token cache, the in-memory channels and the default Data Protection key storage are all per process. Run a single API instance, or move them to shared infrastructure (for example Redis and a persisted Data Protection key ring) before scaling out.
+- Keep `env_webhook_encrypt_key` outside the database — a database leak alone then reveals no subscription secrets.
 
 ---
 
 ## Health Checks
 
-Available at `GET /Admin/_health`.
+Two endpoints are available:
+
+| Endpoint | Auth | Response |
+|---|---|---|
+| `GET /Admin/_health` | Public | Summary JSON; `503` when any check is `Unhealthy` |
+| `GET /admin/_healths` | Admin | Detailed HealthChecks UI JSON |
 
 | Check | What it monitors |
 |---|---|
-| `postgresql` | Primary database connectivity |
-| `email-queue` | Email channel depth — unhealthy above configured threshold |
-| `event-raised-worker` | Heartbeat liveness of the `EventRaisedWorker` |
-| `pending-raised-event-worker` | Heartbeat liveness of the `PendingRaisedEventWorker` |
-| `delivery-worker` | Heartbeat liveness of the `DeliveryWorker` |
-| `stale-claim-worker` | Heartbeat liveness of the `StaleClaimedDeliveryReleaseWorker` |
-| `dead-letter-queue` | Count of unretried dead letter items |
-| `pending-deliveries` | Count of pending deliveries — detects worker backlog |
-| `stale-processing` | Count of `Processing` deliveries past their lease — detects crashed workers |
+| `POSTGRES DB HEALTH CHECK` | Primary database connectivity |
+| `IN MEMORY SYSTEM CACHE HEALTH CHECK` | Cache can store, read and remove a value |
+| `SERVER DISK SPACE HEALTH CHECK` | Free space on the C: drive — `Degraded` when low |
+| `QUEUED EMAIL HEALTH CHECK` | Email channel backlog — `Unhealthy` above 12 queued emails |
+| `QUEUED RAISED EVENTS HEALTH CHECK` | Raised event channel backlog — `Unhealthy` above 10 queued events |
+| `DEAD LETTER DELIVERIES HEALTH CHECK` | Dead-letter entries awaiting manual retry — `Unhealthy` above 10 |
+| `PENDING DELIVERIES HEALTH CHECK` | Count of `Pending` deliveries (informational) |
+| `WORKER LIVELINESS HEALTH CHECK` | Time since the last worker heartbeat — `Degraded` after 45 seconds |
+| `STALE DELIVERY HEALTH CHECK` | `Processing` deliveries past their lock — `Degraded` when any exist |
 
-Each worker updates a `WorkerLivenessTracker` singleton at the top of every loop iteration. If the heartbeat goes stale beyond the configured timeout the check turns `Unhealthy`.
+The delivery, retry, stale-release and pending-event workers update a shared `WorkerLivenessTracker` singleton as they run, so the liveliness check stays healthy while any of them is beating.
 
-Example response:
+Example response from `GET /Admin/_health`:
 
 ```json
 {
   "status": "Healthy",
   "checks": [
-    { "name": "postgresql",                  "status": "Healthy", "duration": 12.3, "exception": null },
-    { "name": "email-queue",                 "status": "Healthy", "duration": 0.1,  "exception": null },
-    { "name": "event-raised-worker",         "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "pending-raised-event-worker", "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "delivery-worker",             "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "stale-claim-worker",          "status": "Healthy", "duration": 0.0,  "exception": null },
-    { "name": "dead-letter-queue",           "status": "Healthy", "duration": 1.2,  "exception": null },
-    { "name": "pending-deliveries",          "status": "Healthy", "duration": 1.1,  "exception": null },
-    { "name": "stale-processing",            "status": "Healthy", "duration": 0.9,  "exception": null }
+    { "name": "POSTGRES DB HEALTH CHECK",            "status": "Healthy", "duration": 12.3, "exception": null },
+    { "name": "IN MEMORY SYSTEM CACHE HEALTH CHECK", "status": "Healthy", "duration": 0.4,  "exception": null },
+    { "name": "SERVER DISK SPACE HEALTH CHECK",      "status": "Healthy", "duration": 0.2,  "exception": null },
+    { "name": "QUEUED EMAIL HEALTH CHECK",           "status": "Healthy", "duration": 0.1,  "exception": null },
+    { "name": "QUEUED RAISED EVENTS HEALTH CHECK",   "status": "Healthy", "duration": 0.1,  "exception": null },
+    { "name": "DEAD LETTER DELIVERIES HEALTH CHECK", "status": "Healthy", "duration": 1.2,  "exception": null },
+    { "name": "PENDING DELIVERIES HEALTH CHECK",     "status": "Healthy", "duration": 1.1,  "exception": null },
+    { "name": "WORKER LIVELINESS HEALTH CHECK",      "status": "Healthy", "duration": 0.0,  "exception": null },
+    { "name": "STALE DELIVERY HEALTH CHECK",         "status": "Healthy", "duration": 0.9,  "exception": null }
   ],
   "totalDurationMs": 16.9
 }
@@ -558,7 +627,7 @@ Example response:
 
 ## API Reference
 
-Full interactive documentation available at `/scalar/v1` when running locally.
+Full interactive documentation is available at `/scalar/v1` when running in Development, and at `/webhookapi/api-docs` (ReDoc).
 
 ### Authentication — `api/Authentication`
 
@@ -567,30 +636,33 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | POST | `/login` | Public | Sign in — returns JWT access token and refresh token |
 | POST | `/change-password` | Authenticated | Change account password |
 | POST | `/request-otp` | Public | Request a one-time password via email |
-| POST | `/refresh` | Public | Refresh an authenticated session |
-| POST | `/assign-new-role` | Admin | Assign a role to a user |
+| POST | `/reset-user-password` | Public + operation token | Reset a password using a `PasswordReset` operation token in `X-Operation-Token` |
+| POST | `/refresh` | Public | Exchange an unexpired access token and refresh token for a new pair |
+| POST | `/assign-new-role` | Admin | Replace a user's role |
 
 ### Users — `api/Users`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | POST | `/register` | Public | Register a new user account |
-| POST | `/deactivate` | Authenticated | Deactivate an account (OTP operation token required for non-Admin) |
+| POST | `/deactivate` | Authenticated | Deactivate an account (`DeactivateProfile` operation token required for non-Admin) |
 | POST | `/reactivate` | Admin | Reactivate a deactivated account |
+| GET | `/` | Admin | List all users, including deactivated ones |
+| GET | `/get-user-details` | Authenticated | Get the current user's details |
 
 ### OTP Operations — `api/OtpOperation`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | POST | `/validate-otp` | Public | Validate a one-time password — returns a signed operation token |
-| DELETE | `/revoke-otp/{userId}` | Admin | Revoke an active OTP for a user |
+| DELETE | `/revoke-otp/{userId}` | Admin | Revoke a user's unused OTPs |
 
 ### Event Catalog — `api/WebhookEventCatalog`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/` | Public | List all event catalog entries |
-| GET | `/{id}` | Authenticated | Get a specific event catalog entry |
+| GET | `/?includeDeactivated={bool}` | Public | List event catalog entries |
+| GET | `/{id}` | Authenticated | Get an active event catalog entry |
 | POST | `/` | Admin | Create a new event type |
 | PUT | `/{id}?isDeactivate={bool}` | Admin | Activate or deactivate an event type |
 
@@ -598,10 +670,10 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/` | Admin | List all onboarded service clients |
+| GET | `/?includeDeactivated={bool}` | Admin | List onboarded service clients |
 | GET | `/{clientId}` | Admin | Get a service client by ClientId |
 | POST | `/` | Admin | Onboard a new internal service client — returns ClientKey once |
-| DELETE | `/deactivate/{clientId}` | Admin | Deactivate a service client |
+| DELETE | `/deactivate/{clientId}` | Admin | Deactivate a service client and remove its event type assignments |
 | PUT | `/reactivate/{clientId}` | Admin | Reactivate a deactivated service client |
 | PUT | `/request-new-key` | Admin | Rotate the ClientKey for a service client |
 
@@ -609,7 +681,7 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/` | Admin | List event catalog subscriptions for a service client |
+| GET | `/?includeDeactivated={bool}` | Admin | List the event types assigned to a service client |
 | POST | `/?catalogName={name}` | Admin | Assign an event type to a service client |
 | DELETE | `/?catalogName={name}` | Admin | Remove an event type from a service client |
 
@@ -617,12 +689,12 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
-| GET | `/` | Admin | List all subscriptions |
-| GET | `/{id}` | Admin | Get a subscription by ID |
-| GET | `/get-user-subscriptions` | Authenticated | Get the current user's subscriptions |
-| POST | `/` | Authenticated | Create a new subscription |
-| PUT | `/{id}` | Authenticated | Activate a subscription |
-| DELETE | `/{id}` | Authenticated | Delete a subscription |
+| GET | `/?includeDeactivated={bool}` | Admin | List all subscriptions (secrets not included) |
+| GET | `/{id}` | Authenticated | Get a subscription with its signing secret — users only get their own |
+| GET | `/get-user-subscriptions?includeDeactivated={bool}` | Authenticated | Get the current user's subscriptions (secrets not included) |
+| POST | `/` | User | Create a new subscription |
+| PUT | `/{id}` | Authenticated | Reactivate a subscription and rotate its secret |
+| DELETE | `/{id}` | Authenticated | Deactivate (soft-delete) a subscription |
 
 ### Subscription Events — `api/WebhookSubscription/{subscriptionId}/events`
 
@@ -632,7 +704,7 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | PUT | `/?eventName={name}` | Authenticated | Subscribe to an event type |
 | DELETE | `/?eventName={name}` | Authenticated | Unsubscribe from an event type |
 
-### Webhook Events — `api/webhookevent`
+### Webhook Events — `api/WebhookEvent`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
@@ -640,12 +712,37 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 | GET | `/` | Admin | Query events with filters |
 | POST | `/` | Service Client | Publish a new webhook event — requires `X-Client-Id` and `X-Client-Key` headers |
 
+### Deliveries — `api/WebhookDeliveries`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/` | User, Admin | Page through deliveries, newest first — filter by date range, status and subscription. Users see only their own |
+| GET | `/{deliveryId}` | User, Admin | Get delivery details, including payload and attempt counts |
+
+### Delivery Attempts — `api/WebhookDeliveryAttempts`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/{deliveryId}` | Authenticated | List the HTTP attempts for a delivery, newest first |
+
 ### Dead Letter Queue — `api/WebhookDelivery/{deliveryId}/deadLetters`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
 | GET | `/` | Authenticated | Get dead letter entries for a delivery |
 | POST | `/` | Admin | Request manual retry of a dead-lettered delivery |
+
+### Reporting Analytics — `api/ReportingAnalytics`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/most-recent-events` | Admin | The five most recent events that have deliveries, with delivery counts |
+| GET | `/get-event-catalog-analytics` | Admin | The five most-raised active event types |
+| GET | `/get-top-failing-subscriptions` | Admin | The five subscriptions with the most failed attempts |
+| GET | `/get-admin-dashboard-summary` | Admin | Platform-wide summary counts and success rate |
+| GET | `/get-user-delivery-dashboard` | User | The current user's five most recent deliveries |
+| GET | `/get-user-top-failing-subscription` | User | The current user's subscriptions with the most failed attempts |
+| GET | `/get-user-dashboard-summary?startDate=&endDate=` | User | The current user's summary for an inclusive date range |
 
 ### Admin — `Admin`
 
@@ -657,35 +754,33 @@ Full interactive documentation available at `/scalar/v1` when running locally.
 
 ## Testing
 
-### Unit Tests
+All tests live in `tests/WebHook.Tests`. Tests that touch the database use a real PostgreSQL container through Testcontainers, so **Docker must be running**.
 
-Service-level tests covering authentication, user management, OTP flows, and the delivery service:
+### Unit Tests (`UnitTests/`)
+
+Service-level tests covering authentication, users, OTP flows, subscriptions, deliveries, dead letters, analytics, security helpers and filters:
 
 - **xUnit** — test runner
-- **Moq** — mocks for `IAuthenticatedUserDetails`, `IDataProtectionProvider`, `ICacheService`
-- **Testcontainers** — real PostgreSQL container via `IClassFixture<PostgreSqlFixture>` for full Identity pipeline testing
-- Each test method gets a fresh scoped `DbContext` via `CreateSut()` to prevent EF Core change tracker contamination across tests
+- **Moq** — mocks for `IAuthenticatedUserDetails`, `IDataProtectionProvider`, `ICacheService` and others
+- **Testcontainers** — real PostgreSQL container via `IClassFixture<PostgreSqlFixture>`, so EF Core queries, Identity and constraints behave as in production
+- Ownership rules are tested for admins, owners and other users
 
-### Integration Tests
+### Integration Tests (`IntegrationTests/`)
 
-HTTP-level tests covering all controllers through the full ASP.NET Core pipeline:
-
-- **`WebApplicationFactory<Program>`** — a single shared `WebApiFactory` used across all controller test classes, with mocks for every service registered centrally
-- **`TestAuthHandler`** — a custom `AuthenticationHandler` that carries both `USER` and `Admin` roles and seeds the cache mock with a non-default JTI so `CustomAuthenticationFilter` passes
-- **Moq** — service layer is fully mocked so tests focus on routing, auth, status code mapping, request forwarding, and exception handling
-- **`IAsyncLifetime`** — fresh `HttpClient` and mock reset before every test method
+- **Controller tests** — `WebApplicationFactory<Program>` with mocked services, covering routing, auth, status code mapping, request forwarding and exception handling. A `TestAuthHandler` carries both `User` and `Admin` roles and seeds the cache mock with a JTI so `CustomAuthenticationFilter` passes
+- **Worker tests** — background workers run against a real PostgreSQL container, including concurrent workers competing for the same deliveries
 
 ### Running Tests
 
 ```bash
 # All tests
-dotnet test
+dotnet test tests/WebHook.Tests
 
 # Unit tests only
-dotnet test WebHook.UnitTests
+dotnet test tests/WebHook.Tests --filter "FullyQualifiedName~UnitTests"
 
 # Integration tests only
-dotnet test WebHook.IntegrationTests
+dotnet test tests/WebHook.Tests --filter "FullyQualifiedName~IntegrationTests"
 ```
 
 ---
@@ -693,121 +788,174 @@ dotnet test WebHook.IntegrationTests
 ## Project Structure
 
 ```
-WebhookHub/
-├── WebhookHub.Api/
+Webhook/
+├── Webhook.slnx
+├── WebHook.Api/
+│   ├── ApplicationFilters/
+│   │   ├── ClientValidationFilter.cs
+│   │   └── CustomAuthenticationFilter.cs
+│   ├── ContextFactory/
+│   │   └── RepositoryContextFactory.cs          — design-time DbContext for dotnet ef
 │   ├── Controllers/
 │   │   ├── AdminController.cs
 │   │   ├── AuthenticationController.cs
 │   │   ├── OtpOperationController.cs
+│   │   ├── ReportingAnalyticsController.cs
 │   │   ├── UsersController.cs
 │   │   ├── WebhookDeadLetterQueueController.cs
+│   │   ├── WebhookDeliveriesController.cs
+│   │   ├── WebhookDeliveryAttemptsController.cs
 │   │   ├── WebhookEventCatalogController.cs
 │   │   ├── WebhookEventController.cs
-│   │   ├── WebhookServiceClientsController.cs
 │   │   ├── WebhookServiceClientEventCatalogsController.cs
+│   │   ├── WebhookServiceClientsController.cs
 │   │   ├── WebhookSubscriptionController.cs
 │   │   └── WebhookSubscriptionEventController.cs
-│   ├── Filters/
-│   │   └── CustomAuthenticationFilter.cs
-│   └── ServiceExtensions/
-│       └── CustomMiddleware/
-│           ├── RequestOtpEmailExtractionMiddleware.cs
-│           └── ValidateOtpEmailExtractionMiddleware.cs
+│   ├── ServiceExtensions/
+│   │   ├── ApplicationServiceExtensions.cs
+│   │   ├── CustomLogSourceEnricher.cs
+│   │   └── CustomMiddleware/
+│   │       ├── ReqeustOtpEmailExtractionMiddleware.cs
+│   │       └── ValidateOtpEmailExtractionMiddleware.cs
+│   ├── GlobalExceptionHandler.cs
+│   └── Program.cs
 │
-├── WebhookHub.Core/
+├── WebHook.Core/
 │   ├── Constants/
+│   ├── CustomValidators/
 │   ├── DataTransferObjects/
 │   ├── Entities/
-│   └── Interfaces/
-│       └── Services/
+│   │   ├── ConfigurationModels/
+│   │   └── CustomEntities/                      — keyless analytics entities
+│   ├── EventContracts/
+│   ├── Interfaces/
+│   │   ├── Helpers/
+│   │   └── Services/
+│   ├── Mapper/
+│   └── RequestParameter/
 │
-├── WebhookHub.Infrastructure/
+├── WebHook.Infrastructure/
 │   ├── BackgroundWorkers/
-│   │   ├── EventRaisedWorker.cs
-│   │   ├── PendingRaisedEventWorker.cs
-│   │   ├── DeliveryWorker.cs
-│   │   ├── RetryWorker.cs
 │   │   ├── EmailProcessorWorker.cs
-│   │   └── StaleClaimedDeliveryReleaseWorker.cs
+│   │   ├── EventRaisedWorker.cs
+│   │   ├── PendingRaisedEventsWorker.cs
+│   │   ├── RetryPendingDeliveriesWorker.cs
+│   │   ├── StaleClaimedDeliverReleaseWorker.cs
+│   │   └── WebhookDeliveryProcessorWorker.cs
 │   ├── CustomHealthChecks/
+│   │   ├── C_DriveHealthCheck.cs
+│   │   ├── DeadLetterQueuedHealthCheck.cs
+│   │   ├── InMemoryCacheHealthCheck.cs
+│   │   ├── PendingDeliveriesHealthCheck.cs
 │   │   ├── QueuedEmailHealthCheck.cs
-│   │   ├── WorkerLivenessHealthCheck.cs
-│   │   ├── DeadLetterQueueHealthCheck.cs
-│   │   ├── PendingDeliveryHealthCheck.cs
-│   │   └── StaleProcessingHealthCheck.cs
-│   ├── Data_Persistence/
+│   │   ├── RaisedEventChannelHealthCheck.cs
+│   │   ├── StaleDeliveryHealthCheck.cs
+│   │   └── WorkerLivelinessHealthCheck.cs
+│   ├── EventObjectGenerator/
+│   │   └── RuntimeEventBuilder.cs               — builds payload types from catalog schemas
+│   ├── EventPublishers/
+│   │   └── ApplicationPublisher.cs
+│   ├── Persistence/
+│   │   ├── Configurations/
+│   │   ├── CustomDbColumnConverters/
+│   │   ├── Migrations/
 │   │   └── RepositoryContext.cs
 │   ├── Security/
 │   │   ├── ApplicationHasher.cs
-│   │   └── AuthenticatedUserDetails.cs
-│   └── Services/
-│       ├── AuthenticationService.cs
-│       ├── DeadLetterQueueService.cs
-│       ├── UserService.cs
-│       ├── WebhookEventService.cs
-│       ├── WebhookEventCatalogService.cs
-│       ├── WebhookServiceClientService.cs
-│       ├── WebhookServiceClientCatalogService.cs
-│       ├── WebhookSubscriptionService.cs
-│       └── WebhookSubscriptionEventService.cs
+│   │   ├── EncryptionService.cs
+│   │   ├── SecretKeyGeneratorService.cs
+│   │   └── SignatureService.cs
+│   ├── Services/
+│   │   ├── AuthenticationService.cs
+│   │   ├── DeadLetterQueueService.cs
+│   │   ├── OtpService.cs
+│   │   ├── ReportingAnalyticsService.cs
+│   │   ├── RetryAfterPendingService.cs
+│   │   ├── StaleClaimedDeliveryReleaseService.cs
+│   │   ├── TrendAnalyticsService.cs             — in progress
+│   │   ├── UserService.cs
+│   │   ├── WebhookDeliveryAttemptService.cs
+│   │   ├── WebhookDeliveryProcessorService.cs
+│   │   ├── WebhookDeliveryService.cs
+│   │   ├── WebhookEventCatalogService.cs
+│   │   ├── WebhookEventService.cs
+│   │   ├── WebhookServiceClientCatalogService.cs
+│   │   ├── WebhookServiceClientService.cs
+│   │   ├── WebhookSubscriptionEventService.cs
+│   │   └── WebhookSubscriptionService.cs
+│   └── Utilities/
+│       ├── AuthenticatedUserDetails.cs
+│       ├── CacheService.cs
+│       ├── EmailContentFormatterHelper.cs
+│       ├── EmailService.cs
+│       ├── OtpGenerator.cs
+│       ├── WebhookDeliveryRetryAfterService.cs
+│       └── WorkerLivenessTracker.cs
 │
-├── WebHook.UnitTests/
-└── WebHook.IntegrationTests/
+├── src/
+│   └── Webhook.Web/                             — Blazor WebAssembly portal
+│       ├── Components/
+│       ├── Handlers/                            — typed API calls per feature
+│       ├── Layout/
+│       ├── Pages/
+│       └── wwwroot/environment/config.json
+│
+└── tests/
+    └── WebHook.Tests/
+        ├── IntegrationTests/
+        ├── UnitTests/
+        └── Utilities/
 ```
 
 ---
 
 ## Roadmap
 
-WebhookHub is currently at **v1**. The core delivery pipeline, identity system, service client onboarding, and administrative tooling are stable. A subscriber-facing dashboard, real-time monitoring, and analytics are planned for v2.
+WebhookHub is currently at **v1**. The core delivery pipeline, identity system, service client onboarding, administrative tooling, web portal and dashboards are in place.
 
-### Planned for v2
+### Already available
 
-#### Subscriber Dashboard
-A web-based interface for subscribers to manage their subscriptions, monitor delivery history, inspect failed deliveries, and trigger manual retries — without requiring admin involvement.
+- Web portal for subscribers and admins
+- Delivery history per user — paginated, filterable by status, date range and subscription
+- Per-delivery attempt log — response body, HTTP status, duration and timestamp for each attempt
+- Admin and user dashboards with aggregate metrics (success rate, failing subscriptions, dead letters)
 
-**Endpoints to support the dashboard:**
-- Delivery history per subscription — paginated, filterable by status, date range, and event type
-- Per-delivery attempt log — request payload, response body, HTTP status, duration, and timestamp for each attempt
-- Subscription secret key rotation — self-service key regeneration with immediate effect on future deliveries
-- Subscriber-scoped aggregate metrics — success rate, average delivery duration, dead letter count
+### In progress
+
+#### Trend Analytics
+Time-series views of delivery health for subscribers and admins (the portal pages exist and are hidden until the API is complete):
+- **Delivery volume** — events published and deliveries attempted over time
+- **Success rate trend** — per subscription or globally
+- **Failure breakdown** — by HTTP response code: 4xx vs 5xx vs timeouts
+- **Retry heatmap** — which subscriptions retry most often
+- **Dead letter rate** — dead letters over time, with drill-down
+- **Delivery latency** — p50, p95 and p99 per subscription
+- **Event type distribution** — published events by type over a time range
+
+### Planned
 
 #### Real-Time Monitoring
-Live delivery activity streamed to the dashboard without polling:
-- **SignalR hub** — pushes delivery status updates, dead letter transitions, and worker heartbeats to connected clients in real time
-- **Live delivery feed** — scrolling activity log showing each delivery attempt as it happens, with status, subscriber name, event type, and response code
-- **Worker status panel** — live view of each background worker — running, idle, or unhealthy — updated from the liveness tracker on each heartbeat
-
-#### Analytics and Charts
-Time-series and aggregate visualisations giving subscribers and admins visibility into delivery health:
-- **Delivery volume chart** — events published and deliveries attempted over time, by hour or day
-- **Success rate trend** — percentage of successful deliveries over a rolling window, per subscription or globally
-- **Failure breakdown** — failed deliveries grouped by HTTP response code — 4xx client errors vs 5xx server errors vs timeouts
-- **Retry heatmap** — which subscriptions are retrying most frequently, indicating unreliable endpoints
-- **Dead letter rate** — dead letters created over time, with drill-down to the triggering subscription
-- **Delivery latency percentiles** — p50, p95, p99 delivery duration per subscription — identifies slow endpoints before they reach the threshold notification
-- **Event type distribution** — breakdown of published events by type over a time range
+- **SignalR hub** — push delivery status updates, dead-letter transitions and worker heartbeats to the portal
+- **Live delivery feed** — each attempt as it happens, with status, subscriber, event type and response code
+- **Worker status panel** — running, idle or unhealthy, per worker
 
 #### Developer Experience
-- **Webhook testing sandbox** — subscribers send a test delivery to their callback URL using a sample payload without creating a real event, to verify endpoint configuration before going live
-- **Event replay** — admin-initiated re-raise of a previously processed event, useful for recovering from downstream bugs
-- **Delivery diff view** — side-by-side comparison of request payload sent vs response received for a failed attempt
-- **Subscriber activity log** — audit trail of all subscription changes, key rotations, and manual retries
+- **Webhook testing sandbox** — send a test delivery with a sample payload to verify a callback URL before going live
+- **Event replay** — admin-initiated re-raise of a previously processed event
+- **Delivery diff view** — side-by-side request and response for a failed attempt
+- **Subscriber activity log** — audit trail of subscription changes, secret rotations and manual retries
 
 #### API and Security
-- **Idempotency keys on `POST /api/webhookevent`** — prevents duplicate events on internal service retries using a short-TTL key store
-- **Subscriber endpoint verification** — challenge/response ping before a callback URL is activated on a new subscription, consistent with Stripe and GitHub webhook patterns
-- **Subscription secret key rotation** — self-service endpoint to regenerate the HMAC signing key for a subscription
-- **OpenTelemetry distributed tracing** — end-to-end trace from event publish through fan-out to final delivery, exportable to Jaeger, Zipkin, or any OTLP-compatible backend
+- **Idempotency keys on `POST /api/WebhookEvent`** — prevent duplicate events on internal service retries
+- **Subscriber endpoint verification** — challenge/response ping before a callback URL is activated, consistent with Stripe and GitHub webhook patterns
+- **Self-service secret rotation** — regenerate a subscription's signing secret without deactivating it
+- **OpenTelemetry distributed tracing** — end-to-end trace from publish through fan-out to delivery
+- **Shared token cache and Data Protection key ring** — to run multiple API instances
 
 #### Infrastructure
-- **Docker Compose setup** — single command to spin up the API, PostgreSQL, and any supporting services for local development
-- **Helm chart** — Kubernetes deployment manifests for production-grade hosting
-- **GitHub Actions CI pipeline** — automated build, test, and migration script generation on pull request
-
----
-
-> **Contributing to v2:** If you want to work on any of the above, open an issue to discuss the approach before submitting a pull request. Feature branches should be prefixed with `v2/` and target the `develop` branch rather than `main`.
+- **Docker Compose setup** — API, portal and PostgreSQL with a single command
+- **Helm chart** — Kubernetes deployment manifests
+- **GitHub Actions CI pipeline** — build, test and migration script generation on pull request
 
 ---
 
@@ -819,4 +967,4 @@ Contributions are welcome. If you find a bug or have a feature suggestion, open 
 
 ## License
 
-Dual licensed under the [MIT License](LICENSE-MIT) and the [Apache License 2.0](LICENSE-APACHE). You may choose either licence depending on your use case.
+Licensed under the [MIT License](LICENSE).
