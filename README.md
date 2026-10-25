@@ -1,8 +1,19 @@
 # WebhookHub
 
-A production-grade webhook notification service built with .NET 10. WebhookHub allows internal business applications to publish events that are reliably delivered as signed HTTP POST requests to registered subscriber callback URLs — with automatic retry, dead-lettering, escalation notifications, and full audit trails. It ships with a Blazor WebAssembly portal for subscribers and administrators.
+**Reliable, signed webhook delivery for your internal services — so they can publish an event once and stop worrying about who receives it.**
+
+WebhookHub is a self-hosted webhook platform built with .NET 10 and PostgreSQL. Your internal applications publish business events (an order was created, a payment settled); WebhookHub validates them, delivers them as signed HTTP POST requests to every subscriber that asked for them, and takes care of everything that can go wrong along the way — retries, slow or failing endpoints, crashed workers, and manual recovery. A Blazor portal gives subscribers and administrators a view of every event, delivery and attempt.
 
 Open source and free to use.
+
+### At a glance
+
+- **Publish once, deliver everywhere** — one API call fans an event out to every active subscription for that event type
+- **Delivery you can trust** — retries with back-off, dead-lettering after repeated failures, crash recovery for events and in-flight deliveries, and admin-triggered manual retry
+- **Secure by default** — onboarded publishers with hashed credentials and per-event-type permissions, HMAC-signed payloads with replay protection, encrypted subscriber secrets, and OTP-protected account operations
+- **Schema-checked events** — each event type declares its fields, and payloads that don't match are rejected with the failing fields named
+- **Nothing happens silently** — every attempt is recorded with its response and timing, subscribers are emailed when their endpoint is slow or a delivery is dead-lettered, and health checks report backlogs and stalled workers
+- **Built-in portal** — subscribers manage subscriptions and inspect deliveries; admins manage clients, users and the event catalog, and see platform dashboards
 
 ---
 
@@ -30,7 +41,19 @@ Open source and free to use.
 
 ## Overview
 
-WebhookHub sits between your internal services and your subscribers. An internal application raises an event — WebhookHub validates it, fans it out to every active subscription registered for that event type, and handles the full delivery lifecycle: retry on failure, escalation emails when an endpoint is slow, dead-lettering when all retries are exhausted, and admin-initiated manual retry for dead-lettered deliveries.
+### Who it's for
+
+- **Platform and integration teams** who want one place to manage outbound webhooks instead of every service building its own retry and signing logic
+- **Internal services** that need to notify other systems or partners about business events without knowing who is listening
+- **Subscribers** — internal teams or external partners — who want to register a callback URL, choose the events they care about and see what was delivered
+
+### How it works
+
+1. **Define and onboard** — an admin registers event types with their payload schemas in the event catalog, and onboards each publishing service with a client ID, a one-time-shown client key and the event types it may publish.
+2. **Subscribe** — users create subscriptions: an HTTPS callback URL, the event types to receive, and a contact email. Each subscription gets its own signing secret.
+3. **Publish and deliver** — a service posts an event with its client credentials. WebhookHub validates and stores it, creates one delivery per active subscription, signs and posts each one, and keeps retrying failed deliveries until they succeed or are dead-lettered for an admin to retry.
+
+The diagram below shows the full path, including the background workers that recover lost events and crashed deliveries.
 
 ```
 Internal Service (onboarded with ClientId + ClientKey)
