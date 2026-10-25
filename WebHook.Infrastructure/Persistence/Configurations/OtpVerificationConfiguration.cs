@@ -5,8 +5,13 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="OtpVerification"/>: purpose stored as a string and indexes on
+/// the lifecycle timestamps used when finding a user's current OTP.
+/// </summary>
 internal sealed class OtpVerificationConfiguration : IEntityTypeConfiguration<OtpVerification>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<OtpVerification> builder)
     {
         builder.HasKey(x => x.Id);

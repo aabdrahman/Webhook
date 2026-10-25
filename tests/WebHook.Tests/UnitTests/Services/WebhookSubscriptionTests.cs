@@ -41,6 +41,7 @@ public class WebhookSubscriptionTests : IDisposable
         //Encryption Service Mocker
         _encryptionServiceMock = new Mock<IEncryptionService>();
         _encryptionServiceMock.Setup(es => es.Encrypt(It.IsAny<string>())).Returns("my-encrypted-secret");
+        _encryptionServiceMock.Setup(es => es.Decrypt(It.IsAny<string>(), It.IsAny<string>())).Returns("my-decrypted-secret");
 
         //Authenticated User Mock
         _authenticatedUserDetailsMock = new Mock<IAuthenticatedUserDetails>();

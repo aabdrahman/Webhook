@@ -4,8 +4,15 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Core.Mapper;
 
+/// <summary>
+/// Maps <see cref="WebhookDelivery"/> entities to DTOs.
+/// </summary>
 public static class WebhookDeliveryMapper
 {
+    /// <summary>
+    /// A LINQ projection from <see cref="WebhookDelivery"/> to the <see cref="WebhookDeliveryDto"/> summary for EF Core queries.
+    /// </summary>
+    /// <returns>The projection expression.</returns>
     public static Expression<Func<WebhookDelivery, WebhookDeliveryDto>> ToDtoExpression()
     {
         return delivery => new WebhookDeliveryDto()
@@ -21,6 +28,13 @@ public static class WebhookDeliveryMapper
         };
     }
 
+    /// <summary>
+    /// A LINQ projection from <see cref="WebhookDelivery"/> to <see cref="WebhookDeliveryDetailsDto"/> for EF Core queries.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="WebhookDeliveryDetailsDto.TotalFailedAttempts"/> counts attempts whose HTTP status code is not 2xx.
+    /// </remarks>
+    /// <returns>The projection expression.</returns>
     public static Expression<Func<WebhookDelivery, WebhookDeliveryDetailsDto>> ToDetailsExpression()
     {
         return delivery => new WebhookDeliveryDetailsDto()
@@ -38,7 +52,7 @@ public static class WebhookDeliveryMapper
             NextRetryAt = delivery.NextRetryAt,
             RequestPayload = delivery.RequestPayload,
             TotalAttempts = delivery.WebhookDeliveryAttempts.Count,
-            TotalFailedAttempts = delivery.WebhookDeliveryAttempts.Count(x => !x.HttpResponse.StartsWith("2"))
+            TotalFailedAttempts = delivery.WebhookDeliveryAttempts.Count(x => !x.HttpResponseCode.StartsWith("2"))
         };
     }
 }

@@ -2,6 +2,9 @@
 
 namespace WebHook.Core.DataTransferObjects.WebhookServiceClient;
 
+/// <summary>
+/// An admin's request to rotate a service client's key. The previous key stops working immediately.
+/// </summary>
 public record class RequestNewClientKeyDto
 {
     /// <summary>

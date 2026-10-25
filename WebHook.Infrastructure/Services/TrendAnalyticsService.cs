@@ -10,11 +10,19 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="ITrendAnalyticsService"/> implementation. Work in progress.
+/// </summary>
 public class TrendAnalyticsService : ITrendAnalyticsService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="TrendAnalyticsService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller, used to scope results.</param>
     public TrendAnalyticsService(RepositoryContext repositoryContext, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
@@ -24,6 +32,8 @@ public class TrendAnalyticsService : ITrendAnalyticsService
     private const string _methodName = "MethodName";
     private ILogger _logger = Log.ForContext("ClassName", nameof(TrendAnalyticsService));
 
+    /// <inheritdoc />
+    /// <exception cref="NotImplementedException">Always thrown; the method is not finished.</exception>
     public Task<GenericResponse<TrendAnalyticsFilterDetails>> GetTrendAnalyticsDetails(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetTrendAnalyticsDetails));

@@ -11,11 +11,19 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IWebhookServiceClientCatalogService"/> implementation backed by EF Core.
+/// </summary>
 public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCatalogService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="WebhookServiceClientCatalogService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller, recorded on audit fields.</param>
     public WebhookServiceClientCatalogService(RepositoryContext repositoryContext, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
@@ -26,6 +34,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
     private const string _className = "ClassName";
     private ILogger _logger = Log.ForContext(_className, nameof(WebhookServiceClientCatalogService));
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<WebhookServiceClientCatalogDto>>> GetSubscribedCatalogsAsync(Guid serviceClientId, bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetSubscribedCatalogsAsync));
@@ -56,6 +65,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> SubscribeToCatalogAsync(Guid serviceClientId, string catalogName, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(SubscribeToCatalogAsync));
@@ -137,6 +147,7 @@ public sealed class WebhookServiceClientCatalogService : IWebhookServiceClientCa
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> UnSubscribeFromCatalogAsync(Guid serviceClientId, string catalogName, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(UnSubscribeFromCatalogAsync));

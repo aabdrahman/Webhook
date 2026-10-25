@@ -4,15 +4,24 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Reports how many dead-letter entries are awaiting a manual retry.
+/// <see cref="HealthStatus.Unhealthy"/> when there are more than 10.
+/// </summary>
 public sealed class DeadLetterQueuedHealthCheck : IHealthCheck
 {
     private readonly RepositoryContext _repositoryContext;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="DeadLetterQueuedHealthCheck"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
     public DeadLetterQueuedHealthCheck(RepositoryContext repositoryContext)
     {
         _repositoryContext = repositoryContext;
     }
 
+    /// <inheritdoc />
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

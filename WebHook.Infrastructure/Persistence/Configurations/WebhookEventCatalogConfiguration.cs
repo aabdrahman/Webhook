@@ -6,8 +6,16 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebHookEventCatalog"/>.
+/// </summary>
+/// <remarks>
+/// <c>NormalizedEventName</c> is a stored computed column (<c>UPPER("EventName")</c>) with a unique
+/// index. <c>AvailableFields</c> is stored as <c>jsonb</c>. A global query filter hides inactive entries.
+/// </remarks>
 public sealed class WebhookEventCatalogConfiguration : IEntityTypeConfiguration<WebHookEventCatalog>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebHookEventCatalog> builder)
     {
         builder.HasKey(x => x.Id);

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Diagnostics;
 using System.Text;
@@ -14,6 +15,28 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// Retries failed deliveries and moves those that run out of attempts to the dead-letter queue.
+/// Used by the retry pending deliveries worker.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Uses the same two-phase claim and request headers as <see cref="WebhookDeliveryProcessorService"/>.
+/// Eligible deliveries are <see cref="WebhookDeliveryStatus.Failed"/>, have at least one attempt, are
+/// due for retry (or have no retry time, as after a stale release), and have no live lock.
+/// </para>
+/// <para>
+/// After an attempt, a delivery that is still failed and whose <c>RetryCount</c> exceeds the maximum
+/// attempt count multiplied by its <c>RetryCycle</c> is marked
+/// <see cref="WebhookDeliveryStatus.DeadLetter"/>, a <see cref="WebhookDeadLetterQueue"/> entry is
+/// added, and a dead-letter email is queued to the subscription's contact. Slow attempts trigger a
+/// slow-endpoint email instead.
+/// </para>
+/// <para>
+/// As in <see cref="WebhookDeliveryProcessorService"/>, HTTP errors and request timeouts are recorded
+/// as failed attempts; any other exception, including cancellation on shutdown, ends the whole batch.
+/// </para>
+/// </remarks>
 public sealed class RetryAfterPendingService
 {
     private readonly RepositoryContext _repositoryContext;
@@ -24,6 +47,16 @@ public sealed class RetryAfterPendingService
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
     private readonly IApplicationPublisher _applicationPublisher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="RetryAfterPendingService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="httpClientFactory">Supplies the named <c>WebhookDeliveryClient</c> HTTP client.</param>
+    /// <param name="retryAfterService">Computes when a failed delivery should be retried.</param>
+    /// <param name="encryptionService">Decrypts subscription signing secrets.</param>
+    /// <param name="signatureService">Signs request payloads.</param>
+    /// <param name="emailContentFormatterHelper">Renders the dead-letter and slow-endpoint emails.</param>
+    /// <param name="applicationPublisher">Queues escalation emails.</param>
     public RetryAfterPendingService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory,
                                     WebhookDeliveryRetryAfterService retryAfterService, IEncryptionService encryptionService,
                                     ISignatureService signatureService, EmailContentFormatterHelper emailContentFormatterHelper, IApplicationPublisher applicationPublisher)
@@ -41,6 +74,17 @@ public sealed class RetryAfterPendingService
 
     private ILogger _logger;
 
+    /// <summary>
+    /// Claims a batch of failed deliveries that are due for retry and makes one HTTP attempt for each.
+    /// </summary>
+    /// <remarks>Errors are logged, not thrown.</remarks>
+    /// <param name="totalAttempts">The maximum number of deliveries to claim.</param>
+    /// <param name="maximumAttemptCount">The number of attempts allowed per retry cycle before dead-lettering.</param>
+    /// <param name="thresholdDuration">The HTTP duration, in milliseconds, above which a slow-endpoint email is sent.</param>
+    /// <param name="workerId">The ID recorded as the delivery's <c>LockedBy</c>.</param>
+    /// <param name="lockDuration">How long, in seconds, each claimed delivery stays locked to this worker.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A task that completes when the batch has been processed.</returns>
     public async Task RunRetryAfterFirstAttemptAsync(int totalAttempts = 10, int maximumAttemptCount = 5, long thresholdDuration = 25000, string workerId = "", double lockDuration = 15, CancellationToken ct = default)
     {
         _logger = _logger.ForContext("MethodName", nameof(RunRetryAfterFirstAttemptAsync));
@@ -151,9 +195,11 @@ public sealed class RetryAfterPendingService
                         Content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json")
                     };
 
-                    httpRequest.Headers.Add("X-Webhook-Timestamp", attemptedTime.ToUnixTimeSeconds().ToString());
+                    //The same timestamp is sent in the header and bound into the signature, so it cannot be replaced on replay.
+                    long signatureTimestamp = attemptedTime.ToUnixTimeSeconds();
+                    httpRequest.Headers.Add("X-Webhook-Timestamp", signatureTimestamp.ToString());
                     httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName);
-                    httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(delivery.RequestPayload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
+                    httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(delivery.RequestPayload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret), signatureTimestamp));
 
                     //using var content = new StringContent(delivery.RequestPayload, encoding: Encoding.UTF8, "application/Json");
                     //using var httpResponse = await httpClient.PostAsync(delivery.CallBackUrl, content, cancellationToken: requestCts.Token);
@@ -202,8 +248,29 @@ public sealed class RetryAfterPendingService
                     }
 
                 }
+                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+                {
+                    stopwatch.Stop();
+                    _logger.Error(ex, "An error occurred while pushing the webhook.....");
+                    httpResponseStatusCode = "408";
+                    delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
+                    delivery.RetryCount++;
+                    delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
+                    delivery.LockedBy = null;
+                    delivery.LockedUntil = null;
+                    delivery.WebhookDeliveryAttempts.Add(new WebhookDeliveryAttempt()
+                    {
+                        WebhookDeliveryId = delivery.Id,
+                        AttemptedAt = DateTimeOffset.UtcNow,
+                        AttemptedCount = 1,
+                        HttpResponse = ex.Message,
+                        HttpResponseCode = ((int)StatusCodes.Status408RequestTimeout).ToString(),
+                        Duration = stopwatch.Elapsed.TotalMilliseconds
+                    });
+                }
                 catch (HttpRequestException ex)
                 {
+                    stopwatch.Stop();
                     _logger.Error(ex, "An erroor ocurred while pushing the webhook.....");
                     httpResponseStatusCode = ex.StatusCode.HasValue ? ex.StatusCode.Value.ToString() : "500";
                     delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;

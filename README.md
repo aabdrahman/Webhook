@@ -132,8 +132,15 @@ WebHook.IntegrationTests   — HTTP-level tests with WebApplicationFactory and M
 - A dedicated background worker monitors deliveries locked beyond their `LockedUntil` timestamp — indicating a crashed worker — and releases them back to the failed queue for reprocessing
 
 ### Webhook Signatures
-- Every delivery includes an `X-Webhook-Signature: sha256=<hmac>` header
-- Subscribers can verify the payload has not been tampered with using their subscription secret key
+- Every delivery includes `X-Webhook-Timestamp` (Unix seconds) and `X-Webhook-Signature: sha256=<hmac>` headers
+- The signature is `HMAC-SHA256("{timestamp}.{body}")`, keyed with the UTF-8 bytes of the subscription secret, so a captured request cannot be replayed with a new timestamp
+- The secret is shown on the subscription's detail page (`GET` by ID); it is rotated when a subscription is reactivated
+
+To verify a delivery, a subscriber should:
+1. Read the raw request body and the `X-Webhook-Timestamp` and `X-Webhook-Signature` headers.
+2. Compute `"sha256=" + lowercase_hex(HMAC_SHA256(key = utf8(secret), message = utf8(timestamp + "." + body)))`.
+3. Compare it with `X-Webhook-Signature` in constant time.
+4. Reject the request if the timestamp is more than a few minutes from the current time.
 
 ### Identity and Access
 - JWT authentication with refresh token support
@@ -490,7 +497,7 @@ If a worker crashes between claim and release, `StaleClaimedDeliveryReleaseWorke
 | Operation token purpose | Tokens are issued for a specific purpose (e.g. `DeactivateProfile`) and rejected if presented for any other operation |
 | Service client credentials | `ClientKey` hashed via `IApplicationHasher` — raw key never stored; validated on every publish request |
 | Service client authorisation | Each client is restricted to publishing only its assigned event types |
-| Webhook signatures | `X-Webhook-Signature: sha256=HMAC(payload, subscriberSecretKey)` |
+| Webhook signatures | `X-Webhook-Signature: sha256=HMAC("{X-Webhook-Timestamp}.{payload}", subscriberSecretKey)` |
 | Password hashing | ASP.NET Core Identity default (PBKDF2) |
 | Account lockout | Configurable max failed attempts; indefinite lockout on deactivation |
 | Rate limiting | Per-email fixed window on OTP request and validation endpoints |

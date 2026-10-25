@@ -3,10 +3,17 @@ using WebHook.Core.Interfaces.Helpers;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Checks that the cache can store, read back and remove a test value.
+/// </summary>
 public sealed class InMemoryCacheHealthCheck : IHealthCheck
 {
     private readonly ICacheService _cacheService;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="InMemoryCacheHealthCheck"/> class.
+    /// </summary>
+    /// <param name="cacheService">The cache to test.</param>
     public InMemoryCacheHealthCheck(ICacheService cacheService)
     {
         _cacheService = cacheService;
@@ -14,6 +21,7 @@ public sealed class InMemoryCacheHealthCheck : IHealthCheck
 
     private string test_cache_key = "test=key";
 
+    /// <inheritdoc />
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

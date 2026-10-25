@@ -4,8 +4,12 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="Role"/>. Seeds the <c>Admin</c>, <c>User</c> and <c>System</c> roles with fixed IDs.
+/// </summary>
 public class RoleConfiguration : IEntityTypeConfiguration<Role>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Role> builder)
     {
         builder.Property(x => x.CreatedAt)

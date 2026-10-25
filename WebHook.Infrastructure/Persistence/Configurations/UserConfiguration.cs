@@ -5,8 +5,16 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="User"/>.
+/// </summary>
+/// <remarks>
+/// A global query filter hides inactive users, which also affects ASP.NET Core Identity
+/// lookups such as <c>FindByEmailAsync</c>. Use <c>IgnoreQueryFilters()</c> to reach them.
+/// </remarks>
 public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.HasKey(x => x.Id);

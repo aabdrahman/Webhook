@@ -4,15 +4,23 @@ using WebHook.Core.EventContracts.Events;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Reports the backlog in the raised event channel. <see cref="HealthStatus.Unhealthy"/> when more than 10 events are queued.
+/// </summary>
 public sealed class RaisedEventChannelHealthCheck : IHealthCheck
 {
     private readonly Channel<EventRaised> _eventRaisedChannel;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="RaisedEventChannelHealthCheck"/> class.
+    /// </summary>
+    /// <param name="eventRaisedChannel">The raised event channel to inspect.</param>
     public RaisedEventChannelHealthCheck(Channel<EventRaised> eventRaisedChannel)
     {
         _eventRaisedChannel = eventRaisedChannel;
     }
 
+    /// <inheritdoc />
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

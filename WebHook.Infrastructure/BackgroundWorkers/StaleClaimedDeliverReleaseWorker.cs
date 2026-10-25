@@ -8,12 +8,26 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Periodically releases deliveries whose worker claim has expired — usually because the
+/// worker crashed mid-delivery — through <see cref="StaleClaimedDeliveryReleaseService"/>.
+/// </summary>
+/// <remarks>
+/// The tick interval is read once at construction; the lock duration used to decide
+/// staleness is re-read every tick.
+/// </remarks>
 public class StaleClaimedDeliverReleaseWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RetryDeliveresAfterFailedConfiguration _retryDeliveresAfterFailedConfiguration;
     private readonly WorkerLivenessTracker _workerLivenessTracker;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="StaleClaimedDeliverReleaseWorker"/> class.
+    /// </summary>
+    /// <param name="scopeFactory">Creates a scope, and so a fresh release service, per tick.</param>
+    /// <param name="optionsMonitor">Retry settings; supplies the tick interval.</param>
+    /// <param name="workerLivenessTracker">Receives a heartbeat on every tick.</param>
     public StaleClaimedDeliverReleaseWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<RetryDeliveresAfterFailedConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
     {
         _scopeFactory = scopeFactory;
@@ -24,18 +38,21 @@ public class StaleClaimedDeliverReleaseWorker : BackgroundService
 
     private ILogger _logger;
 
+    /// <inheritdoc />
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.ForContext("MethodName", nameof(StartAsync)).Information("Worker to process any possible stale claimed deliveries started successfully.....");
         await base.StartAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public override Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.ForContext("MethodName", nameof(StopAsync)).Information("Worker to process any possible stale claimed deliveries is stopping.....");
         return base.StopAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         //Create an instance of the periodic timer.

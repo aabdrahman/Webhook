@@ -30,8 +30,17 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Api.ServiceExtensions;
 
+/// <summary>
+/// <see cref="IServiceCollection"/> extensions that register the API's services, workers and middleware options.
+/// Called from <c>Program.cs</c>.
+/// </summary>
 internal static class ApplicationServiceExtensions
 {
+    /// <summary>
+    /// Registers OpenAPI document generation. Controller action summaries are read from this
+    /// assembly's XML documentation file when it exists.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureSwagger(this IServiceCollection services)
     {
         //services.AddSwaggerGen(opts =>
@@ -174,6 +183,11 @@ internal static class ApplicationServiceExtensions
 
     }
 
+    /// <summary>
+    /// Registers MassTransit with the in-memory transport. No consumers are currently registered;
+    /// in-process messaging uses <see cref="Channel{T}"/> instead.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureMassTransit(this IServiceCollection services)
     {
         services.AddMassTransit(opts =>
@@ -189,6 +203,17 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Registers <see cref="RepositoryContext"/> against PostgreSQL using the <c>DbConnection</c>
+    /// connection string, with dynamic JSON support.
+    /// </summary>
+    /// <remarks>
+    /// Sensitive data and parameter logging are enabled, so SQL parameter values (including
+    /// hashes and encrypted secrets) are written to the logs.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <exception cref="ArgumentNullException">The <c>DbConnection</c> connection string is missing.</exception>
     internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<RepositoryContext>(opts =>
@@ -212,6 +237,12 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Binds each configuration model in <c>WebHook.Core.Entities.ConfigurationModels</c> to its
+    /// <c>appsettings.json</c> section for use with <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
     internal static void AddConfigurationModels(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<SignatureSecretConfiguration>(configuration.GetSection("SignatureSecretKey"));
@@ -227,6 +258,11 @@ internal static class ApplicationServiceExtensions
         services.Configure<OtpSettingsConfiguration>(configuration.GetSection("OtpSettings"));
     }
 
+    /// <summary>
+    /// Registers the application and helper services, delivery processors, filters, middleware and
+    /// the shared <see cref="WorkerLivenessTracker"/> (45-second heartbeat window).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IWebhookEventCatalogService, WebhookEventCatalogService>();
@@ -270,6 +306,11 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<ValidateOtpEmailExtractionMiddleware>();
     }
 
+    /// <summary>
+    /// Registers the singleton bounded channels for raised events (capacity 1,000) and outgoing
+    /// emails (capacity 500). Both have a single reader and wait when full.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
     {
         //Chnanel for raised events
@@ -295,6 +336,11 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Registers the background workers: event fan-out, pending event recovery, first delivery,
+    /// retry, stale claim release and email sending.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationWorkers(this IServiceCollection services)
     {
         services.AddHostedService<EventRaisedWorker>();
@@ -306,6 +352,11 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<EmailProcessorWorker>();
     }
 
+    /// <summary>
+    /// Registers the named <c>WebhookDeliveryClient</c> HTTP client used to post deliveries, with a
+    /// 30-second timeout and at most 10 connections per server.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureHttpClient(this IServiceCollection services)
     {
         //This adds teh webhook delivery named httpclient without the base address wich will be injected at teh point of calling the api.
@@ -322,6 +373,18 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Registers ASP.NET Core Identity for <see cref="User"/> and <see cref="Role"/>.
+    /// </summary>
+    /// <remarks>
+    /// Passwords need a digit, lower- and upper-case letters and a symbol, and a minimum length from
+    /// <c>UserSettingsConfiguration:MinimumPasswordLength</c>. After
+    /// <c>UserSettingsConfiguration:MaximumAuthenticationAttempt</c> failed attempts a user is locked
+    /// out indefinitely, until an admin or a password reset clears it.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <exception cref="ArgumentNullException">Either user setting is missing or zero.</exception>
     internal static void ConfigureIdentity(this IServiceCollection services, IConfiguration configuration)
     {
         int minPasswordLength = configuration.GetValue<int>("UserSettingsConfiguration:MinimumPasswordLength");
@@ -365,6 +428,13 @@ internal static class ApplicationServiceExtensions
         .AddDefaultTokenProviders();
     }
 
+    /// <summary>
+    /// Registers JWT bearer authentication. Tokens are validated against the configured issuer and
+    /// audiences with no clock skew, using the key in the <c>webhook_secret_key</c> environment variable.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <exception cref="ArgumentNullException">The signing key or valid issuer is not configured.</exception>
     internal static void ConfigureApplicationJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var jwtConfigSetings = configuration.GetSection("JwtSettings");
@@ -395,6 +465,8 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>Registers authorization with the default options. Endpoints use role-based <c>[Authorize]</c> attributes.</summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationAuthorization(this IServiceCollection services)
     {
         services.AddAuthorization(opts =>
@@ -403,11 +475,18 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>Registers <see cref="GlobalExceptionHandler"/> to turn unhandled exceptions into a standard error response.</summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationGlobalExceptionHandler(this IServiceCollection services)
     {
         services.AddExceptionHandler<GlobalExceptionHandler>();
     }
 
+    /// <summary>
+    /// Registers ASP.NET Core Data Protection, used to protect OTP operation tokens. Keys use the
+    /// default storage, so tokens issued by one instance may not be readable by another.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void AddDataProtectionService(this IServiceCollection services)
     {
         services.AddDataProtection(opts =>
@@ -416,6 +495,8 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>Registers the in-memory cache with a size limit of 268,435,456 units.</summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationCaching(this IServiceCollection services)
     {
         services.AddMemoryCache(opts =>
@@ -425,6 +506,13 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Registers the PostgreSQL health check and the custom checks in
+    /// <c>WebHook.Infrastructure.CustomHealthChecks</c>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <exception cref="ArgumentNullException">The <c>DbConnection</c> connection string is missing.</exception>
     internal static void ConfigureHealthChecks(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHealthChecks()
@@ -446,6 +534,12 @@ internal static class ApplicationServiceExtensions
         //}).AddInMemoryStorage();
     }
 
+    /// <summary>
+    /// Registers CORS policies: a default policy that allows any origin, method and header, and a
+    /// <c>RestrictedPolicy</c> built from the <c>CorsPolicy</c> configuration section.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
     internal static void ConfigureApplicationCorsPolicy(this IServiceCollection services, IConfiguration configuration)
     {
         var corsConfig = configuration.GetSection("CorsPolicy");
@@ -469,6 +563,19 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Registers the rate limiting policies, which reject excess requests with <c>429</c> and a
+    /// <see cref="GenericResponse{T}"/> body.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    ///   <item><description><c>request-otp-limit</c> — 3 requests per 10 minutes per email address (or IP address).</description></item>
+    ///   <item><description><c>validate-otp-limit</c> — 5 requests per 10 minutes per email address (or IP address).</description></item>
+    ///   <item><description><c>per-user-rating</c> — 10 requests per minute per user ID (or IP address when anonymous).</description></item>
+    /// </list>
+    /// The email address partitions are populated by the OTP email extraction middleware.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationRateLimiting(this IServiceCollection services)
     {
         services.AddRateLimiter(opts =>
@@ -553,6 +660,11 @@ internal static class ApplicationServiceExtensions
         });
     }
 
+    /// <summary>
+    /// Configures forwarded headers so the client IP address and scheme are taken from
+    /// <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c> when running behind a proxy.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
     internal static void ConfigureForwardHeaders(this IServiceCollection services)
     {
         services.Configure<ForwardedHeadersOptions>(opts =>

@@ -203,6 +203,38 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.ToView("vw_getmostrecentevents", (string)null);
                 });
 
+            modelBuilder.Entity("WebHook.Core.Entities.CustomEntities.UserDashboardSummaryReportAnalyticsEntity", b =>
+                {
+                    b.Property<int>("ActiveSubscribedCatalogs")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ActiveSubscriptions")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DeadLetterRetriedToday")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PendingDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PendingDeliveriesToday")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("SuccessRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("TotalDeadLetter")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalDeliveries")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalSubscription")
+                        .HasColumnType("integer");
+
+                    b.ToTable("UserDashboardSummaryReportAnalyticsEntity");
+                });
+
             modelBuilder.Entity("WebHook.Core.Entities.OtpOperationToken", b =>
                 {
                     b.Property<Guid>("Id")

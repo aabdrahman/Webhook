@@ -5,8 +5,13 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="OtpOperationToken"/>: a unique JTI, purpose stored as a string,
+/// and indexes on the lifecycle timestamps used when validating tokens.
+/// </summary>
 public class OtpOperationTokenConfiguration : IEntityTypeConfiguration<OtpOperationToken>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<OtpOperationToken> builder)
     {
         builder.HasKey(x => x.Id);

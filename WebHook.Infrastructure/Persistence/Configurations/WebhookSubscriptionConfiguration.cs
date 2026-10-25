@@ -4,8 +4,13 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookSubscription"/>. <c>SubscribedFields</c> is stored as
+/// <c>jsonb</c>, and a global query filter hides inactive subscriptions.
+/// </summary>
 public sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<WebhookSubscription>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookSubscription> builder)
     {
         builder.HasKey(x => x.Id);

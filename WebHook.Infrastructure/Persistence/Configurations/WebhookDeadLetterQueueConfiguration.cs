@@ -4,8 +4,12 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookDeadLetterQueue"/>, indexed by delivery.
+/// </summary>
 internal sealed class WebhookDeadLetterQueueConfiguration : IEntityTypeConfiguration<WebhookDeadLetterQueue>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookDeadLetterQueue> builder)
     {
         builder.HasKey(x => x.Id);

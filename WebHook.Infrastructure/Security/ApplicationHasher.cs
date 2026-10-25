@@ -4,6 +4,13 @@ using WebHook.Core.Interfaces.Helpers;
 
 namespace WebHook.Infrastructure.Security;
 
+/// <summary>
+/// <see cref="IApplicationHasher"/> implementation using PBKDF2 with SHA-256,
+/// 1,000,000 iterations, a 16-byte random salt and a 32-byte hash.
+/// </summary>
+/// <remarks>
+/// Hashes are stored as <c>HEX(hash)-HEX(salt)</c>.
+/// </remarks>
 public class ApplicationHasher : IApplicationHasher
 {
     private readonly HashAlgorithmName hashAlgorithm = HashAlgorithmName.SHA256;
@@ -12,6 +19,9 @@ public class ApplicationHasher : IApplicationHasher
     private const int hashSize = 32;
     private const int saltSize = 16;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="ApplicationHasher"/> class.
+    /// </summary>
     public ApplicationHasher()
     {
         _logger = Log.ForContext(_classNmae, nameof(ApplicationHasher));
@@ -21,6 +31,7 @@ public class ApplicationHasher : IApplicationHasher
     private const string _methodName = "MethodName";
     private const string _classNmae = "ClassName";
 
+    /// <inheritdoc />
     public async Task<string> HashSecret(string secret)
     {
         _logger = _logger.ForContext(_methodName, nameof(HashSecret));
@@ -40,6 +51,7 @@ public class ApplicationHasher : IApplicationHasher
         }
     }
 
+    /// <inheritdoc />
     public async Task<bool> ValidateHashedSecret(string hashedSecret, string secret)
     {
         _logger = _logger.ForContext(_methodName, nameof(ValidateHashedSecret));

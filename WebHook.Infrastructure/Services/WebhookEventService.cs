@@ -48,10 +48,10 @@ public sealed class WebhookEventService : IWebhookEventService
     /// <param name="repositoryContext">
     /// The EF Core database context used for all persistence and query operations.
     /// </param>
-    /// <paramref name="applicationPublisher"/>
+    /// <param name="applicationPublisher">
     /// The application configured publisher to publish to channels designated for eacj possible operation.
     /// </param>
-    /// <paramref name="authenticatedUserDetails"/>
+    /// <param name="authenticatedUserDetails">
     /// The authenticated user details is provided to ensure that we can extract the client key and client id when posting an event.
     /// </param>
     public WebhookEventService(RepositoryContext repositoryContext, IApplicationPublisher applicationPublisher, IAuthenticatedUserDetails authenticatedUserDetails)

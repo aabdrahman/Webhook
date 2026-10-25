@@ -3,8 +3,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WebHook.Core.CustomValidators;
 
+/// <summary>
+/// Validates that a collection contains at least one item.
+/// </summary>
 internal class NotEmptyCollectionValidatorAttribute : ValidationAttribute
 {
+    /// <inheritdoc />
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is IEnumerable enumObject)
@@ -21,8 +25,12 @@ internal class NotEmptyCollectionValidatorAttribute : ValidationAttribute
 }
 
 
+/// <summary>
+/// Validates that a dictionary contains at least one entry.
+/// </summary>
 internal class NotEmptyDictionaryCollectionAttribute : ValidationAttribute
 {
+    /// <inheritdoc />
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is IDictionary dictionaryObject)

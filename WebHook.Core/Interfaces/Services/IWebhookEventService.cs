@@ -53,7 +53,7 @@ public interface IWebhookEventService
     ///   </item>
     ///   <item>
     ///     <description>
-    ///       <strong>Payload validation</strong> — uses <see cref="WebHook.Infrastructure.EventObjectGenerator.RuntimeEventBuilder"/>
+    ///       <strong>Payload validation</strong> — uses <c>RuntimeEventBuilder</c> (Infrastructure)
     ///       to dynamically construct the expected payload type from the catalog's
     ///       <c>AvailableFields</c>, then deserializes and inspects the submitted
     ///       payload against it. Missing required fields are reported individually
@@ -114,7 +114,7 @@ public interface IWebhookEventService
     ///   <item><description><see cref="System.Net.HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
-    Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventsAsync(GetWebhookEventParameters parameters, CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default);
     /// <summary>
     /// Retrieves a filtered, pageable list of webhook events using the
     /// provided query parameters.
@@ -177,5 +177,5 @@ public interface IWebhookEventService
     ///   <item><description><see cref="System.Net.HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
-    Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventAsync(Guid correlationId, CancellationToken ct = default);
+    Task<GenericResponse<IReadOnlyList<WebhookEventDto>>> GetWebhookEventsAsync(GetWebhookEventParameters parameters, CancellationToken ct = default);
 }

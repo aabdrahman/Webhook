@@ -14,7 +14,7 @@ namespace WebHook.Infrastructure.Services;
 /// <summary>
 /// Service responsible for managing webhook event catalogs.
 /// Implements <see cref="IWebhookEventCatalogService"/> and provides operations for
-/// creating, retrieving, updating, activating/deactivating, and deleting webhook event catalogs.
+/// creating, retrieving, and activating/deactivating webhook event catalogs.
 /// The service utilizes the repository layer for persistence and the logger for
 /// recording application events and errors.
 /// </summary>
@@ -32,27 +32,13 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
     /// <param name="repositoryContext">
     /// The repository context used to perform data access operations.
     /// </param>
-    /// <param name="logger">
-    /// The logger used for recording application events and errors.
-    /// </param>
     public WebhookEventCatalogService(RepositoryContext repositoryContext)
     {
         _repositoryContext = repositoryContext;
         _logger = Log.ForContext<WebhookEventCatalogService>().ForContext(_className, nameof(WebhookEventCatalogService));
     }
 
-    /// <summary>
-    /// Creates a new webhook event type that subscribers can subscribe to.
-    /// </summary>
-    /// <param name="createEventCatalogDto">
-    /// The details of the webhook event type.
-    /// </param>
-    /// <param name="ct">
-    /// The cancellation token.
-    /// </param>
-    /// <returns>
-    /// A generic response containing the outcome of the operation.
-    /// </returns>
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> CreateNewEventCatalogAsync(CreateEventCatalogDto createEventCatalogDto, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(CreateNewEventCatalogAsync));
@@ -120,21 +106,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
             return GenericResponse<string>.Failure("Operation Failed", "We could not perform operation. Please retry later.", HttpStatusCode.InternalServerError, new ErrorDetail() { ErrorDescription = ex.InnerException?.Message ?? "", ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message });
         }
     }
-    /// <summary>
-    /// Activates or deactivates a webhook event type, controlling whether subscribers can register for the event.
-    /// </summary>
-    /// <param name="eventCatalogId">
-    /// The unique identifier of the webhook event type.
-    /// </param>
-    /// <param name="isDeactivate">
-    /// Indicates whether the event type should be deactivated.
-    /// </param>
-    /// <param name="ct">
-    /// The cancellation token.
-    /// </param>
-    /// <returns>
-    /// A generic response containing the outcome of the operation.
-    /// </returns>
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> EventCatalogActivationAsync(Guid EventCatalogId, bool isDeactivate = true, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(EventCatalogActivationAsync));
@@ -180,15 +152,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
             return GenericResponse<string>.Failure("Operation failed.", isDeactivate ? "Event Catalog deactivation could not be completed. please retry later." : "Event Catalog reactivation could not be completed. please retry later.", HttpStatusCode.InternalServerError);
         }
     }
-    /// <summary>
-    /// Retrieves all webhook event catalogs.
-    /// </summary>
-    /// <param name="ct">
-    /// The cancellation token.
-    /// </param>
-    /// <returns>
-    /// A generic response containing the collection of webhook event catalogs.
-    /// </returns>
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<EventCatalogDto>>> GetAllEventCatalogAsync(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllEventCatalogAsync));
@@ -217,18 +181,7 @@ public sealed class WebhookEventCatalogService : IWebhookEventCatalogService
 
         }
     }
-    /// <summary>
-    /// Retrieves a webhook event catalog by its unique identifier.
-    /// </summary>
-    /// <param name="eventCatalogId">
-    /// The unique identifier of the webhook event catalog.
-    /// </param>
-    /// <param name="ct">
-    /// The cancellation token.
-    /// </param>
-    /// <returns>
-    /// A generic response containing the requested webhook event catalog.
-    /// </returns>
+    /// <inheritdoc />
     public async Task<GenericResponse<EventCatalogDto>> GetEventCatalogByIdAsync(Guid EventCatalogId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetEventCatalogByIdAsync));

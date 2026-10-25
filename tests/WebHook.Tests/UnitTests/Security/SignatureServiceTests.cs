@@ -261,4 +261,97 @@ public class SignatureServiceTests
         //Act & Assert
         Assert.Throws<ArgumentException>(() => _sut.VerifySignature(payload, encryptedValue, encryptionKey));
     }
+
+    [Fact]
+    public void IsTimeStampValid_TimestampOlderThanAnHour_ReturnsFalse()
+    {
+        //Arrange - 62 minutes old has a minutes component of 2, which the old check accepted.
+        var webhookTimestamp = DateTimeOffset.UtcNow.AddMinutes(-62);
+
+        //Act
+        var result = _sut.IsTimeStampValid(webhookTimestamp);
+
+        //Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GenerateSignatureWithTimestamp_MatchesHmacOfTimestampDotPayload()
+    {
+        //Arrange
+        string payload = @"{""eventType"":""CustomerCreated""}";
+        string secret = "my-secret";
+        long timestamp = 1761400000;
+
+        //Act
+        var signature = _sut.GenerateSignature(payload, secret, timestamp);
+
+        //Assert
+        Assert.Equal(_sut.GenerateSignature($"{timestamp}.{payload}", secret), signature);
+    }
+
+    [Fact]
+    public void GenerateSignatureWithTimestamp_DifferentTimestamp_GeneratesDifferentSignature()
+    {
+        //Arrange
+        string payload = @"{""eventType"":""CustomerCreated""}";
+        string secret = "my-secret";
+
+        //Act
+        var signature1 = _sut.GenerateSignature(payload, secret, 1761400000);
+        var signature2 = _sut.GenerateSignature(payload, secret, 1761400001);
+
+        //Assert
+        Assert.NotEqual(signature1, signature2);
+    }
+
+    [Fact]
+    public void VerifySignatureWithTimestamp_CorrectSignature_ReturnsTrue()
+    {
+        //Arrange
+        string payload = @"{""eventType"":""CustomerCreated""}";
+        string secret = "my-secret";
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        //Act
+        var signature = _sut.GenerateSignature(payload, secret, timestamp);
+        var isValidResult = _sut.VerifySignature(payload, signature, secret, timestamp);
+
+        //Assert
+        Assert.True(isValidResult);
+    }
+
+    [Fact]
+    public void VerifySignatureWithTimestamp_ReplayedWithNewTimestamp_ReturnsFalse()
+    {
+        //Arrange
+        string payload = @"{""eventType"":""CustomerCreated""}";
+        string secret = "my-secret";
+        long originalTimestamp = DateTimeOffset.UtcNow.AddHours(-1).ToUnixTimeSeconds();
+        long replayTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        //Act
+        var capturedSignature = _sut.GenerateSignature(payload, secret, originalTimestamp);
+        var isValidResult = _sut.VerifySignature(payload, capturedSignature, secret, replayTimestamp);
+
+        //Assert
+        Assert.False(isValidResult);
+    }
+
+    [Fact]
+    public void VerifySignatureWithTimestamp_TamperedPayload_ReturnsFalse()
+    {
+        //Arrange
+        string payload = @"{""eventType"":""CustomerCreated""}";
+        string tamperedPayload = @"{""eventType"":""CustomerCreated"",""hack"":true}";
+        string secret = "my-secret";
+        long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        //Act
+        var signature = _sut.GenerateSignature(payload, secret, timestamp);
+        var isValidResult = _sut.VerifySignature(tamperedPayload, signature, secret, timestamp);
+
+        //Assert
+        Assert.False(isValidResult);
+    }
 }

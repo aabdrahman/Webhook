@@ -5,6 +5,7 @@ using System.Net;
 using WebHook.Core.Constants;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookDeadLetterQueue;
+using WebHook.Core.DataTransferObjects.WebhookDelivery;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
 using WebHook.Core.Interfaces.Helpers;
@@ -13,12 +14,21 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IDeadLetterQueueService"/> implementation backed by EF Core.
+/// </summary>
 public sealed class DeadLetterQueueService : IDeadLetterQueueService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly DeadLetterManualRetryConfiguration _deadLetterManualRetryConfiguration;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="DeadLetterQueueService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="optionsMonitor">Manual retry limits.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller, recorded as the retrying admin.</param>
     public DeadLetterQueueService(RepositoryContext repositoryContext, IOptionsMonitor<DeadLetterManualRetryConfiguration> optionsMonitor, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
@@ -33,6 +43,7 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
     private const string _methodName = "MethodName";
     private const string _className = "ClassName";
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> RequestManualRetryAsync(RequestManualRetryDto requestManualRetry, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RequestManualRetryAsync));
@@ -101,15 +112,30 @@ public sealed class DeadLetterQueueService : IDeadLetterQueueService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<DeadLetterQueueDto>>> GetDeliveryDeadLetterAsync(Guid deliveryId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetDeliveryDeadLetterAsync));
 
         try
         {
-            _logger.Information("Fetching dead letter queue record for delivery - {0}", deliveryId);
+            _logger.Information("Fetching dead letter queue record for delivery - {0} for user - {1}", deliveryId, _authenticatedUserDetails.userId);
 
-            IReadOnlyList<DeadLetterQueueDto> deadLetterItems = await _repositoryContext.WebhookDeadLetterQueues.Where(x => x.WebhookDeliveryId == deliveryId).Select(x => new DeadLetterQueueDto(x.Id, x.CreatedAt, x.Reason, x.RetriedAt, x.RetryJustification, x.RetriedBy)).ToListAsync(ct);
+            var deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.Id == deliveryId);
+
+            if (!_authenticatedUserDetails.assignedRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Guid.TryParse(_authenticatedUserDetails.userId, out Guid authUserId))
+                {
+                    _logger.Warning("The authenticated user details could not be parsed as guid - {0}, UserEamil: {1}", _authenticatedUserDetails.userId, _authenticatedUserDetails.emailAddress);
+                    return GenericResponse<IReadOnlyList<DeadLetterQueueDto>>.Failure(null, "An error occurred while performing operation", HttpStatusCode.BadRequest);
+                }
+                
+                deliveryQuery = _repositoryContext.WebhookDeadLetterQueues.Where(x => x.webhookDelivery.WebhookSubscriptionEvent.webhookSubscription.CreatedByUserId == authUserId && x.Id == deliveryId);
+
+            }
+
+            IReadOnlyList<DeadLetterQueueDto> deadLetterItems = await deliveryQuery.Select(x => new DeadLetterQueueDto(x.Id, x.CreatedAt, x.Reason, x.RetriedAt, x.RetryJustification, x.RetriedBy)).ToListAsync(ct);
 
             return deadLetterItems.Any() ?
                 GenericResponse<IReadOnlyList<DeadLetterQueueDto>>.Success(deadLetterItems, "Dead letter queues fetched successfully", HttpStatusCode.OK) :

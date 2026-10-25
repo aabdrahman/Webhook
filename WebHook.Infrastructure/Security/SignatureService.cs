@@ -7,6 +7,7 @@ namespace WebHook.Infrastructure.Security;
 
 /// <summary>
 /// Implements HMAC-SHA256 payload signing and verification for webhook deliveries.
+/// Delivery signatures cover <c>"{timestamp}.{payload}"</c>; see <see cref="ISignatureService"/>.
 /// Lives in Infrastructure because it uses <see cref="HMACSHA256"/> from the BCL
 /// and has no domain logic — it is purely a security utility.
 /// </summary>
@@ -21,6 +22,9 @@ public sealed class SignatureService : ISignatureService
     // X-Webhook-Signature: sha256=<hex>
     private const string SignaturePrefix = "sha256=";
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="SignatureService"/> class.
+    /// </summary>
     public SignatureService()
     {
         _logger = Log.Logger.ForContext<SignatureService>().ForContext(_className, nameof(SignatureService));
@@ -32,30 +36,60 @@ public sealed class SignatureService : ISignatureService
         ArgumentException.ThrowIfNullOrWhiteSpace(payLoad, nameof(payLoad));
         ArgumentException.ThrowIfNullOrWhiteSpace(encryptionKey, nameof(encryptionKey));
 
-        _logger = _logger.ForContext(_methodName, nameof(GenerateSignature));
+        return ComputeSignature(payLoad, encryptionKey);
+    }
+
+    ///<inheritdoc />
+    public string GenerateSignature(string payLoad, string encryptionKey, long timestamp)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(payLoad, nameof(payLoad));
+        ArgumentException.ThrowIfNullOrWhiteSpace(encryptionKey, nameof(encryptionKey));
+
+        return ComputeSignature(BuildSignedContent(payLoad, timestamp), encryptionKey);
+    }
+
+    ///<inheritdoc />
+    public bool VerifySignature(string payLoad, string receivedSignature, string encryptionKey, long timestamp)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(payLoad, nameof(payLoad));
+        ArgumentException.ThrowIfNullOrWhiteSpace(receivedSignature, nameof(receivedSignature));
+        ArgumentException.ThrowIfNullOrWhiteSpace(encryptionKey, nameof(encryptionKey));
+
+        return IsMatch(ComputeSignature(BuildSignedContent(payLoad, timestamp), encryptionKey), receivedSignature);
+    }
+
+    // The signed content binds the timestamp to the payload: "{timestamp}.{payload}".
+    private static string BuildSignedContent(string payLoad, long timestamp) => $"{timestamp}.{payLoad}";
+
+    private string ComputeSignature(string content, string encryptionKey)
+    {
+        ILogger logger = _logger.ForContext(_methodName, nameof(GenerateSignature));
 
         try
         {
-            _logger.Information("Generating signature for payload.");
-
-            byte[] payLoadBytes = Encoding.UTF8.GetBytes(payLoad);
+            byte[] contentBytes = Encoding.UTF8.GetBytes(content);
             byte[] encryptionKeyBytes = Encoding.UTF8.GetBytes(encryptionKey);
 
             using var hmac = new HMACSHA256(encryptionKeyBytes);
-            byte[] hashBytes = hmac.ComputeHash(payLoadBytes);
+            byte[] hashBytes = hmac.ComputeHash(contentBytes);
 
-            string signature = SignaturePrefix + Convert.ToHexString(hashBytes).ToLowerInvariant();
-
-            _logger.Information("Signature generated successfully.");
-
-            return signature;
-
+            return SignaturePrefix + Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Error occurred while generating webhook signature.");
+            logger.Error(ex, "Error occurred while generating webhook signature.");
             throw;
         }
+    }
+
+    private bool IsMatch(string expectedSignature, string receivedSignature)
+    {
+        bool isValid = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSignature), Encoding.UTF8.GetBytes(receivedSignature));
+
+        if (!isValid)
+            _logger.ForContext(_methodName, nameof(VerifySignature)).Information("Signature Verification Failed - Payload may have been tampered with.");
+
+        return isValid;
     }
     ///<inheritdoc />
     public bool IsTimeStampValid(DateTimeOffset timeStamp, int toleranceWindowInMinutes = 5)
@@ -67,7 +101,7 @@ public sealed class SignatureService : ISignatureService
             _logger.Information("Validating webhook timestamp - tolerance: {0}", timeStamp);
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            double ageInMinutes = Math.Abs((now - timeStamp).Minutes);
+            double ageInMinutes = Math.Abs((now - timeStamp).TotalMinutes);
 
             bool isValid = ageInMinutes <= toleranceWindowInMinutes;
 
@@ -93,27 +127,13 @@ public sealed class SignatureService : ISignatureService
         ArgumentException.ThrowIfNullOrWhiteSpace(receivedSignature, nameof(receivedSignature));
         ArgumentException.ThrowIfNullOrWhiteSpace(encryptionKey, nameof(encryptionKey));
 
-        _logger = _logger.ForContext(_methodName, nameof(VerifySignature));
-
         try
         {
-            _logger.Information("Verifying payload signature.");
-
-            string expectedSignature = GenerateSignature(payLoad, encryptionKey);
-
-            bool isValid = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSignature), Encoding.UTF8.GetBytes(receivedSignature));
-
-            if (isValid)
-                _logger.Information("Signature Verified successfully.");
-            else
-                _logger.Information("Signature Verification Failed - Payload may have been tampered with.");
-
-            return isValid;
-
+            return IsMatch(ComputeSignature(payLoad, encryptionKey), receivedSignature);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "An error occurred verifying webhook signature.");
+            _logger.ForContext(_methodName, nameof(VerifySignature)).Error(ex, "An error occurred verifying webhook signature.");
             return false;
 
         }

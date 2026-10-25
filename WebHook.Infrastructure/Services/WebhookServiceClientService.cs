@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using WebHook.Core.DataTransferObjects;
 using WebHook.Core.DataTransferObjects.WebhookServiceClient;
@@ -13,6 +14,9 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IWebhookServiceClientService"/> implementation backed by EF Core.
+/// </summary>
 public sealed class WebhookServiceClientService : IWebhookServiceClientService
 {
     private readonly RepositoryContext _repositoryContext;
@@ -20,6 +24,13 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
     private readonly ICacheService _cacheService;
     private readonly IApplicationHasher _applicationHasher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="WebhookServiceClientService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller, recorded on audit fields.</param>
+    /// <param name="cacheService">Used to revoke the caller's token if their account is no longer active.</param>
+    /// <param name="applicationHasher">Hashes issued client keys.</param>
     public WebhookServiceClientService(RepositoryContext repositoryContext, IAuthenticatedUserDetails authenticatedUserDetails, ICacheService cacheService, IApplicationHasher applicationHasher)
     {
         _repositoryContext = repositoryContext;
@@ -32,6 +43,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
     private const string _className = "ClassName";
     private ILogger _logger = Log.ForContext(_className, nameof(WebhookServiceClientService));
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> DeactivateClientAsync(string clientId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(DeactivateClientAsync));
@@ -79,6 +91,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<WebhookServiceClientDto>>> GetAllClientsAsync(bool includeDeactivated = false, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetAllClientsAsync));
@@ -104,6 +117,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
 
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<WebhookServiceClientDto>> GetByClientIdAsync(string clientId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetByClientIdAsync));
@@ -130,6 +144,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<ServiceClientOnboardingResponse>> OnboardNewServiceClientAsync(CreateServiceClientDto createServiceClient, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(OnboardNewServiceClientAsync));
@@ -167,7 +182,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
                 return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, "Unauthorized Access.", HttpStatusCode.Forbidden);
             }
 
-            string clientKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(Random.Shared.GetHexString(16)));
+            string clientKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(RandomNumberGenerator.GetHexString(16)));
             if (string.IsNullOrEmpty(clientKey))
             {
                 _logger.Warning("The application could not generate a valid secret key for the client.");
@@ -209,6 +224,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> ReactivateClientAsync(string clientId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ReactivateClientAsync));
@@ -245,6 +261,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<ServiceClientOnboardingResponse>> RequestNewClientKeyAsync(RequestNewClientKeyDto requestNewClientKey, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RequestNewClientKeyAsync));
@@ -261,7 +278,7 @@ public sealed class WebhookServiceClientService : IWebhookServiceClientService
                 return GenericResponse<ServiceClientOnboardingResponse>.Failure(null, $"Service client does not exist: {requestNewClientKey.ClientId}", HttpStatusCode.NotFound);
             }
 
-            string newClientKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(Random.Shared.GetHexString(16)));
+            string newClientKey = Convert.ToBase64String(Encoding.UTF8.GetBytes(RandomNumberGenerator.GetHexString(16)));
 
             clientToUpdate.ClientKey = await _applicationHasher.HashSecret(newClientKey);
 

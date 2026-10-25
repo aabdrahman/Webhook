@@ -31,10 +31,14 @@ namespace WebHook.Infrastructure.Utilities;
 //    }
 //}
 
+/// <summary>
+/// <see cref="IOtpGenerator"/> implementation that draws each digit from <see cref="RandomNumberGenerator"/>.
+/// </summary>
 public sealed class OtpGenerator : IOtpGenerator
 {
     private const string ClassName = nameof(OtpGenerator);
 
+    /// <inheritdoc />
     public string GenerateOtp(int length = 6, int maxLength = 12)
     {
         ILogger logger = Log.ForContext("ClassName", ClassName).ForContext("MethodName", nameof(GenerateOtp));

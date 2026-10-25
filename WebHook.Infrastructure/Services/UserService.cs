@@ -16,6 +16,9 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IUserService"/> implementation built on ASP.NET Core Identity.
+/// </summary>
 public sealed class UserService : IUserService
 {
     private readonly UserManager<User> _userManager;
@@ -24,6 +27,14 @@ public sealed class UserService : IUserService
     private readonly IDataProtector _dataProtector;
     private readonly IApplicationHasher _applicationHasher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="UserService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="userManager">Identity user manager.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller and headers.</param>
+    /// <param name="dataProtectionProvider">Creates the protector for operation tokens.</param>
+    /// <param name="applicationHasher">Verifies operation token hashes.</param>
     public UserService(RepositoryContext repositoryContext, UserManager<User> userManager, IAuthenticatedUserDetails authenticatedUserDetails, IDataProtectionProvider dataProtectionProvider, IApplicationHasher applicationHasher)
     {
         _repositoryContext = repositoryContext;
@@ -40,6 +51,7 @@ public sealed class UserService : IUserService
     private const string _methodName = "MethodName";
     private const string _className = "ClassName";
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> CreateUserAsync(CreateUserDto createUser, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(CreateUserAsync));
@@ -122,6 +134,7 @@ public sealed class UserService : IUserService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> DeactivateUserProfileAsync(UserDeactivationRequestDto userDeactivationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(DeactivateUserProfileAsync));
@@ -274,6 +287,7 @@ public sealed class UserService : IUserService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> ReactivateUserProfileAsync(ReactivateUserRequestDto reactivateUser, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ReactivateUserProfileAsync));
@@ -285,11 +299,11 @@ public sealed class UserService : IUserService
 
             if (reactivateUser.UserNameOrEmailAddress.Contains("@", StringComparison.OrdinalIgnoreCase))
             {
-                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedEmail.Contains(reactivateUser.UserNameOrEmailAddress.ToUpper()));
+                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedEmail == reactivateUser.UserNameOrEmailAddress.ToUpper());
             }
             else
             {
-                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedUserName.Contains(reactivateUser.UserNameOrEmailAddress.ToUpper()));
+                userToReactivateQuery = userToReactivateQuery.Where(x => x.NormalizedUserName == reactivateUser.UserNameOrEmailAddress.ToUpper());
             }
 
             User? userToReactivate = await userToReactivateQuery.FirstOrDefaultAsync(ct);
@@ -307,6 +321,7 @@ public sealed class UserService : IUserService
             }
 
             userToReactivate.IsActive = true;
+            userToReactivate.LockoutEnd = null;
             IdentityResult reactivateResult = await _userManager.UpdateAsync(userToReactivate);
 
             if (!reactivateResult.Succeeded)
@@ -326,6 +341,7 @@ public sealed class UserService : IUserService
         }
 
     }
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<UserDetailsDto>>> GetAllUsers(bool includeDeactivated = false, CancellationToken ct = default)
     {
         try
@@ -361,6 +377,7 @@ public sealed class UserService : IUserService
        
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<UserDetailsDto>> GetUserDetailsAsync(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetUserDetailsAsync));

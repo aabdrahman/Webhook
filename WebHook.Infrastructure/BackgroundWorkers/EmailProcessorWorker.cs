@@ -9,12 +9,26 @@ using WebHook.Core.Interfaces.Helpers;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Sends the emails queued through <see cref="Core.EventContracts.Publishers.IApplicationPublisher.QueueEmailEvent"/>.
+/// </summary>
+/// <remarks>
+/// Each email is sent after a configurable delay, to throttle calls to the SMTP server.
+/// Failed sends are logged and not retried. On shutdown, emails still in the channel are sent
+/// before the worker stops.
+/// </remarks>
 public class EmailProcessorWorker : BackgroundService
 {
     private readonly Channel<EmailSenderDto> _emailSenderChannel;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly EmailProcessorWorkerConfiguration _emailProcessorWorkerConfiguration;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="EmailProcessorWorker"/> class.
+    /// </summary>
+    /// <param name="emailSenderChannel">The channel queued emails are read from.</param>
+    /// <param name="serviceScopeFactory">Creates a scope, and so an <see cref="IEmailService"/>, per email.</param>
+    /// <param name="optionsMonitor">The worker's interval and per-email delay, read once at construction.</param>
     public EmailProcessorWorker(Channel<EmailSenderDto> emailSenderChannel, IServiceScopeFactory serviceScopeFactory, IOptionsMonitor<EmailProcessorWorkerConfiguration> optionsMonitor)
     {
         _emailSenderChannel = emailSenderChannel;
@@ -26,6 +40,7 @@ public class EmailProcessorWorker : BackgroundService
 
     private ILogger _logger;
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext("MethodName", nameof(ExecuteAsync));
@@ -56,12 +71,18 @@ public class EmailProcessorWorker : BackgroundService
         }
     }
 
+    /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.ForContext("MethodName", nameof(StartAsync)).Information("Email processor worker is starting.....");
         return base.StartAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Sends any emails left in the channel, one second apart, then stops the worker.
+    /// </summary>
+    /// <param name="cancellationToken">Signals that shutdown should no longer be graceful.</param>
+    /// <returns>A task that completes when the worker has stopped.</returns>
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger = _logger.ForContext("MethodName", nameof(StopAsync));

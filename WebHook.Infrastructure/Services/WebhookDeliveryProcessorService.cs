@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using System.Diagnostics;
 using System.Text;
@@ -13,6 +14,31 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// Makes the first HTTP attempt for pending deliveries. Used by the delivery processor worker.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Delivery uses a two-phase claim. First, a batch of <see cref="WebhookDeliveryStatus.Pending"/>
+/// deliveries with no retry scheduled and no live lock is selected with
+/// <c>FOR UPDATE SKIP LOCKED</c>, marked <see cref="WebhookDeliveryStatus.Processing"/> and locked
+/// to the worker, and the transaction is committed. Then each delivery is posted to its callback URL
+/// outside the transaction.
+/// </para>
+/// <para>
+/// Each request is sent with the <c>X-Webhook-Timestamp</c> (Unix seconds), <c>X-Webhook-Event</c>
+/// and <c>X-Webhook-Signature</c> headers; the signature covers <c>"{timestamp}.{payload}"</c>. A 2xx response marks the delivery
+/// <see cref="WebhookDeliveryStatus.Delivered"/>; anything else, an <see cref="HttpRequestException"/>,
+/// or a request timeout (recorded as <c>408</c>), marks it <see cref="WebhookDeliveryStatus.Failed"/> with a
+/// <c>NextRetryAt</c> from <see cref="WebhookDeliveryRetryAfterService"/>. Every attempt is recorded.
+/// If the request takes longer than the threshold, a slow-endpoint email is queued to the
+/// subscription's contact.
+/// </para>
+/// <para>
+/// Any other exception, including cancellation on shutdown, ends the whole batch; the remaining
+/// claimed deliveries stay locked until <see cref="StaleClaimedDeliveryReleaseService"/> releases them.
+/// </para>
+/// </remarks>
 public sealed class WebhookDeliveryProcessorService
 {
     private readonly RepositoryContext _repositoryContext;
@@ -23,6 +49,16 @@ public sealed class WebhookDeliveryProcessorService
     private readonly EmailContentFormatterHelper _emailContentFormatterHelper;
     private readonly IApplicationPublisher _applicationPublisher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="WebhookDeliveryProcessorService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="httpClientFactory">Supplies the named <c>WebhookDeliveryClient</c> HTTP client.</param>
+    /// <param name="retryAfterService">Computes when a failed delivery should be retried.</param>
+    /// <param name="signatureService">Signs request payloads.</param>
+    /// <param name="encryptionService">Decrypts subscription signing secrets.</param>
+    /// <param name="emailContentFormatterHelper">Renders the slow-endpoint email.</param>
+    /// <param name="applicationPublisher">Queues escalation emails.</param>
     public WebhookDeliveryProcessorService(RepositoryContext repositoryContext, IHttpClientFactory httpClientFactory, WebhookDeliveryRetryAfterService retryAfterService, ISignatureService signatureService, IEncryptionService encryptionService, EmailContentFormatterHelper emailContentFormatterHelper, IApplicationPublisher applicationPublisher)
     {
         _repositoryContext = repositoryContext;
@@ -38,6 +74,16 @@ public sealed class WebhookDeliveryProcessorService
     private const string _methodName = "MethodName";
     private const string _className = "ClassName";
 
+    /// <summary>
+    /// Claims a batch of pending deliveries and makes one HTTP attempt for each.
+    /// </summary>
+    /// <remarks>Errors are logged, not thrown.</remarks>
+    /// <param name="totalToProcess">The maximum number of deliveries to claim.</param>
+    /// <param name="lockDuration">How long, in seconds, each claimed delivery stays locked to this worker.</param>
+    /// <param name="workerId">The ID recorded as the delivery's <c>LockedBy</c>.</param>
+    /// <param name="thresholdDuration">The HTTP duration, in milliseconds, above which a slow-endpoint email is sent.</param>
+    /// <param name="ct">A token to cancel the operation.</param>
+    /// <returns>A task that completes when the batch has been processed.</returns>
     public async Task ProcessPendingDeliveriesAsync(int totalToProcess = 10, double lockDuration = 30, string workerId = "", long thresholdDuration = 1500, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ProcessPendingDeliveriesAsync));
@@ -156,9 +202,11 @@ public sealed class WebhookDeliveryProcessorService
                     Content = new StringContent(payload, encoding: Encoding.UTF8, "application/json")
                 };
 
-                httpRequest.Headers.Add("X-Webhook-Timestamp", attemptedTime.ToUnixTimeSeconds().ToString());
+                //The same timestamp is sent in the header and bound into the signature, so it cannot be replaced on replay.
+                long signatureTimestamp = attemptedTime.ToUnixTimeSeconds();
+                httpRequest.Headers.Add("X-Webhook-Timestamp", signatureTimestamp.ToString());
                 httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName.ToUpper());
-                httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(payload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret)));
+                httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(payload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret), signatureTimestamp));
 
                 var stopWatch = new Stopwatch();
                 stopWatch.Start();
@@ -190,6 +238,18 @@ public sealed class WebhookDeliveryProcessorService
                         delivery.LockedBy = null;
                         delivery.LockedUntil = null;
                     }
+                }
+                catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+                {
+                    stopWatch.Stop();
+                    _logger.Error(ex, "A timeout occurred while calling the endpoint: {0}", urlToCall);
+                    delivery.DeliveryStatus = WebhookDeliveryStatus.Failed;
+                    delivery.RetryCount++;
+                    delivery.NextRetryAt = await _retryAfterService.GetRetryAfter(attemptedTime, delivery.RetryCount + 1);
+                    delivery.LockedBy = null;
+                    delivery.LockedUntil = null;
+                    responseContent = ex.Message;
+                    httpResponseCode = ((int)StatusCodes.Status408RequestTimeout).ToString();
                 }
                 catch (HttpRequestException ex)
                 {

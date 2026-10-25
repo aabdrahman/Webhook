@@ -25,6 +25,10 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IAuthenticationService"/> implementation built on ASP.NET Core Identity,
+/// with JWTs signed using the key in the <c>webhook_secret_key</c> environment variable.
+/// </summary>
 public sealed class AuthenticationService : IAuthenticationService
 {
     private readonly UserManager<User> _userManager;
@@ -42,6 +46,23 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly RoleManager<Role> _roleManager;
     private readonly IApplicationPublisher _applicationPublisher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="AuthenticationService"/> class.
+    /// </summary>
+    /// <param name="userManager">Identity user manager.</param>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="jwtSettingsOptionsMonitor">JWT issuer, audience and lifetime settings.</param>
+    /// <param name="signInManager">Identity sign-in manager, used for password checks with lockout.</param>
+    /// <param name="otpGenerator">Generates OTPs.</param>
+    /// <param name="otpettingsOptionsMonitor">OTP length settings.</param>
+    /// <param name="tokenValidationOptionsMonitor">OTP and operation token lifetimes.</param>
+    /// <param name="applicationHasher">Hashes and verifies OTPs and operation tokens.</param>
+    /// <param name="emailContentFormatterHelper">Renders email templates.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller and headers.</param>
+    /// <param name="dataProtectionProvider">Creates the protector for operation tokens.</param>
+    /// <param name="cacheService">Stores each user's current access token JTI.</param>
+    /// <param name="roleManager">Identity role manager.</param>
+    /// <param name="applicationPublisher">Queues outgoing emails.</param>
     public AuthenticationService(UserManager<User> userManager, RepositoryContext repositoryContext,
                                 IOptionsMonitor<JwtSettingsConfiguration> jwtSettingsOptionsMonitor, SignInManager<User> signInManager,
                                 IOtpGenerator otpGenerator, IOptionsMonitor<OtpSettingsConfiguration> otpettingsOptionsMonitor,
@@ -73,6 +94,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
     private User? _loggedInUser;
 
+    /// <inheritdoc />
     public async Task<GenericResponse<TokenDto>> LoginUserAsync(LoginUserDto loginUserDetails, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(LoginUserAsync));
@@ -183,6 +205,7 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> ChangePasswordAsync(ChangePasswordDto changePasswordRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ChangePasswordAsync));
@@ -234,6 +257,7 @@ public sealed class AuthenticationService : IAuthenticationService
 
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> RequestOtpAsync(RequestOtpDto requestOtp, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RequestOtpAsync));
@@ -342,6 +366,7 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> ResetUserPasswordAsync(ResetUserPasswordequestDto resetUserPasswordequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ResetUserPasswordAsync));
@@ -492,6 +517,7 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
 
+    /// <inheritdoc />
     public async Task<GenericResponse<TokenDto>> RefreshTokenAsync(TokenDto tokenDetails, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RefreshTokenAsync));
@@ -629,6 +655,7 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> ChangeUserRoleAsync(ChangeUserRoleRequestDto changeUserRoleRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ChangeUserRoleAsync));

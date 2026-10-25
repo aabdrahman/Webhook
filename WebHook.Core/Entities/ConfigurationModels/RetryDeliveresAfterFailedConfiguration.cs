@@ -1,13 +1,21 @@
 ﻿namespace WebHook.Core.Entities.ConfigurationModels;
 
+/// <summary>
+/// Settings for retrying failed deliveries and releasing stale claims, used by the
+/// <c>RetryPendingDeliveriesWorker</c> and <c>StaleClaimedDeliverReleaseWorker</c>.
+/// Bound from configuration.
+/// </summary>
 public class RetryDeliveresAfterFailedConfiguration
 {
     /// <summary>
-    /// The duration threshold for when the system should escalate to contact email if the http call to callback url exceeds the value
+    /// The HTTP duration, in milliseconds, above which a retry attempt is treated as a slow
+    /// endpoint and an escalation email is sent to the subscription's contact.
     /// </summary>
     public long ThresholdDuration { get; set; }
     /// <summary>
-    /// Ths is the maximum number of times a delivery is processed before marking it as a dead letter
+    /// The maximum number of attempts per retry cycle. A failed delivery whose
+    /// <c>RetryCount</c> exceeds this value multiplied by its current <c>RetryCycle</c>
+    /// is moved to the dead-letter queue.
     /// </summary>
     public int MaximumAttendedCount { get; set; }
     /// <summary>
@@ -15,18 +23,19 @@ public class RetryDeliveresAfterFailedConfiguration
     /// </summary>
     public int TotalBatchSize { get; set; }
     /// <summary>
-    /// This is the duration at which a delivery item is locked for in case exception occurs wduring delivery processing
+    /// How long, in seconds, a claimed delivery stays locked to a worker. Also used by the
+    /// stale delivery release worker: a lock older than this is treated as abandoned.
     /// </summary>
     public double DeliveryLockDuration { get; set; }
     /// <summary>
-    /// How often (in seconds) the <see cref="StaleClaimedDeliverRelseaseWorker"/>
+    /// How often (in seconds) the <c>StaleClaimedDeliverReleaseWorker</c>
     /// ticks to scan for and release stale locked deliveries.
     /// Default: 120 seconds.
     /// </summary>
     public int StaleDeliveryReleaseIntervalSeconds { get; set; } = 120;
 
     /// <summary>
-    /// How often (in seconds) the <see cref="RetryPendingDeliveriesWorker"/>
+    /// How often (in seconds) the <c>RetryPendingDeliveriesWorker</c>
     /// ticks to scan for and process failed deliveries.
     /// Default: 60 seconds.
     /// </summary>

@@ -14,23 +14,22 @@ namespace WebHook.Infrastructure.BackgroundWorkers;
 
 /// <summary>
 /// A background service that runs on a periodic timer and re-queues
-/// <see cref="WebhookEvent"/> records that have been stuck in
+/// <see cref="Core.Entities.WebhookEvent"/> records that have been stuck in
 /// <see cref="WebHookEventStatus.Pending"/> status beyond the configured
 /// threshold, pushing their IDs into the <see cref="Channel{EventRaised}"/>
 /// so <see cref="EventRaisedWorker"/> can pick them up and process them.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This worker complements <see cref="StuckProcessingCleanerBackgroundService"/>
-/// which handles events stuck in <c>Processing</c> status. This worker
-/// handles events that never left <c>Pending</c> — meaning they were
+/// This worker handles events that never left <c>Pending</c> — meaning they were
 /// persisted but the channel write failed or the worker that should have
-/// read them crashed before doing so.
+/// read them crashed before doing so. Events already moved to <c>Processing</c>
+/// are not revisited.
 /// </para>
 /// <para>
 /// Both the tick interval and the pending threshold are configurable via
-/// <see cref="WorkerConfiguration"/> so they can be tuned at runtime
-/// without redeploying.
+/// <see cref="PendingRaisedEventsWorkerConfiguration"/>. The threshold is re-read
+/// on every tick; the interval is read once at startup.
 /// </para>
 /// </remarks>
 public sealed class PendingRaisedEventsWorker : BackgroundService
@@ -57,8 +56,11 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
     /// </param>
     /// <param name="options">
     /// Configuration controlling the tick interval and the pending threshold.
-    /// Read inside the loop so runtime config changes are picked up without
+    /// The threshold is read inside the loop so runtime config changes are picked up without
     /// restarting the worker.
+    /// </param>
+    /// <param name="workerLivenessTracker">
+    /// Receives a heartbeat for each re-queued event, reported by the worker liveness health check.
     /// </param>
     public PendingRaisedEventsWorker(Channel<EventRaised> eventRaisedChannel, IServiceScopeFactory serviceScopeFactory, IOptionsMonitor<PendingRaisedEventsWorkerConfiguration> options, WorkerLivenessTracker workerLivenessTracker)
     {
@@ -88,7 +90,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
 
     /// <summary>
     /// The main execution loop. On each tick scans for
-    /// <see cref="WebhookEvent"/> records stuck in
+    /// <see cref="Core.Entities.WebhookEvent"/> records stuck in
     /// <see cref="WebHookEventStatus.Pending"/> beyond the configured
     /// threshold and writes their IDs to the channel.
     /// </summary>

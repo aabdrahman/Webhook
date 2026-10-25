@@ -26,7 +26,7 @@ namespace WebHook.Infrastructure.Services;
 /// releases them by:
 /// <list type="number">
 ///   <item><description>Clearing <c>LockedBy</c> and <c>LockedUntil</c>.</description></item>
-///   <item><description>Resetting <c>DeliveryStatus</c> to <see cref="WebhookDeliveryStatus.Pending"/> so the delivery processor worker can pick it up again.</description></item>
+///   <item><description>Setting <c>DeliveryStatus</c> to <see cref="WebhookDeliveryStatus.Failed"/> so the retry pending deliveries worker picks it up again.</description></item>
 ///   <item><description>Incrementing <c>RetryCount</c> to reflect that an attempt was made even though it did not complete.</description></item>
 /// </list>
 /// </para>
@@ -58,8 +58,8 @@ public sealed class StaleClaimedDeliveryReleaseService
     }
 
     /// <summary>
-    /// Scans for stale-locked webhook deliveries and releases them back to
-    /// <see cref="WebhookDeliveryStatus.Pending"/> so they can be reprocessed.
+    /// Scans for stale-locked webhook deliveries and releases them as
+    /// <see cref="WebhookDeliveryStatus.Failed"/> so they can be retried.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -77,7 +77,7 @@ public sealed class StaleClaimedDeliveryReleaseService
     /// <list type="bullet">
     ///   <item><description><c>LockedBy</c> → <see langword="null"/></description></item>
     ///   <item><description><c>LockedUntil</c> → <see langword="null"/></description></item>
-    ///   <item><description><c>DeliveryStatus</c> → <see cref="WebhookDeliveryStatus.Pending"/></description></item>
+    ///   <item><description><c>DeliveryStatus</c> → <see cref="WebhookDeliveryStatus.Failed"/></description></item>
     ///   <item><description><c>RetryCount</c> → incremented by 1</description></item>
     /// </list>
     /// </para>

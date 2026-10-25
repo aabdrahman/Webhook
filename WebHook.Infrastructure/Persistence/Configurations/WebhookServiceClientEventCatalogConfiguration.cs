@@ -5,8 +5,13 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookServiceClientEventCatalog"/>. A client can be assigned each
+/// event type once, and a global query filter hides removed assignments.
+/// </summary>
 public sealed class WebhookServiceClientEventCatalogConfiguration : IEntityTypeConfiguration<WebhookServiceClientEventCatalog>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookServiceClientEventCatalog> builder)
     {
         builder.HasKey(x => x.Id);

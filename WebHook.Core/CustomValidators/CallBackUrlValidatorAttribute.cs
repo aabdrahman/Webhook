@@ -2,8 +2,15 @@
 
 namespace WebHook.Core.CustomValidators;
 
+/// <summary>
+/// Validates that a value is an absolute HTTPS URL that does not point at a loopback address.
+/// </summary>
+/// <remarks>
+/// Only loopback hosts are rejected; other private or internal addresses are accepted.
+/// </remarks>
 internal sealed class CallBackUrlValidatorAttribute : ValidationAttribute
 {
+    /// <inheritdoc />
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is null)

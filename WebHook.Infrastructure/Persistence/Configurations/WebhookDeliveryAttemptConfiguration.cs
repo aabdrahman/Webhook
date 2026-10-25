@@ -4,8 +4,13 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookDeliveryAttempt"/>. Check constraints require a positive
+/// duration and attempted count.
+/// </summary>
 internal class WebhookDeliveryAttemptConfiguration : IEntityTypeConfiguration<WebhookDeliveryAttempt>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookDeliveryAttempt> builder)
     {
         builder.HasKey(x => x.Id);

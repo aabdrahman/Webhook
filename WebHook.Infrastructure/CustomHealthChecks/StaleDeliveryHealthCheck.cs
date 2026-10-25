@@ -4,15 +4,25 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Reports deliveries still <c>Processing</c> after their lock has expired.
+/// <see cref="HealthStatus.Degraded"/> when there are any, which suggests a worker crashed or the
+/// stale release worker is behind.
+/// </summary>
 public sealed class StaleDeliveryHealthCheck : IHealthCheck
 {
     private readonly RepositoryContext _repositoryContext;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="StaleDeliveryHealthCheck"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
     public StaleDeliveryHealthCheck(RepositoryContext repositoryContext)
     {
         _repositoryContext = repositoryContext;
     }
 
+    /// <inheritdoc />
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

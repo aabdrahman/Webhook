@@ -1,10 +1,14 @@
 ﻿namespace WebHook.Core.Entities.ConfigurationModels;
 
+/// <summary>
+/// Settings for the <c>PendingRaisedEventsWorker</c>, which recovers events that were
+/// persisted but never fanned out. Bound from configuration.
+/// </summary>
 public class PendingRaisedEventsWorkerConfiguration
 {
     /// <summary>
     /// Gets or sets the interval, in seconds, at which the
-    /// <see cref="PendingRaisedEventsWorker"/> scans for pending raised events
+    /// <c>PendingRaisedEventsWorker</c> scans for pending raised events
     /// that require processing.
     /// <para>
     /// The worker performs a scan each time this interval elapses.

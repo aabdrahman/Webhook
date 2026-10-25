@@ -6,11 +6,20 @@ using WebHook.Core.EventContracts.Publishers;
 
 namespace WebHook.Infrastructure.EventPublishers;
 
+/// <summary>
+/// <see cref="IApplicationPublisher"/> implementation that writes to the application's
+/// singleton <see cref="Channel{T}"/> instances.
+/// </summary>
 public sealed class ApplicationPublisher : IApplicationPublisher
 {
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly Channel<EmailSenderDto> _emailSenderChannel;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="ApplicationPublisher"/> class.
+    /// </summary>
+    /// <param name="eventRaisedChannel">The channel read by the event fan-out worker.</param>
+    /// <param name="emailSenderChannel">The channel read by the email processor worker.</param>
     public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel)
     {
         _eventRaisedChannel = eventRaisedChannel;
@@ -20,6 +29,7 @@ public sealed class ApplicationPublisher : IApplicationPublisher
 
     private ILogger _logger;
 
+    /// <inheritdoc />
     public async Task QueueEventRaised(EventRaised eventRaised, CancellationToken ct = default)
     {
         if (await _eventRaisedChannel.Writer.WaitToWriteAsync())
@@ -31,6 +41,7 @@ public sealed class ApplicationPublisher : IApplicationPublisher
         }
     }
 
+    /// <inheritdoc />
     public async Task<bool> QueueEmailEvent(EmailSenderDto emailSenderItem, CancellationToken ct = default)
     {
         if(await _emailSenderChannel.Writer.WaitToWriteAsync(ct))

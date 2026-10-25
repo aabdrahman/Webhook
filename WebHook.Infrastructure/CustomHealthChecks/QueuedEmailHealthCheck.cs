@@ -4,15 +4,23 @@ using WebHook.Core.DataTransferObjects.EmailSender;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Reports the backlog in the email channel. <see cref="HealthStatus.Unhealthy"/> when more than 12 emails are queued.
+/// </summary>
 public sealed class QueuedEmailHealthCheck : IHealthCheck
 {
     private readonly Channel<EmailSenderDto> _emailSenderChannel;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="QueuedEmailHealthCheck"/> class.
+    /// </summary>
+    /// <param name="emailSenderChannel">The email channel to inspect.</param>
     public QueuedEmailHealthCheck(Channel<EmailSenderDto> emailSenderChannel)
     {
         _emailSenderChannel = emailSenderChannel;
     }
 
+    /// <inheritdoc />
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

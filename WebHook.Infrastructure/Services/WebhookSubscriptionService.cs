@@ -98,7 +98,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A <see cref="GenericResponse{T}"/> of <see cref="string"/> where:
     /// <list type="bullet">
     ///   <item><description><see cref="HttpStatusCode.OK"/> — subscription successfully reactivated.</description></item>
-    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription exists for the provided id (including soft-deleted records).</description></item>
+    ///   <item><description><see cref="HttpStatusCode.Forbidden"/> — the caller's user ID claim could not be parsed.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription exists for the provided id (including soft-deleted records), or a <c>User</c> caller does not own it.</description></item>
     ///   <item><description><see cref="HttpStatusCode.Conflict"/> — the subscription is already active.</description></item>
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
@@ -191,7 +192,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A <see cref="GenericResponse{T}"/> of <see cref="string"/> where:
     /// <list type="bullet">
     ///   <item><description><see cref="HttpStatusCode.Created"/> — subscription created successfully.</description></item>
-    ///   <item><description><see cref="HttpStatusCode.BadRequest"/> — one or more event types do not exist in the catalog.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.BadRequest"/> — one or more event types do not exist in the catalog, or the caller's user ID claim could not be parsed.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — the calling user no longer exists or is inactive.</description></item>
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
@@ -291,7 +293,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A <see cref="GenericResponse{T}"/> of <see cref="string"/> where:
     /// <list type="bullet">
     ///   <item><description><see cref="HttpStatusCode.OK"/> — subscription successfully deactivated.</description></item>
-    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no active subscription exists for the provided id.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.Forbidden"/> — the caller's user ID claim could not be parsed.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no active subscription exists for the provided id, or a <c>User</c> caller does not own it.</description></item>
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
@@ -384,6 +387,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             }
 
             IReadOnlyList<WebhookSubscriptionDto> subscriptions = await fetchSubscriptionQuery.Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
+            RemoveSecretKeys(subscriptions);
 
             _logger.Information("Webhook Subscriptions fetched successfully - {0}", subscriptions);
 
@@ -407,7 +411,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// The query uses <c>AsNoTracking</c> for read performance and projects
     /// directly to <see cref="WebhookSubscriptionDto"/> server-side via
     /// <see cref="WebhookSubscriptionMapper.ToDtoExpression"/> to avoid
-    /// loading unnecessary columns or navigation properties.
+    /// loading unnecessary columns or navigation properties. The signing secret
+    /// is decrypted so the subscriber can verify <c>X-Webhook-Signature</c>.
     /// </remarks>
     /// <param name="webhookSubscriptionId">
     /// The unique identifier of the webhook subscription to retrieve.
@@ -420,7 +425,8 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A <see cref="GenericResponse{T}"/> of <see cref="WebhookSubscriptionDto"/> where:
     /// <list type="bullet">
     ///   <item><description><see cref="HttpStatusCode.OK"/> — subscription found and returned successfully.</description></item>
-    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription exists for the provided id.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.Forbidden"/> — the caller's user ID claim could not be parsed.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription exists for the provided id, or a non-admin caller does not own it.</description></item>
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
     /// </returns>
@@ -455,7 +461,11 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
                 return GenericResponse<WebhookSubscriptionDto>.Failure(null, "Webhook SUv=bscription with provided id does not exist.", HttpStatusCode.NotFound);
             }
 
-            _logger.Information("Webhook subscription fetced successfully - {0}, {1}", webhookSubscriptionId, webhookSubscription);
+            //Subscribers need the plaintext secret to verify X-Webhook-Signature; only the owner (or an admin) reaches this point.
+            webhookSubscription.SecretKey = _encryptionService.Decrypt(webhookSubscription.SecretKey);
+
+            //The DTO is not logged as it now carries the plaintext secret.
+            _logger.Information("Webhook subscription fetced successfully - {0}", webhookSubscriptionId);
             return GenericResponse<WebhookSubscriptionDto>.Success(webhookSubscription, "Webhook Subscription Fetched Successfully.", HttpStatusCode.OK);
 
         }
@@ -477,6 +487,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
     /// A <see cref="GenericResponse{T}"/> of <see cref="WebhookSubscriptionDto"/> where:
     /// <list type="bullet">
     ///   <item><description><see cref="HttpStatusCode.OK"/> — subscriptions found and retrieved successfully.</description></item>
+    ///   <item><description><see cref="HttpStatusCode.Forbidden"/> — the caller's user ID claim could not be parsed.</description></item>
     ///   <item><description><see cref="HttpStatusCode.NotFound"/> — no subscription(s) exists for the authenticated user.</description></item>
     ///   <item><description><see cref="HttpStatusCode.InternalServerError"/> — an unexpected error occurred; details are captured in <see cref="ErrorDetail"/>.</description></item>
     /// </list>
@@ -501,6 +512,7 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             }
 
             List<WebhookSubscriptionDto> userSubscriptions = await fetchSubscriptionQuery.Where(x => x.CreatedByUserId!.Value == userId).Select(WebhookSubscriptionMapper.ToDtoExpression()).ToListAsync(ct);
+            RemoveSecretKeys(userSubscriptions);
 
             _logger.Information("Subscriptions fetched successfully for user - {0} - {1}", userId, userSubscriptions);
 
@@ -514,6 +526,19 @@ public sealed class WebhookSubscriptionService : IWebhookSubscriptionService
             _logger.Error(ex, "An error occurred while fetching user subscriptions.");
             return GenericResponse<IReadOnlyList<WebhookSubscriptionDto>>.Failure(null, "An error occurred while fetching user subscriptions.", HttpStatusCode.InternalServerError,
                 new ErrorDetail() { ErrorTitle = ex.GetType().Name, ErrorMessage = ex.Message, ErrorDescription = ex.InnerException?.Message ?? "" });
+        }
+    }
+
+    /// <summary>
+    /// Clears the signing secret from subscriptions returned in a list. The secret is only
+    /// returned, decrypted, by <see cref="GetWebhookSubscriptionByIdAsync"/>.
+    /// </summary>
+    /// <param name="subscriptions">The subscriptions to redact.</param>
+    private static void RemoveSecretKeys(IEnumerable<WebhookSubscriptionDto> subscriptions)
+    {
+        foreach (var subscription in subscriptions)
+        {
+            subscription.SecretKey = string.Empty;
         }
     }
 

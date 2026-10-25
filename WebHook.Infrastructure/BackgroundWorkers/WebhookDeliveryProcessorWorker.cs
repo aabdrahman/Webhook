@@ -8,12 +8,27 @@ using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Periodically makes the first delivery attempt for <see cref="Core.Constants.WebhookDeliveryStatus.Pending"/>
+/// deliveries through <see cref="WebhookDeliveryProcessorService"/>.
+/// </summary>
+/// <remarks>
+/// Each instance claims deliveries under its own worker ID, generated at startup. The tick
+/// interval is read once; the batch size, lock duration and slow-endpoint threshold are
+/// re-read every tick.
+/// </remarks>
 public class WebhookDeliveryProcessorWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<WebhookDeliveryWorkerConfiguration> _optionsMonitor;
     private readonly WorkerLivenessTracker _workerLivenessTracker;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="WebhookDeliveryProcessorWorker"/> class.
+    /// </summary>
+    /// <param name="scopeFactory">Creates a scope, and so a fresh processor service, per tick.</param>
+    /// <param name="optionsMonitor">Delivery processor settings.</param>
+    /// <param name="workerLivenessTracker">Receives a heartbeat on every tick.</param>
     public WebhookDeliveryProcessorWorker(IServiceScopeFactory scopeFactory, IOptionsMonitor<WebhookDeliveryWorkerConfiguration> optionsMonitor, WorkerLivenessTracker workerLivenessTracker)
     {
         _scopeFactory = scopeFactory;
@@ -29,6 +44,7 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
     //private TimeSpan _timeout;
     private Guid workerId;
 
+    /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.ForContext("MethodName", nameof(StartAsync)).Information("WebhookDeliveryProcessorWorker starting. Tick interval: {0}s", 0);
@@ -36,12 +52,14 @@ public class WebhookDeliveryProcessorWorker : BackgroundService
         return base.StartAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public override Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.ForContext("MethodName", nameof(StopAsync)).Information("WebhookDeliveryProcessorWorker stopping at {Time}.", DateTimeOffset.UtcNow);
         return base.StopAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(_optionsMonitor.CurrentValue.DeliveryProcessorIntervalSeconds));

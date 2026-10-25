@@ -11,11 +11,20 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IReportingAnalyticsService"/> implementation that reads EF Core queries,
+/// keyless view entities and a table-valued database function.
+/// </summary>
 public class ReportingAnalyticsService : IReportingAnalyticsService
 {
     private readonly RepositoryContext _repositoryContext;
     private readonly IAuthenticatedUserDetails _authenticatedUserDetails;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="ReportingAnalyticsService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="authenticatedUserDetails">The current request's caller, used to scope user dashboards.</param>
     public ReportingAnalyticsService(RepositoryContext repositoryContext, IAuthenticatedUserDetails authenticatedUserDetails)
     {
         _repositoryContext = repositoryContext;
@@ -25,6 +34,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
     private const string _methodName = "MethodName";
     private Serilog.ILogger _logger = Log.ForContext("ClassName", nameof(ReportingAnalyticsService));
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<TopFiveEventAnalyticsEntity>>> GetMostRecentEventsAsync(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetMostRecentEventsAsync));
@@ -46,6 +56,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
 
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<EventCatalogReportingAnalyticsEntity>>> GetTopActiveEventCatalogsAsync(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetTopActiveEventCatalogsAsync));
@@ -67,6 +78,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<TopFailingSubscriptionDto>>> GetTopFailingSubscriptionsAsync(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetTopFailingSubscriptionsAsync));
@@ -114,6 +126,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<AdminDashboardSummaryReportingAnalyticsEntity>> GetAdminDashboardSummaryAsync(CancellationToken ct = default)
     {
         _logger.ForContext(_methodName, nameof(GetAdminDashboardSummaryAsync));
@@ -136,6 +149,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
 
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<UserDeliveryDashboardDto>>> GetUserDeliveryDashboardAsync(CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetUserDeliveryDashboardAsync));
@@ -172,6 +186,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<IReadOnlyList<TopUserFailingSubscriptionDto>>> GetUserTopFailingSubscriptionDashboardAsync(CancellationToken ct = default)
     {
         _logger.ForContext(_methodName, nameof(GetUserTopFailingSubscriptionDashboardAsync));
@@ -220,6 +235,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
 
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<UserDashboardSummaryReportAnalyticsEntity>> GetUserDashboardSummaryAsync(UserDashboardSummaryAnalyticsRequestParamterDto request, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(GetUserDashboardSummaryAsync));
@@ -239,7 +255,7 @@ public class ReportingAnalyticsService : IReportingAnalyticsService
                 return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Failure(null, "User dashboard could not be fetched.", HttpStatusCode.BadRequest);
             }
 
-            var result = await _repositoryContext.GetUserDashboardSummary(userId, request.StartDate, request.EndDate).FirstOrDefaultAsync(ct);
+            var result = await _repositoryContext.GetUserDashboardSummary(userId, request.StartDate, request.EndDate.AddDays(1)).FirstOrDefaultAsync(ct);
 
             _logger.Information("User dashboard summary fetched successfully for user - {0}, {1}", _authenticatedUserDetails.userId, result);
             return GenericResponse<UserDashboardSummaryReportAnalyticsEntity>.Success(result, "User dashboard summary fetched successfully.", HttpStatusCode.OK);

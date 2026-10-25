@@ -4,11 +4,20 @@ using System.Text;
 
 namespace WebHook.Infrastructure.Utilities;
 
+/// <summary>
+/// Renders notification emails from the HTML templates in
+/// <c>wwwroot/StaticFiles/EmailNotificationTemplates</c>.
+/// </summary>
 public class EmailContentFormatterHelper
 {
     private readonly IWebHostEnvironment _environment;
     private readonly IHostingEnvironment _hostingEnvironment;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="EmailContentFormatterHelper"/> class.
+    /// </summary>
+    /// <param name="environment">The web host environment.</param>
+    /// <param name="hostingEnvironment">The hosting environment, used for the content root path.</param>
     public EmailContentFormatterHelper(IWebHostEnvironment environment, IHostingEnvironment hostingEnvironment)
     {
         _environment = environment;
@@ -26,6 +35,14 @@ public class EmailContentFormatterHelper
         { NotificationType.SendOtpNotification, "OtpNotification.html" }
     };
 
+    /// <summary>
+    /// Loads the template for a notification type and replaces each <c>{{Key}}</c> placeholder
+    /// with its value.
+    /// </summary>
+    /// <remarks>Values are inserted as-is, without HTML encoding.</remarks>
+    /// <param name="emailType">The notification type, which selects the template.</param>
+    /// <param name="parameters">Placeholder names (without braces) mapped to their values.</param>
+    /// <returns>The rendered HTML, or an empty string if the template is missing or an error occurs.</returns>
     public async Task<string?> GetEmailContentAsync(NotificationType emailType, Dictionary<string, string> parameters)
     {
         _logger = _logger.ForContext("MethodName", nameof(GetEmailContentAsync));

@@ -5,8 +5,13 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookSubscriptionEvent"/>. A subscription can link to each event
+/// type once, and a global query filter hides inactive links.
+/// </summary>
 public sealed class WebhookEventSubscriptionConfiguration : IEntityTypeConfiguration<WebhookSubscriptionEvent>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookSubscriptionEvent> builder)
     {
         builder.HasKey(x => x.Id);

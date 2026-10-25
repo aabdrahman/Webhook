@@ -12,12 +12,34 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Fans raised events out into deliveries. Reads <see cref="EventRaised"/> messages from the
+/// channel and creates one <see cref="WebhookDelivery"/> per active subscription to the event type.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Each event is claimed inside a transaction with <c>SELECT … FOR UPDATE SKIP LOCKED</c>, and only
+/// while it is still <see cref="WebHookEventStatus.Pending"/>, so concurrent instances never fan out
+/// the same event twice. Events with subscribers are moved to <see cref="WebHookEventStatus.Processing"/>;
+/// events without any are moved to <see cref="WebHookEventStatus.Processed"/>.
+/// </para>
+/// <para>
+/// If an event cannot be processed it is written back to the channel and the worker waits for its
+/// next timer tick before reading again.
+/// </para>
+/// </remarks>
 public class EventRaisedWorker : BackgroundService
 {
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly EventRaisedWorkerConfiguration _eventRaisedWorkerConfiguration;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="EventRaisedWorker"/> class.
+    /// </summary>
+    /// <param name="eventRaisedChannel">The channel raised events are read from.</param>
+    /// <param name="serviceScopeFactory">Creates a scope, and so a fresh <see cref="RepositoryContext"/>, per event.</param>
+    /// <param name="optionsMonitor">The worker's timer interval, read once at construction.</param>
     public EventRaisedWorker(Channel<EventRaised> eventRaisedChannel, IServiceScopeFactory serviceScopeFactory, IOptionsMonitor<EventRaisedWorkerConfiguration> optionsMonitor)
     {
         _eventRaisedChannel = eventRaisedChannel;
@@ -31,6 +53,7 @@ public class EventRaisedWorker : BackgroundService
     private ILogger _logger;
     private const string _className = "ClassName";
     private const string _methodName = "MethodName";
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));
@@ -148,6 +171,7 @@ public class EventRaisedWorker : BackgroundService
         }
     }
 
+    /// <inheritdoc />
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(StartAsync));
@@ -157,6 +181,7 @@ public class EventRaisedWorker : BackgroundService
         return base.StartAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
     public override Task StopAsync(CancellationToken cancellationToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(StopAsync));

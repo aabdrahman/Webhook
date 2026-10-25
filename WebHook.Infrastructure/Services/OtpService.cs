@@ -15,6 +15,10 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.Services;
 
+/// <summary>
+/// <see cref="IOtpService"/> implementation. Operation tokens are protected with ASP.NET Core
+/// Data Protection under the <c>Webhook.Otp.OtpVerificationSigning</c> purpose.
+/// </summary>
 public sealed class OtpService : IOtpService
 {
     private readonly RepositoryContext _repositoryContext;
@@ -23,6 +27,14 @@ public sealed class OtpService : IOtpService
     private readonly IOptionsMonitor<TokenValidationConfiguration> _tokenValidationOptionsMonitor;
     private readonly IDataProtector _dataProtector;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="OtpService"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
+    /// <param name="userManager">Identity user manager.</param>
+    /// <param name="applicationHasher">Verifies OTPs and hashes operation tokens.</param>
+    /// <param name="tokenValidationOptionsMonitor">Operation token lifetime settings.</param>
+    /// <param name="dataProtectionProvider">Creates the protector for operation tokens.</param>
     public OtpService(RepositoryContext repositoryContext, UserManager<User> userManager,
         IApplicationHasher applicationHasher, IOptionsMonitor<TokenValidationConfiguration> tokenValidationOptionsMonitor, IDataProtectionProvider dataProtectionProvider)
     {
@@ -40,6 +52,7 @@ public sealed class OtpService : IOtpService
     private const string _methodName = "MethodName";
     private ILogger _logger;
 
+    /// <inheritdoc />
     public async Task<GenericResponse<string>> RevokeUserOtpAsync(Guid userId, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(RevokeUserOtpAsync));
@@ -64,6 +77,7 @@ public sealed class OtpService : IOtpService
         }
     }
 
+    /// <inheritdoc />
     public async Task<GenericResponse<OtpVerificationDto>> ValidateOtpAsync(OtpVerificationRequestDto otpVerificationRequest, CancellationToken ct = default)
     {
         _logger = _logger.ForContext(_methodName, nameof(ValidateOtpAsync));

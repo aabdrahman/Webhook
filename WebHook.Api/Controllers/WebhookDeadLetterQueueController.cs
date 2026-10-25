@@ -45,14 +45,14 @@ public class WebhookDeadLetterQueueController : ControllerBase
     /// Retrieves all dead letter items created for a delivery.
     /// </summary>
     /// <param name="deliveryId">
-    /// <paramref name="token"/>
     /// The unique identifier of the webhook deivery id.
     /// </param>
+    /// <param name="token">A token to cancel the request.</param>
     /// <returns>
     /// A list of delivery dead letter items.
     /// </returns>
     /// <response code="200">Dead Letter queue items were retrieved successfully.</response>
-    /// <response code="400">The delivery does not have any dead letter queue item.</response>
+    /// <response code="404">The delivery does not have any dead letter queue item.</response>
     /// <response code="500">An unexpected server error occurred.</response>
     /// <response code="429">Too many reqeusts within the configured rate limit.</response>
     [HttpGet]

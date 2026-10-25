@@ -4,8 +4,16 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookEvent"/>.
+/// </summary>
+/// <remarks>
+/// The correlation ID and event type are unique together. Status is stored as a string and
+/// restricted to the <see cref="Core.Constants.WebHookEventStatus"/> names by a check constraint.
+/// </remarks>
 internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<WebhookEvent>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookEvent> builder)
     {
         builder.HasKey(x => x.Id);

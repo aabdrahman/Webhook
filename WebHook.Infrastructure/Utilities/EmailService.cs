@@ -9,10 +9,28 @@ using WebHook.Core.Interfaces.Helpers;
 
 namespace WebHook.Infrastructure.Utilities;
 
+/// <summary>
+/// <see cref="IEmailService"/> implementation that sends mail over SMTP with SSL.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Host, port, user name and sender address come from
+/// <see cref="EmailSenderEmailSmtpSettingsConfiguration"/>; the password comes from the
+/// <c>SmtpClientPassword</c> environment variable.
+/// </para>
+/// <para>
+/// <strong>Development override:</strong> every message is currently addressed to a single
+/// hard-coded mailbox instead of its real recipients. Remove the override before production use.
+/// </para>
+/// </remarks>
 public class EmailService : IEmailService
 {
     private readonly EmailSenderEmailSmtpSettingsConfiguration _settings;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="EmailService"/> class.
+    /// </summary>
+    /// <param name="optionsMonitor">SMTP settings, read once at construction.</param>
     public EmailService(IOptionsMonitor<EmailSenderEmailSmtpSettingsConfiguration> optionsMonitor)
     {
         _settings = optionsMonitor.CurrentValue;
@@ -21,6 +39,7 @@ public class EmailService : IEmailService
 
     private ILogger _logger;
 
+    /// <inheritdoc />
     public async Task<bool> SendMailAsync(EmailSenderDto emailSenderItem, CancellationToken ct = default)
     {
         _logger = _logger.ForContext("MethodName", nameof(SendMailAsync));

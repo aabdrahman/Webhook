@@ -5,8 +5,13 @@ using WebHook.Infrastructure.Data_Persistence.CustomDbColumnConverters;
 
 namespace WebHook.Infrastructure.Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookServiceClient"/>. Client IDs are unique, and a global query
+/// filter hides inactive clients.
+/// </summary>
 public sealed class WebhookServiceClientConfiguration : IEntityTypeConfiguration<WebhookServiceClient>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookServiceClient> builder)
     {
         builder.HasKey(x => x.Id);

@@ -4,8 +4,17 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Core.Mapper;
 
+/// <summary>
+/// Maps <see cref="WebhookServiceClientEventCatalog"/> entities to DTOs.
+/// </summary>
 public static class WebhookServiceClientCatalogMapper
 {
+    /// <summary>
+    /// A LINQ projection from <see cref="WebhookServiceClientEventCatalog"/> to
+    /// <see cref="WebhookServiceClientCatalogDto"/> for EF Core queries. An assignment is active
+    /// when it has no deactivation time.
+    /// </summary>
+    /// <returns>The projection expression.</returns>
     public static Expression<Func<WebhookServiceClientEventCatalog, WebhookServiceClientCatalogDto>> ToDtoExpression()
     {
         return wsCatalog => new WebhookServiceClientCatalogDto()

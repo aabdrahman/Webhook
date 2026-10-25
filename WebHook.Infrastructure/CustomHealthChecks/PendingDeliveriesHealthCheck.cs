@@ -4,16 +4,24 @@ using WebHook.Infrastructure.Data_Persistence;
 
 namespace WebHook.Infrastructure.CustomHealthChecks;
 
+/// <summary>
+/// Reports how many deliveries are <c>Pending</c>. Always healthy unless the query fails.
+/// </summary>
 public sealed class PendingDeliveriesHealthCheck : IHealthCheck
 {
     private readonly RepositoryContext _repositoryContext;
 
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="PendingDeliveriesHealthCheck"/> class.
+    /// </summary>
+    /// <param name="repositoryContext">The database context.</param>
     public PendingDeliveriesHealthCheck(RepositoryContext repositoryContext)
     {
         _repositoryContext = repositoryContext;
     }
 
+    /// <inheritdoc />
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try

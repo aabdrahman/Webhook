@@ -2,6 +2,9 @@
 
 namespace WebHook.Core.DataTransferObjects.WebhookDelivery;
 
+/// <summary>
+/// Paging and filter parameters for listing deliveries.
+/// </summary>
 public class WebhookDeliveryQueryRequestParameter
 {
     /// <summary>

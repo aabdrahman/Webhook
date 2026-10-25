@@ -4,8 +4,17 @@ using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
 
+/// <summary>
+/// EF Core mapping for <see cref="WebhookDelivery"/>.
+/// </summary>
+/// <remarks>
+/// Status is stored as a string and restricted to the <see cref="Core.Constants.WebhookDeliveryStatus"/>
+/// names by a check constraint; further constraints require a non-negative retry count and a
+/// <c>DeliveredAt</c> for delivered rows. <c>RetryCycle</c> defaults to 1.
+/// </remarks>
 internal sealed class WebhookDeliveryConfiguration : IEntityTypeConfiguration<WebhookDelivery>
 {
+    /// <inheritdoc />
     public void Configure(EntityTypeBuilder<WebhookDelivery> builder)
     {
         builder.HasKey(x => x.Id);

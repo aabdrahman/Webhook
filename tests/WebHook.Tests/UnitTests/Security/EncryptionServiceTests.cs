@@ -52,16 +52,17 @@ public sealed class EncryptionServiceTests : IDisposable
     }
 
     [Fact]
-    public void EncryptionService_NullEncryptionIV_Encrypt_ShouldArgumentNullThrowException()
+    public void EncryptionService_NullEncryptionIV_Encrypt_DoesNotRequireIV()
     {
-        //Arrange
+        //Arrange - new values use a random nonce, so the legacy IV variable is not needed.
         Environment.SetEnvironmentVariable("env_webhook_encrypt_iv", null);
         string valueToEncrypt = "Webhook Test";
 
         //Act
+        var encryptedValue = _sut.Encrypt(valueToEncrypt);
 
         //Assert
-        Assert.Throws<ArgumentNullException>(() => _sut.Encrypt(valueToEncrypt));
+        Assert.Equal(valueToEncrypt, _sut.Decrypt(encryptedValue));
     }
 
     [Fact]
@@ -145,7 +146,58 @@ public sealed class EncryptionServiceTests : IDisposable
         // var decryptedValue = _sut.Decrypt(encryptedValue, wrongKey);
 
         //Assert
-        Assert.Throws<CryptographicException>(() => _sut.Decrypt(encryptedValue, wrongKey));
+        //AES-GCM throws AuthenticationTagMismatchException, a CryptographicException subclass.
+        Assert.ThrowsAny<CryptographicException>(() => _sut.Decrypt(encryptedValue, wrongKey));
+    }
+
+    [Fact]
+    public void EncryptionService_Encrypt_SameValueTwice_ProducesDifferentCiphertexts()
+    {
+        //Arrange
+        string valueToEncrypt = "Webhook Test";
+
+        //Act
+        var first = _sut.Encrypt(valueToEncrypt);
+        var second = _sut.Encrypt(valueToEncrypt);
+
+        //Assert
+        Assert.NotEqual(first, second);
+        Assert.StartsWith("v2:", first);
+        Assert.Equal(valueToEncrypt, _sut.Decrypt(first));
+        Assert.Equal(valueToEncrypt, _sut.Decrypt(second));
+    }
+
+    [Fact]
+    public void EncryptionService_Decrypt_TamperedValue_ThrowsCryptographicException()
+    {
+        //Arrange
+        var encryptedValue = _sut.Encrypt("Webhook Test");
+        byte[] payload = Convert.FromBase64String(encryptedValue["v2:".Length..]);
+        payload[^1] ^= 0x01; // flip one bit of the ciphertext
+        string tamperedValue = "v2:" + Convert.ToBase64String(payload);
+
+        //Act & Assert
+        Assert.ThrowsAny<CryptographicException>(() => _sut.Decrypt(tamperedValue));
+    }
+
+    [Fact]
+    public void EncryptionService_Decrypt_LegacyCbcValue_ReturnsOriginalValue()
+    {
+        //Arrange - encrypt the way the previous implementation did: AES-CBC with the fixed IV.
+        string valueToEncrypt = "Webhook Test";
+        using var aes = Aes.Create();
+        aes.Key = Convert.FromHexString("00AF7F388E47B0AC211E931842DAFA7422648881071244DF484725D249D9E5F1");
+        aes.IV = Convert.FromHexString("315BDF36FBC81E00D668494E187AC4A5");
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+        byte[] plainBytes = System.Text.Encoding.UTF8.GetBytes(valueToEncrypt);
+        string legacyValue = Convert.ToBase64String(aes.EncryptCbc(plainBytes, aes.IV));
+
+        //Act
+        var decryptedValue = _sut.Decrypt(legacyValue);
+
+        //Assert
+        Assert.Equal(valueToEncrypt, decryptedValue);
     }
 
     public void Dispose()
