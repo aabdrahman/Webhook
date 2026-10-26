@@ -72,3 +72,4 @@ nunit-*.xml
 /.vs/Webhook.slnx/v18/DocumentLayout.backup.json
 /.vs/Webhook.slnx/v18/DocumentLayout.json
 /.vs/CopilotSnapshots/0FAA19BE6408394C9CE0D78621974E26
+/src/WebHook.Api/applicationcache.db

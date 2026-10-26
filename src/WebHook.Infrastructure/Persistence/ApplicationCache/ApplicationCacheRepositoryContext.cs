@@ -16,8 +16,11 @@ public class ApplicationCacheRepositoryContext : DbContext
         modelBuilder.Entity<ApplicationCacheLayerEntity>(entity =>
         {
             entity.HasKey(e => e.Id);
+
             entity.HasIndex(x => x.CacheKey).IsUnique();
             entity.HasIndex(x => x.ExpiresAt);
+            entity.HasIndex(x => new { x.CacheKey, x.ExpiresAt }, "IX_CacheKey_ExpiresAt");
+
             entity.Property(e => e.CacheKey).HasMaxLength(100).IsRequired();
             entity.Property(e => e.CacheValue).HasColumnType("blob").IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnType("integer").IsRequired();
