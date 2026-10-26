@@ -1,7 +1,7 @@
 <Solution>
+  <Project Path="src/WebHook.Api/WebHook.Api.csproj" />
+  <Project Path="src/WebHook.Core/WebHook.Core.csproj" />
+  <Project Path="src/WebHook.Infrastructure/WebHook.Infrastructure.csproj" />
   <Project Path="src/Webhook.Web/Webhook.Web.csproj" Id="c61ea3bc-477b-45b9-a9ac-c797b01b1cd2" />
   <Project Path="tests/WebHook.Tests/WebHook.Tests.csproj" Id="2a4bae89-0e1b-4e44-9518-c22f518978b3" />
-  <Project Path="WebHook.Api/WebHook.Api.csproj" />
-  <Project Path="WebHook.Core/WebHook.Core.csproj" />
-  <Project Path="WebHook.Infrastructure/WebHook.Infrastructure.csproj" />
 </Solution>

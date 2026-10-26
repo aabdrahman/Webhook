@@ -51,14 +51,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WebHook.Infrastructure\WebHook.Infrastructure.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\DeadLetterNotification.html" />
     <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\OtpNotification.html" />
     <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\SendOtpNotification.html" />
     <None Include="wwwroot\StaticFiles\EmailNotificationTemplates\SlowEndpointNotification.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebHook.Infrastructure\WebHook.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

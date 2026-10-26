@@ -29,7 +29,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\WebHook.Api\WebHook.Api.csproj" />
+    <ProjectReference Include="..\..\src\WebHook.Api\WebHook.Api.csproj" />
+    
   </ItemGroup>
 
   <ItemGroup>

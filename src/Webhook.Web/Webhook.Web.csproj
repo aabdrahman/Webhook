@@ -19,7 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\WebHook.Core\WebHook.Core.csproj" />
+    
+    <ProjectReference Include="..\WebHook.Core\WebHook.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
