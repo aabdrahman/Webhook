@@ -24,6 +24,7 @@ using WebHook.Infrastructure.BackgroundWorkers;
 using WebHook.Infrastructure.CustomHealthChecks;
 using WebHook.Infrastructure.Data_Persistence;
 using WebHook.Infrastructure.EventPublishers;
+using WebHook.Infrastructure.Persistence.ApplicationCache;
 using WebHook.Infrastructure.Security;
 using WebHook.Infrastructure.Services;
 using WebHook.Infrastructure.Utilities;
@@ -234,6 +235,17 @@ internal static class ApplicationServiceExtensions
                         minimumLevel: LogLevel.Information,
                         options: Microsoft.EntityFrameworkCore.Diagnostics.DbContextLoggerOptions.SingleLine
                  );
+        });
+
+        services.AddDbContext<ApplicationCacheRepositoryContext>(opts =>
+        {
+            opts.UseSqlite(configuration.GetConnectionString("ApplicationCacheDbConnection") ?? throw new ArgumentNullException("Application cache database configuration string not provided"))
+                    .EnableSensitiveDataLogging()
+                    .LogTo(Serilog.Log.Information,
+                            new[] { DbLoggerCategory.Database.Command.Name },
+                            minimumLevel: LogLevel.Information,
+                            options: Microsoft.EntityFrameworkCore.Diagnostics.DbContextLoggerOptions.SingleLine
+                     );
         });
     }
 
