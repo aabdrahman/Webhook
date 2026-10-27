@@ -43,9 +43,13 @@ public sealed class CacheService : ICacheService
                 return cachedItem;
             }
 
-            var result = await _applicationCacheRepositoryContext.ApplicationCacheLayerEntities
-                .Where(x => x.CacheKey == cacheKey && x.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-                .Select(x => x.CacheValue).FirstOrDefaultAsync();
+            _logger.Information("Cache Value for: {0} could not be fetched - {1}", cacheKey, cachedItem);
+
+            //var result = await _applicationCacheRepositoryContext.ApplicationCacheLayerEntities
+            //    .Where(x => x.CacheKey == cacheKey && x.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            //    .Select(x => x.CacheValue).FirstOrDefaultAsync();
+
+            var result = await _applicationCacheRepositoryContext.Database.SqlQueryRaw<string>(@"SELECT CacheValue AS [Value] FROM ApplicationCacheLayerEntities WHERE CacheKey = {0} AND ExpiresAt > {1}", cacheKey.ToUpper(), DateTimeOffset.UtcNow.ToUnixTimeSeconds()).FirstOrDefaultAsync();
 
             return result != null ? JsonSerializer.Deserialize<T>(result) : default(T?);
 
@@ -60,19 +64,16 @@ public sealed class CacheService : ICacheService
     public async Task RemoveItemsFromCacheAsync(params string[] keys)
     {
         _logger.ForContext("MethodName", nameof(RemoveItemsFromCacheAsync)).Information("Removing cached items from cache - {0}", keys);
-
+        List<string> keysToRemove = [];
         foreach (var key in keys)
         {
             _memoryCache.Remove(key);
+            keysToRemove.Add(key.ToUpper());
         }
 
-        var removedItems = await _applicationCacheRepositoryContext.ApplicationCacheLayerEntities
-                                        .Where(x => keys.Contains(x.CacheKey))
-                                        .ExecuteDeleteAsync();
+        var isDeleted = await _applicationCacheRepositoryContext.Database.ExecuteSqlRawAsync(@"DELETE FROM ApplicationCacheLayerEntities WHERE CacheKey IN (SELECT [value] FROM json_each({0}))", JsonSerializer.Serialize(keysToRemove));
 
-        _logger.Information("Removed {0} items from cache for keys - {1}", removedItems, keys);
-
-
+        _logger.Information("Removed items from cache for keys - {0}. Total Deleted: {1}", keys, isDeleted);
     }
 
     public async Task<bool> SetCacheItemAsync<T>(string key, T value, long expiresAfter = 300)

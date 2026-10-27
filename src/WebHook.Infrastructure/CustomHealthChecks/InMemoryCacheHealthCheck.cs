@@ -30,6 +30,8 @@ public sealed class InMemoryCacheHealthCheck : IHealthCheck
 
             bool setResult = await _cacheService.SetCacheItemAsync<string>(test_cache_key, testValue);
 
+            await Task.Delay(100);
+
             if (!setResult)
             {
                 return new HealthCheckResult(status: HealthStatus.Degraded, description: "Test item could not be cached successfully.");

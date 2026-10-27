@@ -1,11 +1,8 @@
 ﻿using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Channels;
 using WebHook.Core.DataTransferObjects.ApplicationCache;
 using WebHook.Infrastructure.Persistence.ApplicationCache;
@@ -15,12 +12,14 @@ namespace WebHook.Infrastructure.BackgroundWorkers;
 public class CachePersistenceWorker : BackgroundService
 {
     private readonly Channel<ApplicationCacheEvent> _cacheEventChannel;
+    private readonly IMemoryCache _memeoryCache;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
-    public CachePersistenceWorker(Channel<ApplicationCacheEvent> cacheEventChannel, IServiceScopeFactory serviceScopeFactory)
+    public CachePersistenceWorker(Channel<ApplicationCacheEvent> cacheEventChannel, IServiceScopeFactory serviceScopeFactory, IMemoryCache memeoryCache)
     {
         _cacheEventChannel = cacheEventChannel;
         _serviceScopeFactory = serviceScopeFactory;
+        _memeoryCache = memeoryCache;
     }
 
     private Serilog.ILogger _logger = Serilog.Log.ForContext("ClassName", nameof(CachePersistenceWorker));
@@ -52,7 +51,13 @@ public class CachePersistenceWorker : BackgroundService
 
                 var persistence = await ctx.Database.ExecuteSqlRawAsync(sql: "INSERT OR REPLACE INTO ApplicationCacheLayerEntities (CacheKey, CacheValue, ExpiresAt, CreatedAt) VALUES (@Key,@Value,@ExpiresAt,@CreatedAt)", 
                     [cacheKeyParameter, cacheValueParameter, cacheExpirationParameter, cacheCreatedAtParameter], cancellationToken: stoppingToken);
-                _logger.Information("Cache Item persisted affected {0} row(s)", persistence);
+                var cacheResult = _memeoryCache.Set<string>(cacheItem.cacheKey, cacheItem.cacheValue, new MemoryCacheEntryOptions
+                {
+                    Size = 1, //This memory cache option is necessary as the caching fails otherwise, also the 1unit ensures that the cache uses the defined value in the DI.
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(int.MaxValue),
+                    SlidingExpiration = TimeSpan.FromMinutes(cacheItem.cacheExpiration)
+                });
+                _logger.Information("Cache Item persisted affected {0} row(s) in db. Returns: {1} from memeory cache", persistence, cacheResult);
 
                 await Task.Delay(10);
             }
@@ -67,7 +72,8 @@ public class CachePersistenceWorker : BackgroundService
 
         using var scope = _serviceScopeFactory.CreateScope();
         var cacheRepoCtx = scope.ServiceProvider.GetRequiredService<ApplicationCacheRepositoryContext>();
-        var staleItemsDeleted = await cacheRepoCtx.ApplicationCacheLayerEntities.Where(x => x.ExpiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ExecuteDeleteAsync(cancellationToken);
+        //var staleItemsDeleted = await cacheRepoCtx.ApplicationCacheLayerEntities.Where(x => x.ExpiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ExecuteDeleteAsync(cancellationToken);
+        var staleItemsDeleted = await cacheRepoCtx.Database.ExecuteSqlRawAsync(@"DELETE FROM ApplicationCacheLayerEntities WHERE ExpiresAt < {0}", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         _logger.Information("Total Stale Items deleted - {0}", staleItemsDeleted);
 
