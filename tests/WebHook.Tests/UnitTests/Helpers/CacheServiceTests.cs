@@ -1,7 +1,10 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using WebHook.Core.EventContracts.Publishers;
+using WebHook.Infrastructure.Persistence.ApplicationCache;
 using WebHook.Infrastructure.Utilities;
 
 namespace WebHook.Tests.UnitTests.Helpers;
@@ -10,14 +13,19 @@ public class CacheServiceTests
 {
     private readonly IMemoryCache _cache;
     private readonly CacheService _cacheService;
+    private Mock<IApplicationPublisher> _applicationPublisherMock;
+    private Mock<ApplicationCacheRepositoryContext> _cacheRepositoryContextMock;
 
     public CacheServiceTests()
     {
+        _applicationPublisherMock = new Mock<IApplicationPublisher>();
+        _cacheRepositoryContextMock = new Mock<ApplicationCacheRepositoryContext>();
         _cache = new MemoryCache(new MemoryCacheOptions());
-        _cacheService = new CacheService(_cache);
+
+        _cacheService = new CacheService(_cache, applicationPublisher: _applicationPublisherMock.Object, applicationCacheRepositoryContext: _cacheRepositoryContextMock.Object);
     }
 
-    private CacheService CreateSut() => new CacheService(_cache);
+    private CacheService CreateSut() => new CacheService(_cache, applicationPublisher: _applicationPublisherMock.Object, applicationCacheRepositoryContext: _cacheRepositoryContextMock.Object);
 
     [Fact]
     public async Task GetItemsFromCacheAsync_NonExistentKey_ShouldReturnNull()

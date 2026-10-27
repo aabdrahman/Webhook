@@ -13,6 +13,7 @@ using System.Threading.RateLimiting;
 using System.Xml.XPath;
 using WebHook.Api.ApplicationFilters;
 using WebHook.Core.DataTransferObjects;
+using WebHook.Core.DataTransferObjects.ApplicationCache;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.Entities;
 using WebHook.Core.Entities.ConfigurationModels;
@@ -346,6 +347,16 @@ internal static class ApplicationServiceExtensions
                 FullMode = BoundedChannelFullMode.Wait
             });
         });
+
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<ApplicationCacheEvent>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
     }
 
     /// <summary>
@@ -362,6 +373,7 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<RetryPendingDeliveriesWorker>();
         services.AddHostedService<StaleClaimedDeliverReleaseWorker>();
         services.AddHostedService<EmailProcessorWorker>();
+        services.AddHostedService<CachePersistenceWorker>();
     }
 
     /// <summary>

@@ -2,7 +2,7 @@
 
 public class ApplicationCacheLayerEntity
 {
-    public int Id { get; set; }
+    //public int Id { get; set; }
     public string CacheKey { get; set; }
     public string CacheValue { get; set; }
     public long CreatedAt { get; set; }

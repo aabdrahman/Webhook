@@ -1,4 +1,5 @@
-﻿using WebHook.Core.DataTransferObjects.EmailSender;
+﻿using WebHook.Core.DataTransferObjects.ApplicationCache;
+using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.EventContracts.Events;
 
 namespace WebHook.Core.EventContracts.Publishers;
@@ -27,4 +28,5 @@ public interface IApplicationPublisher
     /// <param name="ct">A token to cancel the write.</param>
     /// <returns><see langword="true"/> if the email was queued; <see langword="false"/> if the channel is closed.</returns>
     Task<bool> QueueEmailEvent(EmailSenderDto emailSenderItem, CancellationToken ct = default);
+    Task<bool> QueueItemToCache(ApplicationCacheEvent cacheEvent, CancellationToken ct = default);
 }

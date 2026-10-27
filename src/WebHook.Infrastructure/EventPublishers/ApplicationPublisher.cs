@@ -1,5 +1,6 @@
 ﻿using Serilog;
 using System.Threading.Channels;
+using WebHook.Core.DataTransferObjects.ApplicationCache;
 using WebHook.Core.DataTransferObjects.EmailSender;
 using WebHook.Core.EventContracts.Events;
 using WebHook.Core.EventContracts.Publishers;
@@ -14,16 +15,19 @@ public sealed class ApplicationPublisher : IApplicationPublisher
 {
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly Channel<EmailSenderDto> _emailSenderChannel;
+    private readonly Channel<ApplicationCacheEvent> _applicationCacheChannel;
 
     /// <summary>
     /// Initialises a new instance of the <see cref="ApplicationPublisher"/> class.
     /// </summary>
     /// <param name="eventRaisedChannel">The channel read by the event fan-out worker.</param>
     /// <param name="emailSenderChannel">The channel read by the email processor worker.</param>
-    public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel)
+    public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel, Channel<ApplicationCacheEvent> applicationCacheChannel)
     {
         _eventRaisedChannel = eventRaisedChannel;
         _emailSenderChannel = emailSenderChannel;
+        _applicationCacheChannel = applicationCacheChannel;
+
         _logger = Log.ForContext("ClassName", nameof(ApplicationPublisher));
     }
 
@@ -52,6 +56,19 @@ public sealed class ApplicationPublisher : IApplicationPublisher
         }
 
         _logger.ForContext("MethodName", nameof(QueueEmailEvent)).Information("Email item could not be queued - {0}", emailSenderItem);
+        return false;
+    }
+
+    public async Task<bool> QueueItemToCache(ApplicationCacheEvent cacheEvent, CancellationToken ct = default)
+    {
+        if(await _applicationCacheChannel.Writer.WaitToWriteAsync(ct))
+        {
+            await _applicationCacheChannel.Writer.WriteAsync(cacheEvent, ct);
+            _logger.ForContext("MethodName", nameof(QueueItemToCache)).Information("Cache item queued successfully - {0}", cacheEvent);
+            return true;
+        }
+
+        _logger.ForContext("MethodName", nameof(QueueItemToCache)).Information("Cache item could not be queued - {0}", cacheEvent);
         return false;
     }
 }

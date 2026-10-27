@@ -13,9 +13,10 @@ public class ApplicationCacheRepositoryContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ApplicationCacheLayerEntity>().HasNoKey();
         modelBuilder.Entity<ApplicationCacheLayerEntity>(entity =>
         {
-            entity.HasKey(e => e.Id);
+            //entity.HasKey(e => e.Id);
 
             entity.HasIndex(x => x.CacheKey).IsUnique();
             entity.HasIndex(x => x.ExpiresAt);
@@ -26,5 +27,19 @@ public class ApplicationCacheRepositoryContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnType("integer").IsRequired();
             entity.Property(e => e.ExpiresAt).HasColumnType("integer").IsRequired();
         });
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await ApplyPragmaOptimizations();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ApplyPragmaOptimizations()
+    {
+        await Database.OpenConnectionAsync();
+        using var command = Database.GetDbConnection().CreateCommand();
+        command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-20000; PRAGMA mmap_size=268435456";
+        await command.ExecuteNonQueryAsync();
     }
 }

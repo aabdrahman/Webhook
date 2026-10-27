@@ -18,10 +18,6 @@ namespace WebHook.Infrastructure.Migrations
 
             modelBuilder.Entity("WebHook.Core.Entities.ApplicationCache.ApplicationCacheLayerEntity", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("CacheKey")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -36,8 +32,6 @@ namespace WebHook.Infrastructure.Migrations
 
                     b.Property<long>("ExpiresAt")
                         .HasColumnType("integer");
-
-                    b.HasKey("Id");
 
                     b.HasIndex("CacheKey")
                         .IsUnique();
