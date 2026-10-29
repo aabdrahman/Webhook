@@ -64,12 +64,12 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetSubscribedEvents(Guid subscriptionId)
+    public async Task<IActionResult> GetSubscribedEvents(Guid subscriptionId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetSubscribedEvents));
         try
         {
-            var result = await _webhookSubscriptionEventService.GetSubscribedEventsAsync(subscriptionId, new CancellationToken());
+            var result = await _webhookSubscriptionEventService.GetSubscribedEventsAsync(subscriptionId, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)
@@ -108,12 +108,12 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> SubscribeEvent(Guid subscriptionId, string eventName)
+    public async Task<IActionResult> SubscribeEvent(Guid subscriptionId, string eventName, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(SubscribeEvent));
         try
         {
-            var result = await _webhookSubscriptionEventService.SubscribeToEventAsync(subscriptionId, eventName, new CancellationToken());
+            var result = await _webhookSubscriptionEventService.SubscribeToEventAsync(subscriptionId, eventName, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)
@@ -149,12 +149,12 @@ public class WebhookSubscriptionEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> UnsubscribeEvent(Guid subscriptionId, string eventName)
+    public async Task<IActionResult> UnsubscribeEvent(Guid subscriptionId, string eventName, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(UnsubscribeEvent));
         try
         {
-            var result = await _webhookSubscriptionEventService.UnsubscribeFromEventAsync(subscriptionId, eventName, new CancellationToken());
+            var result = await _webhookSubscriptionEventService.UnsubscribeFromEventAsync(subscriptionId, eventName, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)

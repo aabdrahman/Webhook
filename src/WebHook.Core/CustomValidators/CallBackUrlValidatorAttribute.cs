@@ -35,7 +35,7 @@ internal sealed class CallBackUrlValidatorAttribute : ValidationAttribute
 
         if (uri.IsLoopback)
         {
-            return new ValidationResult("Loopback addresses ar enot supported.");
+            return new ValidationResult("Loopback addresses are not supported.");
         }
 
         return ValidationResult.Success;

@@ -213,7 +213,7 @@ public sealed class WebhookDeliveryProcessorService
                 try
                 {
                     _logger.Information("Pushing webhook delivery to call back url - {0}", urlToCall);
-                    using var content = new StringContent(payload, encoding: Encoding.UTF8, "application/json");
+                    //using var content = new StringContent(payload, encoding: Encoding.UTF8, "application/json");
                     //using HttpResponseMessage httpResponse = await httpClient.PostAsync(urlToCall, content, requestCts.Token);
                     using var httpResponse = await httpClient.SendAsync(httpRequest, requestCts.Token);
                     stopWatch.Stop();

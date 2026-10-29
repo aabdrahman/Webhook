@@ -8,7 +8,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 /// </summary>
 [Route("[controller]")]
 [ApiController]
-[AllowAnonymous]
+//[AllowAnonymous]
 public class AdminController : ControllerBase
 {
     private readonly HealthCheckService _healthCheckService;
@@ -61,6 +61,7 @@ public class AdminController : ControllerBase
     [HttpGet("_health")]
     [ProducesResponseType(typeof(HealthCheckResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(HealthCheckResponse), StatusCodes.Status503ServiceUnavailable)]
+    [Authorize]
     public async Task<IActionResult> GetHealthStatus()
     {
         HealthReport report = await _healthCheckService.CheckHealthAsync();

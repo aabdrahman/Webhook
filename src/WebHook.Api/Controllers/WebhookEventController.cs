@@ -90,12 +90,12 @@ public class WebhookEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetEventByCorrelationId(Guid correlationId)
+    public async Task<IActionResult> GetEventByCorrelationId(Guid correlationId, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetEventByCorrelationId));
         try
         {
-            var result = await _webhookEventService.GetWebhookEventAsync(correlationId, new CancellationToken());
+            var result = await _webhookEventService.GetWebhookEventAsync(correlationId, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)
@@ -158,12 +158,12 @@ public class WebhookEventController : ControllerBase
     [ProducesResponseType(typeof(GenericResponse<object>), StatusCodes.Status429TooManyRequests)]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("per-user-rating")]
-    public async Task<IActionResult> GetAllEvents([FromQuery] GetWebhookEventParameters getWebhookEventParameters)
+    public async Task<IActionResult> GetAllEvents([FromQuery] GetWebhookEventParameters getWebhookEventParameters, CancellationToken ct = default)
     {
         _logger = Log.ForContext(_methodName, nameof(GetAllEvents));
         try
         {
-            var result = await _webhookEventService.GetWebhookEventsAsync(getWebhookEventParameters, new CancellationToken());
+            var result = await _webhookEventService.GetWebhookEventsAsync(getWebhookEventParameters, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)
