@@ -207,15 +207,17 @@ internal static class ApplicationServiceExtensions
 
     /// <summary>
     /// Registers <see cref="RepositoryContext"/> against PostgreSQL using the <c>DbConnection</c>
-    /// connection string, with dynamic JSON support.
+    /// connection string, with dynamic JSON support, and <see cref="ApplicationCacheRepositoryContext"/>
+    /// against SQLite using the <c>ApplicationCacheDbConnection</c> connection string.
     /// </summary>
     /// <remarks>
     /// Sensitive data and parameter logging are enabled, so SQL parameter values (including
-    /// hashes and encrypted secrets) are written to the logs.
+    /// hashes and encrypted secrets) are written to the logs. The cache context also gets
+    /// <see cref="SqlitePragmaInterceptor"/>, which applies the SQLite PRAGMAs whenever a connection opens.
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
-    /// <exception cref="ArgumentNullException">The <c>DbConnection</c> connection string is missing.</exception>
+    /// <exception cref="ArgumentNullException">The <c>DbConnection</c> or <c>ApplicationCacheDbConnection</c> connection string is missing.</exception>
     internal static void ConfigureDatabaseConnection(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<RepositoryContext>(opts =>
@@ -321,8 +323,9 @@ internal static class ApplicationServiceExtensions
     }
 
     /// <summary>
-    /// Registers the singleton bounded channels for raised events (capacity 1,000) and outgoing
-    /// emails (capacity 500). Both have a single reader and wait when full.
+    /// Registers the singleton bounded channels for raised events (capacity 1,000), outgoing
+    /// emails (capacity 500) and cache entries awaiting persistence (capacity 500). All have a
+    /// single reader and wait when full.
     /// </summary>
     /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationChannels(this IServiceCollection services)
@@ -362,7 +365,7 @@ internal static class ApplicationServiceExtensions
 
     /// <summary>
     /// Registers the background workers: event fan-out, pending event recovery, first delivery,
-    /// retry, stale claim release and email sending.
+    /// retry, stale claim release, email sending, cache persistence and stale cache eviction.
     /// </summary>
     /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationWorkers(this IServiceCollection services)
@@ -521,7 +524,11 @@ internal static class ApplicationServiceExtensions
         });
     }
 
-    /// <summary>Registers the in-memory cache with a size limit of 268,435,456 units.</summary>
+    /// <summary>
+    /// Registers the in-memory tier of the application cache with a size limit of 268,435,456 units.
+    /// Each cached entry counts as one unit. The persistent SQLite tier is registered by
+    /// <see cref="ConfigureDatabaseConnection"/>.
+    /// </summary>
     /// <param name="services">The service collection.</param>
     internal static void ConfigureApplicationCaching(this IServiceCollection services)
     {

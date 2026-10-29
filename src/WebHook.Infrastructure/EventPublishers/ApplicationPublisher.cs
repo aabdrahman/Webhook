@@ -22,6 +22,7 @@ public sealed class ApplicationPublisher : IApplicationPublisher
     /// </summary>
     /// <param name="eventRaisedChannel">The channel read by the event fan-out worker.</param>
     /// <param name="emailSenderChannel">The channel read by the email processor worker.</param>
+    /// <param name="applicationCacheChannel">The channel read by the cache persistence worker.</param>
     public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel, Channel<ApplicationCacheEvent> applicationCacheChannel)
     {
         _eventRaisedChannel = eventRaisedChannel;
@@ -59,6 +60,8 @@ public sealed class ApplicationPublisher : IApplicationPublisher
         return false;
     }
 
+    /// <inheritdoc />
+    /// <remarks>The cache channel is bounded (500 items), so the call waits for space when the worker is behind.</remarks>
     public async Task<bool> QueueItemToCache(ApplicationCacheEvent cacheEvent, CancellationToken ct = default)
     {
         if(await _applicationCacheChannel.Writer.WaitToWriteAsync(ct))

@@ -9,12 +9,35 @@ using WebHook.Infrastructure.Persistence.ApplicationCache;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Persists queued cache entries to the SQLite cache table (the write-behind half of <c>CacheService</c>).
+/// </summary>
+/// <remarks>
+/// <para>
+/// On start it deletes expired rows. After the first <see cref="PollInterval"/> tick it reads
+/// <see cref="ApplicationCacheEvent"/> items from the channel one at a time, and for each one runs an
+/// <c>INSERT OR REPLACE</c> (key upper-cased, <c>ExpiresAt</c> = now + expiry seconds) in a new scope and then
+/// puts the JSON value into <see cref="IMemoryCache"/> with a sliding expiry of the same number of seconds.
+/// </para>
+/// <para>
+/// The memory entry written here is the JSON <see cref="string"/>, not the original typed value, so a typed read
+/// such as <c>Get&lt;Guid&gt;</c> does not hit it and falls back to SQLite. The loop has no per-item error
+/// handling: an exception from SQLite ends the worker. The cache table must exist (apply the
+/// <c>ApplicationCacheRepositoryContext</c> migrations) or <see cref="StartAsync"/> fails.
+/// </para>
+/// </remarks>
 public class CachePersistenceWorker : BackgroundService
 {
     private readonly Channel<ApplicationCacheEvent> _cacheEventChannel;
     private readonly IMemoryCache _memeoryCache;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="CachePersistenceWorker"/> class.
+    /// </summary>
+    /// <param name="cacheEventChannel">The channel the cache service queues entries on.</param>
+    /// <param name="serviceScopeFactory">Creates a scope per entry to resolve the cache DbContext.</param>
+    /// <param name="memeoryCache">The in-memory tier updated after each write.</param>
     public CachePersistenceWorker(Channel<ApplicationCacheEvent> cacheEventChannel, IServiceScopeFactory serviceScopeFactory, IMemoryCache memeoryCache)
     {
         _cacheEventChannel = cacheEventChannel;
@@ -25,9 +48,16 @@ public class CachePersistenceWorker : BackgroundService
     private Serilog.ILogger _logger = Serilog.Log.ForContext("ClassName", nameof(CachePersistenceWorker));
     private const string _methodName = "MethodName";
 
-    /// <summary>How long the worker waits before it starts draining the channel. Overridable so tests need not wait.</summary>
+    /// <summary>
+    /// How long the worker waits before it starts draining the channel. Once draining starts it keeps reading
+    /// until the channel completes, so this delays only the first write. Defaults to 10 seconds; overridable
+    /// so tests need not wait.
+    /// </summary>
     protected virtual TimeSpan PollInterval => TimeSpan.FromSeconds(10);
 
+    /// <summary>Waits for the first tick, then persists queued cache entries until the host stops.</summary>
+    /// <param name="stoppingToken">Signalled when the host is shutting down.</param>
+    /// <returns>A task that completes when the worker stops.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));
@@ -67,6 +97,10 @@ public class CachePersistenceWorker : BackgroundService
         }
     }
 
+    /// <summary>Deletes expired cache rows, then starts the worker.</summary>
+    /// <param name="cancellationToken">Signalled if startup is aborted.</param>
+    /// <returns>A task that completes when the worker has started.</returns>
+    /// <exception cref="Microsoft.Data.Sqlite.SqliteException">The cache table does not exist.</exception>
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(StartAsync));

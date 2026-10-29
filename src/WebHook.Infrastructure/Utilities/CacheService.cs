@@ -9,12 +9,34 @@ using WebHook.Infrastructure.Persistence.ApplicationCache;
 
 namespace WebHook.Infrastructure.Utilities;
 
+/// <summary>
+/// <see cref="ICacheService"/> implementation backed by <see cref="IMemoryCache"/> and a SQLite table.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Set:</b> the entry is queued to the cache persistence worker (write-behind) and placed in memory
+/// straight away, so reads see it immediately. <b>Get:</b> memory is checked first; on a miss the SQLite table
+/// is queried for an unexpired row (the result is not copied back into memory). <b>Remove:</b> keys are deleted
+/// from memory and from SQLite.
+/// </para>
+/// <para>
+/// All SQL is raw and parameterised because <see cref="WebHook.Core.Entities.ApplicationCache.ApplicationCacheLayerEntity"/>
+/// has no key. Keys are upper-cased for SQLite, so lookups there are case-insensitive. The service is scoped
+/// because it uses the scoped cache DbContext.
+/// </para>
+/// </remarks>
 public sealed class CacheService : ICacheService
 {
     private readonly IMemoryCache _memoryCache;
     private readonly ApplicationCacheRepositoryContext _applicationCacheRepositoryContext;
     private readonly IApplicationPublisher _applicationPublisher;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="CacheService"/> class.
+    /// </summary>
+    /// <param name="memoryCache">The in-memory tier.</param>
+    /// <param name="applicationCacheRepositoryContext">The context for the persistent SQLite tier.</param>
+    /// <param name="applicationPublisher">Queues entries for the cache persistence worker.</param>
     public CacheService(IMemoryCache memoryCache, ApplicationCacheRepositoryContext applicationCacheRepositoryContext, IApplicationPublisher applicationPublisher)
     {
         _memoryCache = memoryCache;
@@ -28,6 +50,7 @@ public sealed class CacheService : ICacheService
 
     private ILogger _logger;
 
+    /// <inheritdoc />
     public async Task<T?> GetItemsFromCacheAsync<T>(string cacheKey)
     {
         _logger = _logger.ForContext("MethodName", nameof(GetItemsFromCacheAsync));
@@ -57,6 +80,12 @@ public sealed class CacheService : ICacheService
         }
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Unlike the other methods this does not catch exceptions: a SQLite failure propagates to the caller.
+    /// A set that is still waiting in the persistence channel is not cancelled, so it can write the key again
+    /// after this call.
+    /// </remarks>
     public async Task RemoveItemsFromCacheAsync(params string[] keys)
     {
         _logger.ForContext("MethodName", nameof(RemoveItemsFromCacheAsync)).Information("Removing cached items from cache - {0}", keys);
@@ -72,6 +101,11 @@ public sealed class CacheService : ICacheService
         _logger.Information("Removed items from cache for keys - {0}. Total Deleted: {1}", keys, isDeleted);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The memory entry expires <paramref name="expiresAfter"/> seconds after this call. The persisted row
+    /// expires the same number of seconds after the worker writes it, which can be slightly later.
+    /// </remarks>
     public async Task<bool> SetCacheItemAsync<T>(string key, T value, long expiresAfter = 300)
     {
         _logger = _logger.ForContext("MethodName", nameof(SetCacheItemAsync));

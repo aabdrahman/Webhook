@@ -9,10 +9,22 @@ using WebHook.Infrastructure.Persistence.ApplicationCache;
 
 namespace WebHook.Infrastructure.BackgroundWorkers;
 
+/// <summary>
+/// Periodically deletes expired rows from the SQLite cache table.
+/// </summary>
+/// <remarks>
+/// Reads already ignore expired rows, so this only stops the table growing. Each tick runs
+/// <c>DELETE ... WHERE ExpiresAt &lt; now</c> in a new scope. Errors are logged and the next tick tries again,
+/// so a temporary database problem does not stop the worker.
+/// </remarks>
 public class StaleCacheEvictionWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
+    /// <summary>
+    /// Initialises a new instance of the <see cref="StaleCacheEvictionWorker"/> class.
+    /// </summary>
+    /// <param name="serviceScopeFactory">Creates a scope per tick to resolve the cache DbContext.</param>
     public StaleCacheEvictionWorker(IServiceScopeFactory serviceScopeFactory)
     {
         _serviceScopeFactory = serviceScopeFactory;
@@ -21,9 +33,12 @@ public class StaleCacheEvictionWorker : BackgroundService
     private ILogger _logger = Log.ForContext("ClassName", nameof(StaleCacheEvictionWorker));
     private const string _methodName = "MethodName";
 
-    /// <summary>How often stale rows are deleted. Overridable so tests need not wait.</summary>
+    /// <summary>How often stale rows are deleted. Defaults to 20 seconds; overridable so tests need not wait.</summary>
     protected virtual TimeSpan PollInterval => TimeSpan.FromSeconds(20);
 
+    /// <summary>Deletes expired cache rows every <see cref="PollInterval"/> until the host stops.</summary>
+    /// <param name="stoppingToken">Signalled when the host is shutting down.</param>
+    /// <returns>A task that completes when the worker stops.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));

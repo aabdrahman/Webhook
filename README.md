@@ -28,6 +28,7 @@ Open source and free to use.
 - [Service Client Onboarding](#service-client-onboarding)
 - [Delivery Pipeline](#delivery-pipeline)
 - [Background Workers](#background-workers)
+- [Application Cache](#application-cache)
 - [Security](#security)
 - [Health Checks](#health-checks)
 - [API Reference](#api-reference)
@@ -205,7 +206,7 @@ To verify a delivery, a subscriber should:
 | Payload signing | HMAC-SHA256 |
 | Secret encryption | AES-GCM |
 | Data protection | ASP.NET Core Data Protection |
-| Caching | `IMemoryCache` |
+| Caching | `IMemoryCache` in front of a SQLite table (EF Core) that survives restarts |
 | Logging | Serilog |
 | Rate limiting | ASP.NET Core `RateLimiter` middleware |
 | API documentation | OpenAPI + Scalar (`/scalar/v1`, Development) and ReDoc (`/webhookapi/api-docs`) |
@@ -244,7 +245,8 @@ Keep these out of source control. In production, prefer a secrets manager.
   },
   "AllowedHosts": "*",
   "ConnectionStrings": {
-    "DbConnection": ""
+    "DbConnection": "",
+    "ApplicationCacheDbConnection": "Data Source=applicationcache.db"
   },
   "CorsPolicy": {
     "AllowedMethods": "POST,GET,PUT,DELETE,OPTIONS",
@@ -327,6 +329,15 @@ dotnet ef migrations script <LastAppliedMigration> <NewMigration> `
 ```
 
 Run the generated script against your PostgreSQL database, then start the application. The analytics dashboards depend on database views and a function created by migrations, so apply every migration, including the SQL-only ones.
+
+The application cache uses a separate SQLite database (`ConnectionStrings:ApplicationCacheDbConnection`, default `applicationcache.db`) with its own migrations. Apply them before the first start, because `CachePersistenceWorker` queries the cache table on startup and fails if it is missing:
+
+```powershell
+dotnet ef database update `
+    --context ApplicationCacheRepositoryContext `
+    --project WebHook.Infrastructure `
+    --startup-project WebHook.Api
+```
 
 ### Run the API
 
@@ -554,6 +565,8 @@ An Admin may request a manual retry for a dead-lettered delivery (`POST /api/Web
 | `RetryPendingDeliveriesWorker` | DB poll | Retries `Failed` deliveries and dead-letters those out of attempts |
 | `StaleClaimedDeliverReleaseWorker` | DB poll | Releases deliveries whose claim has expired, returning them to `Failed` |
 | `EmailProcessorWorker` | Channel | Sends queued emails — OTPs, slow-endpoint and dead-letter notifications. Remaining emails are flushed on shutdown |
+| `CachePersistenceWorker` | Channel | Writes queued cache entries to the SQLite cache table and refreshes the memory tier. Deletes expired rows on startup |
+| `StaleCacheEvictionWorker` | Timer (20 s) | Deletes expired rows from the SQLite cache table |
 
 ### Two-Phase Claim Pattern
 
@@ -567,12 +580,32 @@ If a worker crashes between claim and release, `StaleClaimedDeliverReleaseWorker
 
 ---
 
+## Application Cache
+
+`ICacheService` is a two-tier cache. Its main use is the JTI of each user's current access token, which the authentication filter checks on every request.
+
+| Tier | Role |
+|---|---|
+| `IMemoryCache` | Fast path. Checked first on every read |
+| SQLite table `ApplicationCacheLayerEntities` | Persistent tier in a separate database (`ApplicationCacheDbConnection`), read when memory misses, so entries survive a restart |
+
+- **Set** — the entry is queued on a bounded channel (500) and placed in memory immediately, so it can be read straight away. `CachePersistenceWorker` then writes it to SQLite with `INSERT OR REPLACE`. `expiresAfter` is in seconds and defaults to 300; login and token refresh use the configured access-token lifetime
+- **Get** — memory first, then SQLite for an unexpired row. A SQLite hit is returned but not copied back into memory. Errors are logged and reported as a miss
+- **Remove** — deletes the keys from memory and from SQLite
+- **Keys** — stored upper-cased in SQLite, so lookups there ignore case; the memory tier is case-sensitive
+- **Housekeeping** — expired rows are ignored by reads, deleted once at startup and then every 20 seconds by `StaleCacheEvictionWorker`
+- **Tuning** — `SqlitePragmaInterceptor` applies WAL mode and related PRAGMAs each time a connection opens
+
+The cache is best-effort: entries still in the channel when the process stops are not persisted.
+
+---
+
 ## Security
 
 | Mechanism | Implementation |
 |---|---|
 | JWT signing | HMAC-SHA256, key from the `webhook_secret_key` environment variable; the token audience is the caller's origin |
-| Token revocation | The JTI of each user's current token is held in `IMemoryCache`; the filter rejects any request whose JTI is missing or mismatched. Changing a user's role evicts it |
+| Token revocation | The JTI of each user's current token is held in the application cache (memory plus SQLite, so sessions survive a restart); the filter rejects any request whose JTI is missing or mismatched. Changing a user's role evicts it |
 | Refresh tokens | Random 32-byte values, rotated on every login and refresh |
 | OTPs and operation tokens | OTPs are hashed; operation tokens are protected with ASP.NET Core Data Protection, hashed, purpose-bound and single-use |
 | Service client credentials | `ClientKey` generated with a cryptographic RNG and stored as a PBKDF2 hash; validated on every publish request |
@@ -598,7 +631,7 @@ This ensures that revoking a user's session (by evicting their JTI from the cach
 
 ### Deployment Notes
 
-- The token cache, the in-memory channels and the default Data Protection key storage are all per process. Run a single API instance, or move them to shared infrastructure (for example Redis and a persisted Data Protection key ring) before scaling out.
+- The memory tier of the cache, the in-memory channels and the default Data Protection key storage are all per process, and the SQLite cache file is local to the host. Run a single API instance, or move them to shared infrastructure (for example Redis and a persisted Data Protection key ring) before scaling out.
 - Keep `env_webhook_encrypt_key` outside the database — a database leak alone then reveals no subscription secrets.
 
 ---
@@ -615,7 +648,7 @@ Two endpoints are available:
 | Check | What it monitors |
 |---|---|
 | `POSTGRES DB HEALTH CHECK` | Primary database connectivity |
-| `IN MEMORY SYSTEM CACHE HEALTH CHECK` | Cache can store, read and remove a value |
+| `IN MEMORY SYSTEM CACHE HEALTH CHECK` | Cache can store, read and remove a value. A write is queued before it is persisted, so this check reads back from the memory tier |
 | `SERVER DISK SPACE HEALTH CHECK` | Free space on the C: drive — `Degraded` when low |
 | `QUEUED EMAIL HEALTH CHECK` | Email channel backlog — `Unhealthy` above 12 queued emails |
 | `QUEUED RAISED EVENTS HEALTH CHECK` | Raised event channel backlog — `Unhealthy` above 10 queued events |
@@ -859,10 +892,12 @@ Webhook/
 │
 ├── WebHook.Infrastructure/
 │   ├── BackgroundWorkers/
+│   │   ├── CachePersistenceWorker.cs
 │   │   ├── EmailProcessorWorker.cs
 │   │   ├── EventRaisedWorker.cs
 │   │   ├── PendingRaisedEventsWorker.cs
 │   │   ├── RetryPendingDeliveriesWorker.cs
+│   │   ├── StaleCacheEvictionWorker.cs
 │   │   ├── StaleClaimedDeliverReleaseWorker.cs
 │   │   └── WebhookDeliveryProcessorWorker.cs
 │   ├── CustomHealthChecks/
@@ -879,6 +914,7 @@ Webhook/
 │   ├── EventPublishers/
 │   │   └── ApplicationPublisher.cs
 │   ├── Persistence/
+│   │   ├── ApplicationCache/           — SQLite cache context, migrations, PRAGMA interceptor
 │   │   ├── Configurations/
 │   │   ├── CustomDbColumnConverters/
 │   │   ├── Migrations/
