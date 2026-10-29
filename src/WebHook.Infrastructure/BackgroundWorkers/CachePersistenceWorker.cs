@@ -44,7 +44,7 @@ public class CachePersistenceWorker : BackgroundService
                 var ctx = scope.ServiceProvider.GetRequiredService<ApplicationCacheRepositoryContext>();
 
                 var operationTimestamp = DateTimeOffset.UtcNow;
-                var cacheKeyParameter = new SqliteParameter("@Key", cacheItem.cacheKey.ToUpper());
+                var cacheKeyParameter = new SqliteParameter("@Key", cacheItem.cacheKey.ToUpperInvariant());
                 var cacheValueParameter = new SqliteParameter("@Value", cacheItem.cacheValue);
                 var cacheExpirationParameter = new SqliteParameter("@ExpiresAt", operationTimestamp.AddSeconds(cacheItem.cacheExpiration).ToUnixTimeSeconds());
                 var cacheCreatedAtParameter = new SqliteParameter("@CreatedAt", operationTimestamp.ToUnixTimeSeconds());
@@ -55,11 +55,11 @@ public class CachePersistenceWorker : BackgroundService
                 {
                     Size = 1, //This memory cache option is necessary as the caching fails otherwise, also the 1unit ensures that the cache uses the defined value in the DI.
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(int.MaxValue),
-                    SlidingExpiration = TimeSpan.FromMinutes(cacheItem.cacheExpiration)
+                    SlidingExpiration = TimeSpan.FromSeconds(cacheItem.cacheExpiration)
                 });
                 _logger.Information("Cache Item persisted affected {0} row(s) in db. Returns: {1} from memeory cache", persistence, cacheResult);
 
-                await Task.Delay(10);
+                await Task.Delay(1, stoppingToken);
             }
         }
     }

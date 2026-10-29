@@ -251,7 +251,7 @@ public class WebhookEventController : ControllerBase
         _logger = Log.ForContext(_methodName, nameof(CreateEvent));
         try
         {
-            var result = await _webhookEventService.CreateEventAsync(createWebhookEventRequest, new CancellationToken());
+            var result = await _webhookEventService.CreateEventAsync(createWebhookEventRequest, ct);
             return StatusCode((int)result.HttpStatusCode, result);
         }
         catch (Exception ex)

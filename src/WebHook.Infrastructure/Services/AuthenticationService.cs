@@ -191,7 +191,8 @@ public sealed class AuthenticationService : IAuthenticationService
             }
 
             var tokenDetails = new TokenDto(accessToken: token, refreshToken: _loggedInUser.RefreshToken);
-            var writeTokenToCache = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser?.NormalizedEmail!, tokenJti);
+            var writeTokenToCache = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser?.NormalizedEmail!, tokenJti, 
+                                expiresAfter: long.TryParse(_jwtSettingsConfiguration.TokenExpirationAfterInSeconds.ToString(), out long expiresAfter) ? expiresAfter : 300);
 
             _logger.Information("User with details - {0} aigned in successfully and token generated. Write to cache result - {1}", loginUserDetails.UserNameOrEmailAddress, writeTokenToCache);
 
@@ -639,7 +640,8 @@ public sealed class AuthenticationService : IAuthenticationService
 
             Guid accessTokenJti = Guid.CreateVersion7(DateTimeOffset.UtcNow);
             string accessToken = await GenerateToken(tokenJti: accessTokenJti);
-            bool writeToCacheResult = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser.NormalizedEmail!, accessTokenJti);
+            bool writeToCacheResult = await _cacheService.SetCacheItemAsync<Guid>(_loggedInUser.NormalizedEmail!, accessTokenJti,
+                                        expiresAfter: long.TryParse(_jwtSettingsConfiguration.TokenExpirationAfterInSeconds.ToString(), out long expiresAfter) ? expiresAfter : 300);
 
             _logger.Information("Token generated successfully for user - {0}. Write to cache result - {1}", _loggedInUser.Id, writeToCacheResult);
 

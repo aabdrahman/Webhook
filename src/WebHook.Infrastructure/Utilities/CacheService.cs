@@ -45,10 +45,6 @@ public sealed class CacheService : ICacheService
 
             _logger.Information("Cache Value for: {0} could not be fetched - {1}", cacheKey, cachedItem);
 
-            //var result = await _applicationCacheRepositoryContext.ApplicationCacheLayerEntities
-            //    .Where(x => x.CacheKey == cacheKey && x.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-            //    .Select(x => x.CacheValue).FirstOrDefaultAsync();
-
             var result = await _applicationCacheRepositoryContext.Database.SqlQueryRaw<string>(@"SELECT CacheValue AS [Value] FROM ApplicationCacheLayerEntities WHERE CacheKey = {0} AND ExpiresAt > {1}", cacheKey.ToUpper(), DateTimeOffset.UtcNow.ToUnixTimeSeconds()).FirstOrDefaultAsync();
 
             return result != null ? JsonSerializer.Deserialize<T>(result) : default(T?);
@@ -82,25 +78,26 @@ public sealed class CacheService : ICacheService
         try
         {
             _logger.Information("Setting cached item for key - {0}, value - {1}", key, value);
-            await Task.Delay(1);
 
             var isQueued = await _applicationPublisher.QueueItemToCache(new ApplicationCacheEvent(cacheKey: key, cacheValue: JsonSerializer.Serialize(value), cacheExpiration: expiresAfter));
 
             if (isQueued)
             {
-                return isQueued;
+                //var cacheResult = _memoryCache.Set<T>(key, value);
+                var cacheResult = _memoryCache.Set<T>(key, value, new MemoryCacheEntryOptions
+                {
+                    Size = 1, //This memory cache option is necessary as the caching fails otherwise, also the 1unit ensures that the cache uses the defined value in the DI.
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(expiresAfter),
+                    SlidingExpiration = TimeSpan.FromMinutes(int.MaxValue)
+                });
+
+                _logger.Information("Item set in cache successfully. Key: {0}, Value: {1}, Result: {2}", key, value, cacheResult);
+                return true;
             }
 
-            //var cacheResult = _memoryCache.Set<T>(key, value);
-            var cacheResult = _memoryCache.Set<T>(key, value, new MemoryCacheEntryOptions
-            {
-                Size = 1, //This memory cache option is necessary as the caching fails otherwise, also the 1unit ensures that the cache uses the defined value in the DI.
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(int.MaxValue),
-                SlidingExpiration = TimeSpan.FromMinutes(int.MaxValue)
-            });
+            _logger.Information("Item could not be set to cache successfully - {0}", isQueued);
+            return isQueued;
 
-            _logger.Information("Item set in cache successfully. Key: {0}, Value: {1}, Result: {2}", key, value, cacheResult);
-            return true;
         }
         catch (Exception ex)
         {

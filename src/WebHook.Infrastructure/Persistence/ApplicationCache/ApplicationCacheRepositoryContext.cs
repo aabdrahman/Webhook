@@ -29,17 +29,4 @@ public class ApplicationCacheRepositoryContext : DbContext
         });
     }
 
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await ApplyPragmaOptimizations();
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task ApplyPragmaOptimizations()
-    {
-        await Database.OpenConnectionAsync();
-        using var command = Database.GetDbConnection().CreateCommand();
-        command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-20000; PRAGMA mmap_size=268435456";
-        await command.ExecuteNonQueryAsync();
-    }
 }

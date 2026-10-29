@@ -241,6 +241,7 @@ internal static class ApplicationServiceExtensions
         services.AddDbContext<ApplicationCacheRepositoryContext>(opts =>
         {
             opts.UseSqlite(configuration.GetConnectionString("ApplicationCacheDbConnection") ?? throw new ArgumentNullException("Application cache database configuration string not provided"))
+                    .AddInterceptors(new SqlitePragmaInterceptor())
                     .EnableSensitiveDataLogging()
                     .LogTo(Serilog.Log.Information,
                             new[] { DbLoggerCategory.Database.Command.Name },
@@ -374,6 +375,7 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<StaleClaimedDeliverReleaseWorker>();
         services.AddHostedService<EmailProcessorWorker>();
         services.AddHostedService<CachePersistenceWorker>();
+        services.AddHostedService<StaleCacheEvictionWorker>();
     }
 
     /// <summary>
