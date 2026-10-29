@@ -108,6 +108,7 @@ public sealed class WebhookDeliveryProcessorServiceTests
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddApplicationCacheForTests();
         services.AddSingleton<EmailContentFormatterHelper>();
 
         _serviceProvider = services.BuildServiceProvider();

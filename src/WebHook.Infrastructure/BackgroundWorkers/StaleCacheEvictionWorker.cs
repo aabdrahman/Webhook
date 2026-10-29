@@ -21,11 +21,14 @@ public class StaleCacheEvictionWorker : BackgroundService
     private ILogger _logger = Log.ForContext("ClassName", nameof(StaleCacheEvictionWorker));
     private const string _methodName = "MethodName";
 
+    /// <summary>How often stale rows are deleted. Overridable so tests need not wait.</summary>
+    protected virtual TimeSpan PollInterval => TimeSpan.FromSeconds(20);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));
 
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
+        using var timer = new PeriodicTimer(PollInterval);
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {

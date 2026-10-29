@@ -1,4 +1,5 @@
 ﻿using MassTransit;
+using WebHook.Tests.Utilities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
@@ -212,6 +213,7 @@ public class AuthenticationServiceTests : IClassFixture<PostgreSqlFixture>, IAsy
         services.AddScoped<EmailContentFormatterHelper>();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<ICacheService, CacheService>();
+        services.AddApplicationCacheForTests();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         _serviceProvider = services.BuildServiceProvider();

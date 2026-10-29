@@ -127,6 +127,7 @@ public sealed class RetryAfterPendingServiceTests
         services.AddScoped<ISignatureService, SignatureService>();
         services.AddSingleton<EmailContentFormatterHelper>();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddApplicationCacheForTests();
 
         var environment = new TestWebHostEnvironment
         {

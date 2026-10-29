@@ -1,3 +1,4 @@
+using WebHook.Tests.Utilities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -830,6 +831,8 @@ public sealed class WebhookSubscriptionWebApiFactory
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+
+        builder.UseTemporaryCacheDatabase();
         builder.UseEnvironment("Testing");
         Environment.SetEnvironmentVariable("webhook_secret_key", Random.Shared.GetHexString(16));
         builder.ConfigureServices(services =>

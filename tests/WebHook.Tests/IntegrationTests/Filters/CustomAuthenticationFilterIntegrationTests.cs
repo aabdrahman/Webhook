@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using WebHook.Tests.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -187,6 +188,8 @@ public sealed class FilterWebApplicationFactory
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+
+        builder.UseTemporaryCacheDatabase();
         builder.UseEnvironment("Testing");
         Environment.SetEnvironmentVariable("webhook_secret_key", Random.Shared.GetHexString(16));
         builder.ConfigureAppConfiguration((context, config) =>

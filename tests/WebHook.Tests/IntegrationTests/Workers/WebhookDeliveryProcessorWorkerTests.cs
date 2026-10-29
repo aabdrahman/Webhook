@@ -105,6 +105,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddApplicationCacheForTests();
         services.AddSingleton<EmailContentFormatterHelper>();
 
         //Add the signature and encrptor services.
@@ -850,6 +851,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         services.AddScoped<WebhookDeliveryRetryAfterService>();
         services.AddScoped<WebhookDeliveryProcessorService>();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
+        services.AddApplicationCacheForTests();
 
         services.AddScoped<IEncryptionService, EncryptionService>();
         services.AddScoped<ISignatureService, SignatureService>();

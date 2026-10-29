@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using WebHook.Tests.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System.Net;
@@ -49,6 +50,7 @@ public class WebhookServiceClientServiceTests : IClassFixture<PostgreSqlFixture>
         services.AddScoped<IWebhookServiceClientService, WebhookServiceClientService>();
         services.AddScoped<IApplicationHasher, ApplicationHasher>();
         services.AddScoped<ICacheService, CacheService>();
+        services.AddApplicationCacheForTests();
         services.AddMemoryCache(opts =>
         {
             opts.SizeLimit = 2 * 1024 * 1024;

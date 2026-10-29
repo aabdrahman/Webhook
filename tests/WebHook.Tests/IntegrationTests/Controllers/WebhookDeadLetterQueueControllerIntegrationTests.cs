@@ -1,3 +1,4 @@
+using WebHook.Tests.Utilities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -485,6 +486,8 @@ public sealed class DeadLetterQueueWebApiFactory
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+
+        builder.UseTemporaryCacheDatabase();
         builder.UseEnvironment("Testing");
 
         builder.ConfigureServices(services =>

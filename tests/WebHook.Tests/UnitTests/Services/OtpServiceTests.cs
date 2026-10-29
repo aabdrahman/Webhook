@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.DataProtection;
+using WebHook.Tests.Utilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -131,6 +132,7 @@ public class OtpServiceTests : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
         services.AddSingleton<Microsoft.AspNetCore.Hosting.IHostingEnvironment>(hostingenvironment);
         services.AddScoped<IAuthenticatedUserDetails, AuthenticatedUserDetails>();
         services.AddScoped<ICacheService, CacheService>();
+        services.AddApplicationCacheForTests();
         services.AddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         services.AddLogging();

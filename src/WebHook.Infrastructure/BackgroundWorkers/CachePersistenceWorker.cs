@@ -25,11 +25,14 @@ public class CachePersistenceWorker : BackgroundService
     private Serilog.ILogger _logger = Serilog.Log.ForContext("ClassName", nameof(CachePersistenceWorker));
     private const string _methodName = "MethodName";
 
+    /// <summary>How long the worker waits before it starts draining the channel. Overridable so tests need not wait.</summary>
+    protected virtual TimeSpan PollInterval => TimeSpan.FromSeconds(10);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger = _logger.ForContext(_methodName, nameof(ExecuteAsync));
 
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        using var timer = new PeriodicTimer(PollInterval);
 
         while (!stoppingToken.IsCancellationRequested && await timer.WaitForNextTickAsync(stoppingToken))
         {
