@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using WebHook.Core.Constants;
 using WebHook.Core.Entities;
 
 namespace WebHook.Infrastructure.Data_Persistence.Configurations;
@@ -36,6 +37,10 @@ public sealed class WebhookSubscriptionConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.ContactEmail)
             .IsRequired(false)
             .HasMaxLength(100);
+
+        builder.Property(x => x.OnboardStatus)
+            .HasDefaultValue<SubscriptionOnboardStatus>(SubscriptionOnboardStatus.Inactive)
+            .HasConversion<string>();
 
         //RELATIONSHIPS
         builder.HasMany(x => x.WebhookEvents)

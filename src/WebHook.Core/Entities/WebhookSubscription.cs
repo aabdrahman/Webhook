@@ -1,4 +1,6 @@
-﻿namespace WebHook.Core.Entities;
+﻿using WebHook.Core.Constants;
+
+namespace WebHook.Core.Entities;
 
 /// <summary>
 /// A user's registration of a callback URL to receive one or more event types.
@@ -26,6 +28,8 @@ public class WebhookSubscription
     public List<string> SubscribedFields { get; set; } = [];
     /// <summary>The email address for slow-endpoint and dead-letter notifications.</summary>
     public string? ContactEmail { get; set; } = string.Empty;
+    /// <summary>The onboard status of the subscription, defaults to Inactive. <see cref="SubscriptionOnboardStatus"/> </summary>
+    public SubscriptionOnboardStatus OnboardStatus { get; set; } = SubscriptionOnboardStatus.Inactive;
 
     //RELATIONSHIPS
     //-----Many to Many relationship with the webhook event catalog
