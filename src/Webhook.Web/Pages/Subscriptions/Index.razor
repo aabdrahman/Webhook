@@ -66,6 +66,7 @@
                                 <th>Callback URL</th>
                                 <th>Events</th>
                                 <th>Status</th>
+                                <th>Onboard Status</th>
                                 <th>Created</th>
                                 <th></th>
                             </tr>
@@ -90,6 +91,10 @@
                                     </td>
                                     <td>
                                         <Badge Value="@(sub.IsActive ? "Active" : "Inactive")"
+                                               Variant="subscription" />
+                                    </td>
+                                    <td class="text-sm text-muted">
+                                        <Badge Value="@sub.OnboardStatus"
                                                Variant="subscription" />
                                     </td>
                                     <td class="text-sm text-muted">
@@ -138,6 +143,32 @@
                                                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                                                 </svg>
                                             </button>
+
+                                            @if(sub.OnboardStatus.Equals(SubscriptionOnboardStatus.Inactive.ToString(), StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <!-- Activate Subscription -->
+                                                <button class="btn btn-ghost btn-sm"
+                                                        @onclick="() => OpenActivationModal(sub)"
+                                                        title="Delete">
+
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
+                                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" 
+                                                         stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;color:#f59e0b;">
+                                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                                        <polyline points="9 12 11 14 15 10" />
+                                                    </svg>
+
+                                                    @* <svg viewBox="0 0 24 24" fill="none"
+                                                         stroke="currentColor" stroke-width="2"
+                                                         stroke-linecap="round" stroke-linejoin="round"
+                                                         style="width:15px;height:15px;color:var(--color-danger);">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                                        <path d="M10 11v6M14 11v6" />
+                                                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                                    </svg> *@
+                                                </button>
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -234,6 +265,44 @@
     </Modal>
 }
 
+@if(_selectedSubscription is not null)
+{
+    <Modal @bind-IsOpen="_showActivateSubscriptionModal"
+           Title="Verify Callback URL"
+           ConfirmText="Send Challenge"
+           ConfirmVariant="primary"
+           IsConfirming="@_isActivatingSubscription"
+           OnConfirm="HandleVerify"
+           OnClose="CloseModals">
+
+        <div class="subscription-modal-details">
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Name</span>
+                <span class="subscription-modal-value">@_selectedSubscription.Name</span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Callback URL</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @_selectedSubscription.CallBackUrl
+                </span>
+            </div>
+            <div class="subscription-modal-row">
+                <span class="subscription-modal-label">Signature Key</span>
+                <span class="subscription-modal-value table-mono text-sm">
+                    @MaskKey(_selectedSubscription.SecretKey)
+                </span>
+            </div>
+        </div>
+
+        <Alert Type="info"
+               Title="How verification works"
+               Message="A signed challenge will be sent to your callback URL. Your endpoint must respond with the correct HMAC-SHA256 token to become active." />
+
+        <Alert Message="@_activateSubscriptionErrorMessage" />
+
+    </Modal>
+}
+
 @code {
 
     //------------------------------------------------------------------------
@@ -261,6 +330,11 @@
     private bool   _showDeleteModal    = false;
     private bool   _isDeleting         = false;
     private string _deleteErrorMessage = string.Empty;
+
+    // Activate Subscription
+    private bool _showActivateSubscriptionModal = false;
+    private bool _isActivatingSubscription = false;
+    private string _activateSubscriptionErrorMessage = string.Empty;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -351,13 +425,22 @@
         _showDeleteModal      = true;
     }
 
+    private void OpenActivationModal(WebhookSubscriptionDto sub)
+    {
+        _selectedSubscription = sub;
+        _activateSubscriptionErrorMessage = string.Empty;
+        _showActivateSubscriptionModal = true;
+    }
+
     private void CloseModals()
     {
         _showToggleModal      = false;
         _showDeleteModal      = false;
+        _showActivateSubscriptionModal = false; 
         _selectedSubscription = null;
         _toggleErrorMessage   = string.Empty;
         _deleteErrorMessage   = string.Empty;
+        _activateSubscriptionErrorMessage = string.Empty;
     }
 
     private async Task HandleToggle()
@@ -413,10 +496,10 @@
             //     return;
             // }
 
-            await Task.Delay(8000);
+            //await Task.Delay(8000);
 
             //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
-            await Task.Delay(800);
+            //await Task.Delay(800);
             var result = await deleteSubscriptionHandler.HandleAsync(_selectedSubscription.Id);
             bool success = result.successStatus;
 
@@ -437,6 +520,41 @@
         {
             _isDeleting = false;
         }
+    }
+
+    private async Task HandleVerify()
+    {
+        _isActivatingSubscription = true;
+        _activateSubscriptionErrorMessage = "";
+
+        //var result = await SubscriptionService.InitiateVerificationAsync(_selectedSubscription.Id);
+
+        await Task.Delay(8000);
+        bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+
+        if (!success)
+        {
+            _activateSubscriptionErrorMessage = $"Failed to initiate verification.";
+            toastService.ShowError(_activateSubscriptionErrorMessage, "Subscription Activation Operation Failed.");
+            _isActivatingSubscription = false;
+            return;
+
+        }
+
+        toastService.ShowSuccess($"An error occurred.", "Subscription Activation Successful.");
+        _subscriptions.Clear();
+        await LoadSubscriptionsAsync();
+        CloseModals();
+
+        _isActivatingSubscription = false;
+    }
+
+    private static string MaskKey(string key)
+    {
+        if (string.IsNullOrEmpty(key) || key.Length <= 8)
+            return "••••••••";
+
+        return key[..4] + "••••••••" + key[^4..];
     }
 
     private async Task HandleToggleInactive()
