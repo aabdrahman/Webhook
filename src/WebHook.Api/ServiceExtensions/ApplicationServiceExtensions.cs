@@ -352,9 +352,21 @@ internal static class ApplicationServiceExtensions
             });
         });
 
+        //Channel for persisting cache entries
         services.AddSingleton(_ =>
         {
             return Channel.CreateBounded<ApplicationCacheEvent>(new BoundedChannelOptions(500)
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                FullMode = BoundedChannelFullMode.Wait
+            });
+        });
+
+        //Channel for perofrming subscription verification
+        services.AddSingleton(_ =>
+        {
+            return Channel.CreateBounded<SubscriptionVerificationRaised>(new BoundedChannelOptions(500)
             {
                 SingleReader = true,
                 SingleWriter = false,
@@ -388,7 +400,7 @@ internal static class ApplicationServiceExtensions
     /// <param name="services">The service collection.</param>
     internal static void ConfigureHttpClient(this IServiceCollection services)
     {
-        //This adds teh webhook delivery named httpclient without the base address wich will be injected at teh point of calling the api.
+        //This adds the webhook delivery named httpclient without the base address which will be injected at the point of calling the api.
         services.AddHttpClient("WebhookDeliveryClient", opts =>
         {
             opts.Timeout = TimeSpan.FromSeconds(30);
@@ -399,6 +411,20 @@ internal static class ApplicationServiceExtensions
             MaxConnectionsPerServer = 10,
             PooledConnectionLifetime = TimeSpan.FromSeconds(120),
             EnableMultipleHttp2Connections = true
+        });
+
+        //This adds the webhook subscription verification httpclient with the base address which will be injected at the point of calling the challenge api.
+        services.AddHttpClient("WebhookSubscriptionVerificationClient", opts =>
+        {
+            opts.Timeout = TimeSpan.FromSeconds(30);
+
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler()
+        {
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+            MaxConnectionsPerServer = 10,
+            PooledConnectionLifetime = TimeSpan.FromSeconds(120),
+            EnableMultipleHttp2Connections = true,
+            AllowAutoRedirect = false
         });
     }
 
