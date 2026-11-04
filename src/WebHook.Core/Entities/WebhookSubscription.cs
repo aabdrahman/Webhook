@@ -38,9 +38,15 @@ public class WebhookSubscription
     //------One to many realtionship with the webhook subscription
     //public ICollection<WebhookDelivery> WebhookDeliveries { get; set; } = [];
 
-    //Relationship with teh user - nullable
+    //Relationship with the user - nullable
     /// <summary>The user who created the subscription.</summary>
     public User? CreatedByUser { get; set; }
     /// <summary>The ID of the user who created the subscription.</summary>
     public Guid? CreatedByUserId { get; set; }
+
+    //Relationship with the WebhookSubscriptionVerification
+    /// <summary>
+    /// Defaults to empty collection
+    /// </summary>
+    public ICollection<WebhookSubscriptionVerification> WebhookSubscriptionVerifications { get; set; } = [];
 }

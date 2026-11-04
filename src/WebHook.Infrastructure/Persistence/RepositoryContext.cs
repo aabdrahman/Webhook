@@ -39,6 +39,8 @@ public class RepositoryContext : IdentityDbContext<User, Role, Guid>
     public DbSet<WebhookServiceClient> WebhookServiceClients { get; set; }
     /// <summary>The event types each service client may publish.</summary>
     public DbSet<WebhookServiceClientEventCatalog> WebhookServiceClientEventCatalogs { get; set; }
+    /// <summary> The subscription verification attempt details for each subscription. </summary>
+    public DbSet<WebhookSubscriptionVerification> WebhookSubscriptionVerifications { get; set; }
     /// <summary>Read-only rows from the <c>vw_getmostrecentevents</c> view.</summary>
     public DbSet<TopFiveEventAnalyticsEntity> TopFiveEventAnalyticsEntities { get; set; }
     /// <summary>Read-only rows from the <c>vw_GetEventCatalogAnalytics</c> view.</summary>

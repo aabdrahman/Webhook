@@ -936,6 +936,54 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.ToTable("WebhookEventSubscriptions");
                 });
 
+            modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscriptionVerification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChallengeToken")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResponseDetails")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResponseStatusCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ValidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SubscriptionId");
+
+                    b.ToTable("WebhookSubscriptionVerifications", t =>
+                        {
+                            t.HasCheckConstraint("CK_WebhookSubscriptionVerification_Status", "\"Status\" IN ('Pending', 'Failed', 'Success')");
+                        });
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("WebHook.Core.Entities.Role", null)
@@ -1108,6 +1156,17 @@ namespace WebHook.Infrastructure.Persistence.Migrations
                     b.Navigation("webhookSubscription");
                 });
 
+            modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscriptionVerification", b =>
+                {
+                    b.HasOne("WebHook.Core.Entities.WebhookSubscription", "Subscription")
+                        .WithMany("WebhookSubscriptionVerifications")
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Subscription");
+                });
+
             modelBuilder.Entity("WebHook.Core.Entities.OtpVerification", b =>
                 {
                     b.Navigation("OperationTokens");
@@ -1149,6 +1208,8 @@ namespace WebHook.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscription", b =>
                 {
                     b.Navigation("WebhookEvents");
+
+                    b.Navigation("WebhookSubscriptionVerifications");
                 });
 
             modelBuilder.Entity("WebHook.Core.Entities.WebhookSubscriptionEvent", b =>
