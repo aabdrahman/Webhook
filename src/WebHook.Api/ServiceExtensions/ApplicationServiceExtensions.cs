@@ -294,6 +294,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<IWebhookServiceClientCatalogService, WebhookServiceClientCatalogService>();
         services.AddScoped<IWebhookDeliveryService, WebhookDeliveryService>();
         services.AddScoped<IWebhookDeliveryAttemptService, WebhookDeliveryAttemptService>();
+        services.AddScoped<ISubscriptionVerificationService, SubscriptionVerificationService>();
 
         services.AddScoped<ISecretKeyGenerator, SecretKeyGeneratorService>();
         services.AddScoped<IEncryptionService, EncryptionService>();
@@ -310,6 +311,7 @@ internal static class ApplicationServiceExtensions
         services.AddScoped<WebhookDeliveryProcessorService>();
         services.AddScoped<RetryAfterPendingService>();
         services.AddScoped<StaleClaimedDeliveryReleaseService>();
+        services.AddScoped<SubscriptionVerificationProcessorService>();
 
         services.AddScoped<CustomAuthenticationFilter>();
         services.AddScoped<ClientValidationFilter>();
@@ -391,6 +393,7 @@ internal static class ApplicationServiceExtensions
         services.AddHostedService<EmailProcessorWorker>();
         services.AddHostedService<CachePersistenceWorker>();
         services.AddHostedService<StaleCacheEvictionWorker>();
+        services.AddHostedService<SignatureVerificationProcessorWorker>();
     }
 
     /// <summary>

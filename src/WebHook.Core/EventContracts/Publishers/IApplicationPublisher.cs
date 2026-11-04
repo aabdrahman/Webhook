@@ -36,4 +36,11 @@ public interface IApplicationPublisher
     /// <param name="ct">A token to cancel the write.</param>
     /// <returns><see langword="true"/> if the entry was queued; <see langword="false"/> if the channel is closed.</returns>
     Task<bool> QueueItemToCache(ApplicationCacheEvent cacheEvent, CancellationToken ct = default);
+    /// <summary>
+    /// This queues the signature verification record for http processing.
+    /// </summary>
+    /// <param name="verificationRaised">This contains the id of teh created signature verification record.</param>
+    /// <param name="ct">A token to cancel the write.</param>
+    /// <returns><see langword="true"/> if the entry was queued; <see langword="false"/> if the channel is closed.</returns>
+    Task<bool> QueueSignatureVerificationEvent(SubscriptionVerificationRaised verificationRaised, CancellationToken ct = default);
 }

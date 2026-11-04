@@ -16,6 +16,7 @@ public sealed class ApplicationPublisher : IApplicationPublisher
     private readonly Channel<EventRaised> _eventRaisedChannel;
     private readonly Channel<EmailSenderDto> _emailSenderChannel;
     private readonly Channel<ApplicationCacheEvent> _applicationCacheChannel;
+    private readonly Channel<SubscriptionVerificationRaised> _subscriptionVerificationChannel;
 
     /// <summary>
     /// Initialises a new instance of the <see cref="ApplicationPublisher"/> class.
@@ -23,13 +24,16 @@ public sealed class ApplicationPublisher : IApplicationPublisher
     /// <param name="eventRaisedChannel">The channel read by the event fan-out worker.</param>
     /// <param name="emailSenderChannel">The channel read by the email processor worker.</param>
     /// <param name="applicationCacheChannel">The channel read by the cache persistence worker.</param>
-    public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel, Channel<ApplicationCacheEvent> applicationCacheChannel)
+    /// <param name="subscriptionVerificationChannel">The channel read by the signature verification worker.</param>
+    public ApplicationPublisher(Channel<EventRaised> eventRaisedChannel, Channel<EmailSenderDto> emailSenderChannel, Channel<ApplicationCacheEvent> applicationCacheChannel, Channel<SubscriptionVerificationRaised> subscriptionVerificationChannel)
     {
         _eventRaisedChannel = eventRaisedChannel;
         _emailSenderChannel = emailSenderChannel;
         _applicationCacheChannel = applicationCacheChannel;
+        _subscriptionVerificationChannel = subscriptionVerificationChannel;
 
         _logger = Log.ForContext("ClassName", nameof(ApplicationPublisher));
+
     }
 
     private ILogger _logger;
@@ -72,6 +76,19 @@ public sealed class ApplicationPublisher : IApplicationPublisher
         }
 
         _logger.ForContext("MethodName", nameof(QueueItemToCache)).Information("Cache item could not be queued - {0}", cacheEvent);
+        return false;
+    }
+
+    public async Task<bool> QueueSignatureVerificationEvent(SubscriptionVerificationRaised verificationRaised, CancellationToken ct = default)
+    {
+        if(await _subscriptionVerificationChannel.Writer.WaitToWriteAsync(ct))
+        {
+            await _subscriptionVerificationChannel.Writer.WriteAsync(verificationRaised, ct);
+            _logger.ForContext("MethodName", nameof(QueueSignatureVerificationEvent)).Information("Signature verification item queued successfully - {0}", verificationRaised);
+            return true;
+        }
+
+        _logger.ForContext("MethodName", nameof(QueueSignatureVerificationEvent)).Information("Signature verification item could not be queued - {0}", verificationRaised);
         return false;
     }
 }
