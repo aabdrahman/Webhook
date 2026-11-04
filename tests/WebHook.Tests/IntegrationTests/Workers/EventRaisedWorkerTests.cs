@@ -179,14 +179,15 @@ public sealed class EventRaisedWorkerTests : IClassFixture<PostgreSqlFixture>, I
 
     private static WebhookSubscription BuildSubscription(
         string callbackUrl = "https://partner.com/webhook",
-        bool isActive = true) => new()
+        bool isActive = true, SubscriptionOnboardStatus onboardStatus = SubscriptionOnboardStatus.Active) => new()
         {
             Id = Guid.NewGuid(),
             Name = "Test Subscription",
             CallbackUrl = callbackUrl,
             IsActive = isActive,
             CreatedAt = DateTimeOffset.UtcNow,
-            SecretKey = "test-secret-key"
+            SecretKey = "test-secret-key",
+            OnboardStatus = onboardStatus
         };
 
     /// <summary>

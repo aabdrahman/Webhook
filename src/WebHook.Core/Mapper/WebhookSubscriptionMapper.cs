@@ -28,7 +28,8 @@ public static class WebhookSubscriptionMapper
             SubscribedFields = wbSubscription.SubscribedFields,
             SubscribedEvents = wbSubscription.WebhookEvents.Where(x => x.IsActive).Select(x => x.webHookEventCatalog.NormalizedEventName).ToList(),
             CallBackUrl = wbSubscription.CallbackUrl,
-            IsActive = wbSubscription.IsActive
+            IsActive = wbSubscription.IsActive,
+            OnboardStatus = wbSubscription.OnboardStatus.ToString()
         };
     }
 
@@ -52,7 +53,8 @@ public static class WebhookSubscriptionMapper
             SubscribedFields = wbSubscription.SubscribedFields,
             SubscribedEvents = wbSubscription.WebhookEvents.Select(x => x.webHookEventCatalog.NormalizedEventName).ToList(),
             CallBackUrl = wbSubscription.CallbackUrl,
-            IsActive = wbSubscription.IsActive
+            IsActive = wbSubscription.IsActive,
+            OnboardStatus = wbSubscription.OnboardStatus.ToString()
         };
     }
 

@@ -140,7 +140,7 @@ public sealed class WebhookDeliveryProcessorService
             var deliveryIds = deliveriesToProcess.Select(x => x.Id).ToList();
 
             Dictionary<Guid, WebhookDeliveryProcessorMetadataDto> deliveryMetadatas = await _repositoryContext.WebhookDeliveries
-                                                .Where(x => deliveryIds.Contains(x.Id))
+                                                .Where(x => deliveryIds.Contains(x.Id) && x.WebhookSubscriptionEvent.webhookSubscription.OnboardStatus == SubscriptionOnboardStatus.Active)
                                                 .Select(x => new WebhookDeliveryProcessorMetadataDto()
                                                 {
                                                     DeliveryId = x.Id,

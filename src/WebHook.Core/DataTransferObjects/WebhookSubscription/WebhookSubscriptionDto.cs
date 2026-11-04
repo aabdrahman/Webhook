@@ -24,4 +24,6 @@ public record class WebhookSubscriptionDto
     public IReadOnlyList<string> SubscribedFields { get; set; } = [];
     /// <summary>The normalised names of the event types the subscription receives.</summary>
     public IReadOnlyList<string> SubscribedEvents { get; set; } = [];
+    /// <summary> The onboard status of the subscription.</summary>
+    public string OnboardStatus { get; set; }
 }

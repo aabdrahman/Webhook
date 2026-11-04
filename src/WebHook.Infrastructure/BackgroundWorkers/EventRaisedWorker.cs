@@ -96,7 +96,7 @@ public class EventRaisedWorker : BackgroundService
                     //We begin to genrate for all possible subscriptions. All subscriptions are then used to get a list of webhook deliveries for the event
                     List<WebhookDelivery> subscribers = await repositoryContext.WebhookEventSubscriptions
                                                                     .Include(x => x.webhookSubscription)
-                                                                    .Where(x => x.webHookEventCatalog.NormalizedEventName == eventItem.EventType.ToUpper() && x.webhookSubscription.IsActive)
+                                                                    .Where(x => x.webHookEventCatalog.NormalizedEventName == eventItem.EventType.ToUpper() && x.webhookSubscription.IsActive && x.webhookSubscription.OnboardStatus == SubscriptionOnboardStatus.Active)
                                                                     .Select(x => new WebhookDelivery()
                                                                     {
                                                                         RetryCount = 0,

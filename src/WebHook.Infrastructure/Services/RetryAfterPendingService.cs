@@ -143,7 +143,7 @@ public sealed class RetryAfterPendingService
 
             //Get teh metadata hosted in the otehr tables from database.
             var deliveriesMetadata = await _repositoryContext.WebhookDeliveries
-                                                        .Where(x => deliveryIds.Contains(x.Id))
+                                                        .Where(x => deliveryIds.Contains(x.Id) && x.WebhookSubscriptionEvent.webhookSubscription.OnboardStatus == SubscriptionOnboardStatus.Active)
                                                         .Select(x => new WebhookDeliveryProcessorMetadataDto()
                                                         {
                                                             DeliveryId = x.Id,

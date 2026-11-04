@@ -115,7 +115,7 @@ public sealed class PendingRaisedEventsWorker : BackgroundService
 
                 // Read threshold inside loop so runtime config changes are respected
                 var thresholdMinutes = _options.CurrentValue.PendingEventsThresholdMinutes;
-                var thresholdDatetime = DateTimeOffset.UtcNow.AddMinutes(-thresholdMinutes);
+                var thresholdDatetime = DateTimeOffset.UtcNow.AddMinutes(0 - thresholdMinutes);
 
                 List<Guid> pendingIds = await repositoryContext.WebhookEvents
                                                     .Where(x => x.Status == WebHookEventStatus.Pending && x.CreatedAt <= thresholdDatetime)

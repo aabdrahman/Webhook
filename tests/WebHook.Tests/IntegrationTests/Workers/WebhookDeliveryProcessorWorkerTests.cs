@@ -239,7 +239,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
         NormalizedEventName = name.ToUpper()
     };
 
-    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/",SubscriptionOnboardStatus onboardStatus = SubscriptionOnboardStatus.Active)
     {
         var entityId = Guid.NewGuid();
 
@@ -250,6 +250,7 @@ public sealed class WebhookDeliveryProcessorWorkerTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
+            OnboardStatus = onboardStatus,
             SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList()
         };

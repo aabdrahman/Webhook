@@ -292,7 +292,7 @@ public sealed class RetryAfterPendingServiceTests
         NormalizedEventName = name.ToUpper()
     };
 
-    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/", string contactEmail = "noeamil@mail.com")
+    private WebhookSubscription BuildEntity(string entityName, List<Guid> eventIds, string url = "https://example.com/", string contactEmail = "noeamil@mail.com", SubscriptionOnboardStatus onboardStatus = SubscriptionOnboardStatus.Active)
     {
         var entityId = Guid.NewGuid();
 
@@ -303,6 +303,7 @@ public sealed class RetryAfterPendingServiceTests
             IsActive = true,
             SubscribedFields = [],
             CallbackUrl = url,
+            OnboardStatus = onboardStatus,
             SecretKey = _encryptedSecrets.OrderBy(x => Guid.NewGuid()).First(),
             WebhookEvents = eventIds.Select(x => new WebhookSubscriptionEvent() { WebhookSubscriptionId = entityId, WebhookEventCatalogId = x, CreatedAt = DateTimeOffset.UtcNow, IsActive = true }).ToList(),
             ContactEmail = contactEmail
