@@ -44,7 +44,7 @@ public class SubscriptionVerificationService : ISubscriptionVerificationService
             if(!Guid.TryParse(_authenticatedUserDetails.userId, out var userId))
             {
                 _logger.Error("Invalid user id - {0}", _authenticatedUserDetails.userId);
-                return GenericResponse<string>.Failure("Operation Failed", "An error occurred processing request.", HttpStatusCode.BadRequest);
+                return GenericResponse<string>.Failure("Operation Failed.", "An error occurred processing request.", HttpStatusCode.BadRequest);
             }
 
             var subscription = await _repositoryContext.WebhookSubscriptions.FirstOrDefaultAsync(x => x.Id == SubscriptionId && x.CreatedByUserId == userId, ct);
@@ -52,13 +52,13 @@ public class SubscriptionVerificationService : ISubscriptionVerificationService
             if(subscription is null)
             {
                 _logger.Error("Subscription with id: {0} not found for user - {1}", SubscriptionId, userId);
-                return GenericResponse<string>.Failure("Operation Failed", "Subscription not found.", HttpStatusCode.NotFound);
+                return GenericResponse<string>.Failure("Operation Failed.", "Subscription not found.", HttpStatusCode.NotFound);
             }
 
             if(subscription.OnboardStatus != SubscriptionOnboardStatus.Inactive)
             {
                 _logger.Error("Subscription with id: {0} is not in inactive status for user - {1}", SubscriptionId, userId);
-                return GenericResponse<string>.Failure("Operation Failed", "Subscription is not in inactive status.", HttpStatusCode.BadRequest);
+                return GenericResponse<string>.Failure("Operation Failed.", "Subscription is not in inactive status.", HttpStatusCode.Conflict);
             }
 
             var signatureVerificationRecordToInsert = new WebhookSubscriptionVerification
@@ -77,13 +77,13 @@ public class SubscriptionVerificationService : ISubscriptionVerificationService
 
             _logger.Information("Signature verification record created successfully for subscription - {0}, Queue Result: {1}", SubscriptionId, queueResult);
 
-            return GenericResponse<string>.Success("Operation Successful", "Subscription callback URL verification initiated successfully.", HttpStatusCode.OK);
+            return GenericResponse<string>.Success("Operation Successful.", "Subscription callback URL verification initiated successfully.", HttpStatusCode.OK);
 
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "An error occurred while verifying subscription callback URL for subscription - {0}", SubscriptionId);
-            return GenericResponse<string>.Failure("Operation Failed", "An error occurred processing request.", HttpStatusCode.InternalServerError);
+            return GenericResponse<string>.Failure("Operation Failed.", "An error occurred processing request.", HttpStatusCode.InternalServerError);
         }
 
     }
