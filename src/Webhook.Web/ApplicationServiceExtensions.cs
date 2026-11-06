@@ -35,6 +35,8 @@ public static class ApplicationServiceExtensions
         services.AddScoped<DeleteSubscriptionHandler>();
         services.AddScoped<CreateSubscriptionHandler>();
         services.AddScoped<ReactivateSubscriptionHandler>();
+        services.AddScoped<SubscriptionCallbackUrlVerificationHandler>();
+        services.AddScoped<GetSubscriptionVerificationsHandler>();
 
         //Subscription Events
         services.AddScoped<AddEventToSubscriptionHandler>();

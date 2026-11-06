@@ -410,13 +410,13 @@
     </Modal>
 }
 
-    @code {
+@code {
 
-        [Parameter] public Guid Id { get; set; }
+    [Parameter] public Guid Id { get; set; }
 
     // -------------------------------------------------------------------------
-        // State
-        // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
 
     private bool                   _isLoading          = true;
     private bool                   _isLoadingDeliveries = true;
@@ -475,7 +475,7 @@
         {
             await LoadRecentDeliveriesAsync();
         }
-        
+
     }
 
     private async Task LoadSubscriptionAsync()
@@ -757,24 +757,24 @@
 
     private async Task HandleVerify()
     {
+        if (_subscription is null) return;
         _isActivatingSubscription = true;
         _activateSubscriptionErrorMessage = "";
 
         //var result = await SubscriptionService.InitiateVerificationAsync(_selectedSubscription.Id);
-
-        await Task.Delay(8000);
-        bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
+        var result = await subscriptionCallbackUrlVerificationHandler.HandleAsync(_subscription.Id);
+        bool success = result.successStatus;
 
         if (!success)
         {
-            _activateSubscriptionErrorMessage = $"Failed to initiate verification.";
+            _activateSubscriptionErrorMessage = $"Failed to verify subscription. {result.responseMessage}";
             toastService.ShowError(_activateSubscriptionErrorMessage, "Subscription Activation Operation Failed.");
             _isActivatingSubscription = false;
             return;
 
         }
 
-        toastService.ShowSuccess($"An error occurred.", "Subscription Activation Successful.");
+        toastService.ShowSuccess($"Subscription verified successfully.", $"Subscription Activation Submitted. {result.responseMessage}");
         await GetNewFormState();
         CloseModals();
 

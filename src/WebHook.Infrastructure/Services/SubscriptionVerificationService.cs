@@ -95,7 +95,7 @@ public class SubscriptionVerificationService : ISubscriptionVerificationService
             {
                 SubscriptionId = subscription.Id,
                 Status = WebhookSubscriptionVerificationStatus.Pending,
-                CreatedAt =DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow,
                 ChallengeToken = _secretKeyGenerator.GenerateKey(secretKeySize: 64)
             };
 
@@ -107,7 +107,7 @@ public class SubscriptionVerificationService : ISubscriptionVerificationService
 
             if (!queueResult)
             {
-                //The queue is closed, so nothing will ever process this record: fail it now instead of leaving it pending.
+                // Verification could not be queued, so mark it as failed and return 503 to the caller.
                 _logger.Error("Signature verification {0} for subscription {1} could not be queued.", signatureVerificationRecordToInsert.Id, SubscriptionId);
 
                 signatureVerificationRecordToInsert.Status = WebhookSubscriptionVerificationStatus.Failed;
