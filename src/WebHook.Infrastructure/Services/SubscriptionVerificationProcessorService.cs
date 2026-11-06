@@ -15,12 +15,14 @@ public class SubscriptionVerificationProcessorService
     private readonly RepositoryContext _repositoryContext;
     private readonly ISignatureService _signatureService;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IEncryptionService _encryptionService;
 
-    public SubscriptionVerificationProcessorService(RepositoryContext repositoryContext, ISignatureService signatureService, IHttpClientFactory httpClientFactory)
+    public SubscriptionVerificationProcessorService(RepositoryContext repositoryContext, ISignatureService signatureService, IHttpClientFactory httpClientFactory, IEncryptionService encryptionService)
     {
         _repositoryContext = repositoryContext;
         _signatureService = signatureService;
         _httpClientFactory = httpClientFactory;
+        _encryptionService = encryptionService;
     }
 
     private ILogger _logger = Log.ForContext("ClassName", nameof(SubscriptionVerificationProcessorService));
@@ -44,7 +46,8 @@ public class SubscriptionVerificationProcessorService
             }
 
             // Call the signature service to generate the signature for the subscription with the subscription secret key.
-            string generatedSignature = _signatureService.GenerateSignature(payLoad: verificationRecord.ChallengeToken, encryptionKey: verificationRecord.Subscription.SecretKey);
+            string subscriberSignature = _encryptionService.Decrypt(verificationRecord.Subscription.SecretKey);
+            string generatedSignature = _signatureService.GenerateSignature(payLoad: verificationRecord.ChallengeToken, encryptionKey: subscriberSignature);
 
             //Create a new HttpClient instance using the factory
             var httpClient = _httpClientFactory.CreateClient("WebhookSubscriptionVerificationClient");
@@ -53,10 +56,10 @@ public class SubscriptionVerificationProcessorService
             //Add Headers for signature verification
             httpClient.DefaultRequestHeaders.Add("X-Webhook-Challenge-Signature", generatedSignature);
 
-            // Prepare the request to the callback URL with the generated signature, this will be a POST request with the challenge token in the body and to teh path /challenge.
+            // Prepare the request to the callback URL with the generated signature, this will be a POST request with the challenge token in the body and to the path /challenge.
             var httpRequest = new HttpRequestMessage(HttpMethod.Post, "challenge")
             {
-                Content = new StringContent(verificationRecord.ChallengeToken)
+                Content = new StringContent(generatedSignature)
             };
 
             // Send the request and get the response
@@ -85,7 +88,7 @@ public class SubscriptionVerificationProcessorService
 
                     if(deserialiedResponse is not null)
                     {
-                        var isValidSignature = _signatureService.VerifySignature(payLoad: verificationRecord.ChallengeToken, receivedSignature: deserialiedResponse.Challenge, encryptionKey: verificationRecord.Subscription.SecretKey);
+                        var isValidSignature = _signatureService.VerifySignature(payLoad: deserialiedResponse.Challenge, receivedSignature: generatedSignature, encryptionKey: subscriberSignature);
                         verificationRecord.Subscription.OnboardStatus = isValidSignature ? SubscriptionOnboardStatus.Active : SubscriptionOnboardStatus.Inactive;
                         verificationRecord.Subscription.IsActive = isValidSignature ? true : verificationRecord.Subscription.IsActive;
                         verificationRecord.Status = isValidSignature ? WebhookSubscriptionVerificationStatus.Success : WebhookSubscriptionVerificationStatus.Failed;
@@ -95,7 +98,7 @@ public class SubscriptionVerificationProcessorService
                     {
                         _logger.Information("Signature verification response deserialization failed for verification id - {0}. Response content: {1}", verificationId, responseContent);
                         verificationRecord.Status = WebhookSubscriptionVerificationStatus.Failed;
-                        
+                        verificationRecord.ResponseDetails = responseContent;
                     }
                     
 
