@@ -6,6 +6,7 @@ using System.Net;
 using System.Text;
 using WebHook.Core.Constants;
 using WebHook.Core.Entities;
+using WebHook.Core.EventContracts.Events;
 using WebHook.Core.EventContracts.Publishers;
 using WebHook.Core.Interfaces.Helpers;
 using WebHook.Infrastructure.Data_Persistence;
@@ -28,7 +29,9 @@ public class WebhookSubscriptionVerificationServiceTests : IAsyncDisposable
 
         _authenticatedUserMock = new Mock<IAuthenticatedUserDetails>();
         _secretKeyGeneratorMock = new Mock<ISecretKeyGenerator>();
+        _secretKeyGeneratorMock.Setup(x => x.GenerateKey(It.IsAny<int>())).Returns("test-challenge-token");
         _applicationPublisherMock = new Mock<IApplicationPublisher>();
+        _applicationPublisherMock.Setup(x => x.QueueSignatureVerificationEvent(It.IsAny<SubscriptionVerificationRaised>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         using var ctx = new RepositoryContext(_dbContextOptions);
         ctx.Database.EnsureCreated();
@@ -289,7 +292,7 @@ public class WebhookSubscriptionVerificationServiceTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task GetSubscriptionVerifications_SubscriptionNotFound_ShouldReturnSuccessResponse()
+    public async Task GetSubscriptionVerifications_SubscriptionNotFound_ShouldReturnNotFound()
     {
         // Arrange
         var userId = Guid.NewGuid();
@@ -299,10 +302,10 @@ public class WebhookSubscriptionVerificationServiceTests : IAsyncDisposable
         var result = await sut.GetSubscriptionVerifications(Guid.NewGuid());
         // Assert
         Assert.NotNull(result);
-        Assert.NotNull(result.ResponseData);
-        Assert.True(result.IsSuccessful);
-        Assert.Equal("Subscription verification records fetched successfully.", result.ResponseMessage, ignoreCase: true);
-        Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
+        Assert.Null(result.ResponseData);
+        Assert.False(result.IsSuccessful);
+        Assert.Equal("Subscription not found.", result.ResponseMessage, ignoreCase: true);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
     }
 
     [Fact]
@@ -342,5 +345,156 @@ public class WebhookSubscriptionVerificationServiceTests : IAsyncDisposable
         Assert.Equal("Subscription verification records fetched successfully.", result.ResponseMessage, ignoreCase: true);
         Assert.Equal(HttpStatusCode.OK, result.HttpStatusCode);
         Assert.Single(result.ResponseData);
+    }
+
+    // ------------------------------------------------------------------------------------------------
+    // Additional behaviour: queue failure, in-progress guard, and ownership scoping on reads
+    // ------------------------------------------------------------------------------------------------
+
+    private async Task<(WebhookSubscription Subscription, Guid OwnerId)> SeedSubscriptionAsync(params (WebhookSubscriptionVerificationStatus Status, TimeSpan Age)[] verifications)
+    {
+        var subscription = BuildEntity("Seeded Subscription", new List<Guid>());
+        subscription.OnboardStatus = SubscriptionOnboardStatus.Inactive;
+
+        using var ctx = new RepositoryContext(_dbContextOptions);
+        (Guid Id, string Email, string UserName) owner = await TestDataSeeder.SeedUserAsync(ctx);
+        subscription.CreatedByUserId = owner.Id;
+
+        foreach (var (status, age) in verifications)
+        {
+            subscription.WebhookSubscriptionVerifications.Add(new WebhookSubscriptionVerification
+            {
+                Id = Guid.NewGuid(),
+                SubscriptionId = subscription.Id,
+                Status = status,
+                CreatedAt = DateTimeOffset.UtcNow - age,
+                ChallengeToken = Guid.NewGuid().ToString("N")
+            });
+        }
+
+        await ctx.WebhookSubscriptions.AddAsync(subscription);
+        await ctx.SaveChangesAsync();
+        return (subscription, owner.Id);
+    }
+
+    [Fact]
+    public async Task VerifySubscriptionCallbackUrl_QueueUnavailable_Returns503AndFailsTheRecord()
+    {
+        // Arrange
+        var (subscription, ownerId) = await SeedSubscriptionAsync();
+        _authenticatedUserMock.Setup(x => x.userId).Returns(ownerId.ToString());
+        _applicationPublisherMock.Setup(x => x.QueueSignatureVerificationEvent(It.IsAny<SubscriptionVerificationRaised>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.VerifySubscriptionCallbackUrl(subscription.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, result.HttpStatusCode);
+
+        using var ctx = new RepositoryContext(_dbContextOptions);
+        var record = await ctx.WebhookSubscriptionVerifications.SingleAsync(x => x.SubscriptionId == subscription.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, record.Status);
+    }
+
+    [Fact]
+    public async Task VerifySubscriptionCallbackUrl_VerificationAlreadyPending_Returns409AndAddsNothing()
+    {
+        // Arrange
+        var (subscription, ownerId) = await SeedSubscriptionAsync((WebhookSubscriptionVerificationStatus.Pending, TimeSpan.FromMinutes(1)));
+        _authenticatedUserMock.Setup(x => x.userId).Returns(ownerId.ToString());
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.VerifySubscriptionCallbackUrl(subscription.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.Conflict, result.HttpStatusCode);
+        Assert.Equal("A verification for this subscription is already in progress.", result.ResponseMessage);
+
+        using var ctx = new RepositoryContext(_dbContextOptions);
+        Assert.Equal(1, await ctx.WebhookSubscriptionVerifications.CountAsync(x => x.SubscriptionId == subscription.Id));
+        _applicationPublisherMock.Verify(x => x.QueueSignatureVerificationEvent(It.IsAny<SubscriptionVerificationRaised>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task VerifySubscriptionCallbackUrl_PendingVerificationTooOldToAnswer_DoesNotBlockNewOne()
+    {
+        // Arrange: a pending record older than the challenge validity can never succeed.
+        var stale = SubscriptionVerificationProcessorService.ChallengeValidity + TimeSpan.FromMinutes(1);
+        var (subscription, ownerId) = await SeedSubscriptionAsync((WebhookSubscriptionVerificationStatus.Pending, stale));
+        _authenticatedUserMock.Setup(x => x.userId).Returns(ownerId.ToString());
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.VerifySubscriptionCallbackUrl(subscription.Id);
+
+        // Assert
+        Assert.True(result.IsSuccessful);
+        using var ctx = new RepositoryContext(_dbContextOptions);
+        Assert.Equal(2, await ctx.WebhookSubscriptionVerifications.CountAsync(x => x.SubscriptionId == subscription.Id));
+    }
+
+    [Theory]
+    [InlineData(WebhookSubscriptionVerificationStatus.Failed)]
+    [InlineData(WebhookSubscriptionVerificationStatus.Success)]
+    public async Task VerifySubscriptionCallbackUrl_PreviousAttemptFinished_AllowsNewVerification(WebhookSubscriptionVerificationStatus previousStatus)
+    {
+        var (subscription, ownerId) = await SeedSubscriptionAsync((previousStatus, TimeSpan.FromMinutes(1)));
+        _authenticatedUserMock.Setup(x => x.userId).Returns(ownerId.ToString());
+
+        var result = await CreateSut().VerifySubscriptionCallbackUrl(subscription.Id);
+
+        Assert.True(result.IsSuccessful);
+    }
+
+    [Fact]
+    public async Task GetSubscriptionVerifications_SubscriptionOfAnotherUser_Returns404()
+    {
+        // Arrange
+        var (subscription, _) = await SeedSubscriptionAsync((WebhookSubscriptionVerificationStatus.Failed, TimeSpan.FromMinutes(1)));
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("User");
+
+        // Act
+        var result = await CreateSut().GetSubscriptionVerifications(subscription.Id);
+
+        // Assert
+        Assert.False(result.IsSuccessful);
+        Assert.Null(result.ResponseData);
+        Assert.Equal(HttpStatusCode.NotFound, result.HttpStatusCode);
+    }
+
+    [Fact]
+    public async Task GetSubscriptionVerifications_AdminReadingAnotherUsersSubscription_ReturnsRecords()
+    {
+        // Arrange
+        var (subscription, _) = await SeedSubscriptionAsync(
+            (WebhookSubscriptionVerificationStatus.Failed, TimeSpan.FromMinutes(5)),
+            (WebhookSubscriptionVerificationStatus.Success, TimeSpan.FromMinutes(1)));
+        _authenticatedUserMock.Setup(x => x.userId).Returns(Guid.NewGuid().ToString());
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("Admin");
+
+        // Act
+        var result = await CreateSut().GetSubscriptionVerifications(subscription.Id);
+
+        // Assert
+        Assert.True(result.IsSuccessful);
+        Assert.Equal(2, result.ResponseData!.Count);
+        Assert.Equal("Success", result.ResponseData[0].Status);
+    }
+
+    [Fact]
+    public async Task GetSubscriptionVerifications_UserWithInvalidId_Returns400()
+    {
+        _authenticatedUserMock.Setup(x => x.userId).Returns("not-a-guid");
+        _authenticatedUserMock.Setup(x => x.assignedRole).Returns("User");
+
+        var result = await CreateSut().GetSubscriptionVerifications(Guid.NewGuid());
+
+        Assert.False(result.IsSuccessful);
+        Assert.Equal(HttpStatusCode.BadRequest, result.HttpStatusCode);
     }
 }

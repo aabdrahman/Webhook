@@ -380,85 +380,277 @@ WebHookEventStatus status = WebHookEventStatus.Pending,
         Assert.NotNull(assertVerificationRecord.ResponseDetails);
     }
 
-    [Fact]
-    public async Task ProcessSignatureVerificationAsync_SubscriptionVerificationHttpSuccessContextValid_RunsSuccessfully()
+
+    // ------------------------------------------------------------------------------------------------
+    // Handshake tests. The fake receivers below behave like a real subscriber: they see only the HTTP
+    // request (never the database), verify the platform's signature, and answer from the request alone.
+    // ------------------------------------------------------------------------------------------------
+
+    private static readonly SignatureService Signer = new();
+
+    private async Task<(WebhookSubscription Subscription, WebhookSubscriptionVerification Verification, string Secret)> SeedPendingVerificationAsync(
+        RepositoryContext ctx, string url = "https://example.com/hooks", DateTimeOffset? createdAt = null)
     {
-        //Arrange
-        using var scope = _serviceProvider.CreateScope();
-        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var signature = scope.ServiceProvider.GetRequiredService<ISignatureService>();
-        var encryptor = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+        var subscription = BuildEntity("Handshake Subscription", eventIds: [_webHookEventCatalogs.First().Id], url: url, onboardStatus: SubscriptionOnboardStatus.Inactive);
+        var verification = BuildSubscriptionVerificationEntity(subscriptionId: subscription.Id);
 
-        var subId = _webhookSubscriptions.First().Id;
-        var subscription = BuildEntity("Subscription Test", eventIds: [_webHookEventCatalogs.First().Id], onboardStatus: SubscriptionOnboardStatus.Inactive);
-        var verificationRecord = BuildSubscriptionVerificationEntity(subscriptionId: subscription.Id, channelgeToken: Random.Shared.GetHexString(32));
+        if (createdAt.HasValue)
+            verification.CreatedAt = createdAt.Value;
 
-        subscription.WebhookSubscriptionVerifications.Add(verificationRecord);
+        subscription.WebhookSubscriptionVerifications.Add(verification);
 
         await ctx.WebhookSubscriptions.AddAsync(subscription);
         await ctx.SaveChangesAsync();
 
-        var signedChallenge = signature.GenerateSignature(verificationRecord.ChallengeToken, encryptionKey: encryptor.Decrypt(subscription.SecretKey));
+        string secret = _serviceProvider.GetRequiredService<IEncryptionService>().Decrypt(subscription.SecretKey);
+        return (subscription, verification, secret);
+    }
 
-        var httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK, responseBody: JsonSerializer.Serialize(new SignatureVerificationResponseDto(Challenge: verificationRecord.ChallengeToken)));
-        var sut = CreateSut(ctx, httpHandler);
+    private async Task<WebhookSubscriptionVerification> ReloadAsync(Guid verificationId)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        return await ctx.WebhookSubscriptionVerifications.Include(x => x.Subscription).FirstAsync(x => x.Id == verificationId);
+    }
 
-        //Act
-        await sut.ProcessSignatureVerificationAsync(verificationId: verificationRecord.Id, CancellationToken.None);
+    private static HttpResponseMessage JsonResponse(string json, HttpStatusCode status = HttpStatusCode.OK)
+        => new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-        //Assert
-        using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+    private static string TokenFrom(CapturedRequest request)
+        => JsonDocument.Parse(request.Body).RootElement.GetProperty("challenge").GetString()!;
 
-        WebhookSubscriptionVerification? assertVerificationRecord = await assertCtx.WebhookSubscriptionVerifications.Include(x => x.Subscription).FirstOrDefaultAsync(x => x.Id == verificationRecord.Id);
+    /// <summary>True when the request carries a valid platform signature over "{timestamp}.{body}".</summary>
+    private static bool HasValidPlatformSignature(CapturedRequest request, string secret)
+        => request.Headers.TryGetValue("X-Webhook-Timestamp", out var timestamp)
+           && request.Headers.TryGetValue("X-Webhook-Challenge-Signature", out var signature)
+           && long.TryParse(timestamp, out var ts)
+           && Signer.VerifySignature(request.Body, signature, secret, ts);
 
-        Assert.NotNull(assertVerificationRecord);
-        Assert.NotNull(assertVerificationRecord.AttemptedAt);
-        Assert.NotNull(assertVerificationRecord.ValidatedAt);
-        Assert.Equal(WebhookSubscriptionVerificationStatus.Success, assertVerificationRecord.Status);
-        Assert.NotNull(assertVerificationRecord.ResponseDetails);
-        Assert.Equal(((int)HttpStatusCode.OK).ToString(), assertVerificationRecord.ResponseStatusCode);
-        Assert.Equal(SubscriptionOnboardStatus.Active, assertVerificationRecord.Subscription.OnboardStatus);
+    /// <summary>A receiver that follows the documented contract.</summary>
+    private static Func<CapturedRequest, HttpResponseMessage> CorrectReceiver(string secret, string propertyName = "response") => request =>
+    {
+        if (!HasValidPlatformSignature(request, secret))
+            return JsonResponse("{}", HttpStatusCode.Unauthorized);
+
+        string answer = Signer.GenerateSignature(SubscriptionVerificationProcessorService.ChallengeResponsePayloadPrefix + TokenFrom(request), secret);
+        return JsonResponse($"{{\"{propertyName}\":\"{answer}\"}}");
+    };
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ReceiverFollowsContract_ActivatesSubscription()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (subscription, verification, secret) = await SeedPendingVerificationAsync(ctx);
+
+        var handler = new MockHttpMessageHandler(CorrectReceiver(secret));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Success, result.Status);
+        Assert.NotNull(result.AttemptedAt);
+        Assert.NotNull(result.ValidatedAt);
+        Assert.Equal("200", result.ResponseStatusCode);
+        Assert.Equal(SubscriptionOnboardStatus.Active, result.Subscription.OnboardStatus);
+        Assert.True(result.Subscription.IsActive);
+        Assert.Equal(1, handler.CallCount);
     }
 
     [Fact]
-    public async Task ProcessSignatureVerificationAsync_SubscriptionVerificationHttpSuccessContentValidInvalidChallegeReturned_RunsSuccessfully()
+    public async Task ProcessSignatureVerificationAsync_Request_CarriesTokenInBodyAndSignatureOverTimestampAndBody()
     {
-        //Arrange
         using var scope = _serviceProvider.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
-        var signature = scope.ServiceProvider.GetRequiredService<ISignatureService>();
-        var encryptor = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+        var (_, verification, secret) = await SeedPendingVerificationAsync(ctx);
 
-        var subId = _webhookSubscriptions.First().Id;
-        var subscription = BuildEntity("Subscription Test", eventIds: [_webHookEventCatalogs.First().Id], onboardStatus: SubscriptionOnboardStatus.Inactive);
-        var verificationRecord = BuildSubscriptionVerificationEntity(subscriptionId: subscription.Id, channelgeToken: Random.Shared.GetHexString(32));
+        var handler = new MockHttpMessageHandler(CorrectReceiver(secret));
 
-        subscription.WebhookSubscriptionVerifications.Add(verificationRecord);
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
 
-        await ctx.WebhookSubscriptions.AddAsync(subscription);
-        await ctx.SaveChangesAsync();
+        var request = handler.LastRequest!;
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal(verification.ChallengeToken, TokenFrom(request));
+        Assert.StartsWith("application/json", request.Headers["Content-Type"]);
+        Assert.True(HasValidPlatformSignature(request, secret));
 
-        var signedChallenge = signature.GenerateSignature(verificationRecord.ChallengeToken, encryptionKey: encryptor.Decrypt(subscription.SecretKey));
+        // The timestamp is current, and the secret itself is never sent.
+        Assert.InRange(long.Parse(request.Headers["X-Webhook-Timestamp"]), DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 10, DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 10);
+        Assert.DoesNotContain(secret, request.Body);
+        Assert.DoesNotContain(secret, string.Join(";", request.Headers.Values));
+    }
 
-        var httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK, responseBody: JsonSerializer.Serialize(new SignatureVerificationResponseDto(Challenge: Random.Shared.GetHexString(32))));
-        var sut = CreateSut(ctx, httpHandler);
+    [Theory]
+    [InlineData("https://example.com/hooks", "https://example.com/hooks/challenge")]
+    [InlineData("https://example.com/hooks/", "https://example.com/hooks/challenge")]
+    [InlineData("https://example.com/", "https://example.com/challenge")]
+    [InlineData("https://example.com", "https://example.com/challenge")]
+    [InlineData("https://example.com/hooks?tenant=1", "https://example.com/hooks/challenge?tenant=1")]
+    public async Task ProcessSignatureVerificationAsync_BuildsChallengeUrlRegardlessOfTrailingSlash(string callbackUrl, string expectedUrl)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, secret) = await SeedPendingVerificationAsync(ctx, url: callbackUrl);
 
-        //Act
-        await sut.ProcessSignatureVerificationAsync(verificationId: verificationRecord.Id, CancellationToken.None);
+        var handler = new MockHttpMessageHandler(CorrectReceiver(secret));
 
-        //Assert
-        using var assertScope = _serviceProvider.CreateScope();
-        var assertCtx = assertScope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
 
-        WebhookSubscriptionVerification? assertVerificationRecord = await assertCtx.WebhookSubscriptionVerifications.Include(x => x.Subscription).FirstOrDefaultAsync(x => x.Id == verificationRecord.Id);
+        Assert.Equal(expectedUrl, handler.LastRequest!.Uri.ToString());
+    }
 
-        Assert.NotNull(assertVerificationRecord);
-        Assert.NotNull(assertVerificationRecord.AttemptedAt);
-        Assert.Null(assertVerificationRecord.ValidatedAt);
-        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, assertVerificationRecord.Status);
-        Assert.NotNull(assertVerificationRecord.ResponseDetails);
-        Assert.Equal(((int)HttpStatusCode.OK).ToString(), assertVerificationRecord.ResponseStatusCode);
-        Assert.Equal(SubscriptionOnboardStatus.Inactive, assertVerificationRecord.Subscription.OnboardStatus);
+    [Theory]
+    [InlineData("response")]
+    [InlineData("Response")]
+    public async Task ProcessSignatureVerificationAsync_ResponsePropertyCasingIsIgnored(string propertyName)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, secret) = await SeedPendingVerificationAsync(ctx);
+
+        await CreateSut(ctx, new MockHttpMessageHandler(CorrectReceiver(secret, propertyName))).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Success, (await ReloadAsync(verification.Id)).Status);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ReceiverSignsWithWrongSecret_Fails()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        // Answers correctly in shape, but without knowing the subscription secret.
+        var handler = new MockHttpMessageHandler(request => JsonResponse(
+            $"{{\"response\":\"{Signer.GenerateSignature(SubscriptionVerificationProcessorService.ChallengeResponsePayloadPrefix + TokenFrom(request), "not-the-secret")}\"}}"));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Null(result.ValidatedAt);
+        Assert.Equal(SubscriptionOnboardStatus.Inactive, result.Subscription.OnboardStatus);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ReceiverEchoesRequestBack_Fails()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        // A reflecting server: returns the token and the signature header it was given, knowing no secret.
+        var handler = new MockHttpMessageHandler(request => JsonResponse(
+            $"{{\"challenge\":\"{TokenFrom(request)}\",\"response\":\"{request.Headers["X-Webhook-Challenge-Signature"]}\"}}"));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Equal(SubscriptionOnboardStatus.Inactive, result.Subscription.OnboardStatus);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ReceiverReturnsUnsignedToken_Fails()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        var handler = new MockHttpMessageHandler(request => JsonResponse($"{{\"response\":\"{TokenFrom(request)}\"}}"));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, (await ReloadAsync(verification.Id)).Status);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"response\":\"\"}")]
+    [InlineData("{\"response\":null}")]
+    [InlineData("not json at all")]
+    [InlineData("[]")]
+    public async Task ProcessSignatureVerificationAsync_MalformedOrEmptyResponse_Fails(string responseBody)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        await CreateSut(ctx, new MockHttpMessageHandler(HttpStatusCode.OK, responseBody)).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Equal(SubscriptionOnboardStatus.Inactive, result.Subscription.OnboardStatus);
+        Assert.NotNull(result.AttemptedAt);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ExpiredChallenge_FailsWithoutSendingRequest()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var createdAt = DateTimeOffset.UtcNow - SubscriptionVerificationProcessorService.ChallengeValidity - TimeSpan.FromMinutes(1);
+        var (_, verification, secret) = await SeedPendingVerificationAsync(ctx, createdAt: createdAt);
+
+        var handler = new MockHttpMessageHandler(CorrectReceiver(secret));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(0, handler.CallCount);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Null(result.AttemptedAt);
+        Assert.Contains("expired", result.ResponseDetails, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(SubscriptionOnboardStatus.Inactive, result.Subscription.OnboardStatus);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_ReceiverTimesOut_FailsWith408()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        // HttpClient reports its own timeout as a TaskCanceledException caused by a TimeoutException.
+        var handler = new MockHttpMessageHandler(new TaskCanceledException("The request timed out.", new TimeoutException()));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Equal("408", result.ResponseStatusCode);
+        Assert.NotNull(result.AttemptedAt);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_OversizedResponse_IsTruncatedAndFails()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, _) = await SeedPendingVerificationAsync(ctx);
+
+        var handler = new MockHttpMessageHandler(HttpStatusCode.OK, new string('x', SubscriptionVerificationProcessorService.MaxResponseBytes * 4));
+
+        await CreateSut(ctx, handler).ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        var result = await ReloadAsync(verification.Id);
+        Assert.Equal(WebhookSubscriptionVerificationStatus.Failed, result.Status);
+        Assert.Equal(SubscriptionVerificationProcessorService.MaxResponseBytes, result.ResponseDetails.Length);
+    }
+
+    [Fact]
+    public async Task ProcessSignatureVerificationAsync_AlreadyProcessed_DoesNotSendAgain()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var (_, verification, secret) = await SeedPendingVerificationAsync(ctx);
+
+        var handler = new MockHttpMessageHandler(CorrectReceiver(secret));
+        var sut = CreateSut(ctx, handler);
+
+        await sut.ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+        await sut.ProcessSignatureVerificationAsync(verification.Id, CancellationToken.None);
+
+        Assert.Equal(1, handler.CallCount);
     }
 }

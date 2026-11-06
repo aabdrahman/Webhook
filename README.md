@@ -169,6 +169,51 @@ To verify a delivery, a subscriber should:
 3. Compare it with `X-Webhook-Signature` in constant time.
 4. Reject the request if the timestamp is more than a few minutes from the current time.
 
+### Verifying Your Endpoint
+A new subscription starts `Inactive` and receives no deliveries until its callback URL passes a challenge handshake. The owner starts it with `PUT /api/WebhookSubscription/{id}/verifications/verify`. The platform then sends a request to **`{callbackUrl}/challenge`** and the endpoint must answer it correctly within 10 seconds. A correct answer makes the subscription `Active`; anything else records a `Failed` attempt, and the owner can start another.
+
+**Request** (the secret is never sent):
+```
+POST {callbackUrl}/challenge
+Content-Type: application/json
+X-Webhook-Timestamp: <Unix seconds>
+X-Webhook-Challenge-Signature: sha256=<hmac>
+
+{"challenge":"<random token>"}
+```
+`X-Webhook-Challenge-Signature` is `"sha256=" + hex(HMAC-SHA256(secret, timestamp + "." + raw body))`, the same format as delivery signatures.
+
+**What the endpoint must do:**
+1. Verify `X-Webhook-Challenge-Signature` over the **raw body** with the subscription secret, in constant time, and reject with `401` if it does not match. Also reject a stale timestamp. Only the platform can produce a valid signature, so never answer an unsigned request.
+2. Compute `"sha256=" + hex(HMAC-SHA256(secret, "challenge-response:" + challenge))`.
+3. Return `200` with JSON:
+```json
+{ "response": "sha256=<hex>" }
+```
+
+The platform recomputes the same value from its stored token and compares it in constant time. The answer is a different signature from the one in the request header and never appears in the request, so an endpoint that merely echoes what it receives cannot pass; only a holder of the secret can.
+
+**Rules:** each challenge is single-use and valid for 10 minutes, redirects are not followed, the stored response is capped at 16 KB, and only one verification can be in progress per subscription. A user can only start and read verifications for their own subscriptions.
+
+Example receiver (C#):
+```csharp
+app.MapPost("/hooks/challenge", async (HttpRequest req) =>
+{
+    var body = await new StreamReader(req.Body).ReadToEndAsync();
+    var ts = req.Headers["X-Webhook-Timestamp"].ToString();
+    var sig = req.Headers["X-Webhook-Challenge-Signature"].ToString();
+
+    string Hmac(string data) => "sha256=" + Convert.ToHexString(
+        HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(data))).ToLowerInvariant();
+
+    if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(Hmac($"{ts}.{body}")), Encoding.UTF8.GetBytes(sig)))
+        return Results.Unauthorized();
+
+    var challenge = JsonDocument.Parse(body).RootElement.GetProperty("challenge").GetString()!;
+    return Results.Json(new { response = Hmac("challenge-response:" + challenge) });
+});
+```
+
 ### Identity and Access
 - JWT authentication with rotating refresh tokens (refresh before the access token expires)
 - OTP flow for sensitive self-service operations — password reset and self-deactivation require a verified OTP and a short-lived, purpose-bound operation token sent in the `X-Operation-Token` header
@@ -760,6 +805,15 @@ Full interactive documentation is available at `/scalar/v1` when running in Deve
 | PUT | `/?eventName={name}` | Authenticated | Subscribe to an event type |
 | DELETE | `/?eventName={name}` | Authenticated | Unsubscribe from an event type |
 
+### Subscription Verifications — `api/WebhookSubscription/{subscriptionId}/verifications`
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Authenticated | List verification attempts, newest first — users only get their own subscriptions (`404` otherwise) |
+| PUT | `/verify` | User | Start the callback URL handshake — `409` if the subscription is already active or a verification is in progress, `503` if it could not be queued |
+
+See [Verifying Your Endpoint](#verifying-your-endpoint) for the contract.
+
 ### Webhook Events — `api/WebhookEvent`
 
 | Method | Route | Auth | Description |
@@ -1006,7 +1060,6 @@ Time-series views of delivery health for subscribers and admins (the portal page
 
 #### API and Security
 - **Idempotency keys on `POST /api/WebhookEvent`** — prevent duplicate events on internal service retries
-- **Subscriber endpoint verification** — challenge/response ping before a callback URL is activated, consistent with Stripe and GitHub webhook patterns
 - **Self-service secret rotation** — regenerate a subscription's signing secret without deactivating it
 - **OpenTelemetry distributed tracing** — end-to-end trace from publish through fan-out to delivery
 - **Shared token cache and Data Protection key ring** — to run multiple API instances

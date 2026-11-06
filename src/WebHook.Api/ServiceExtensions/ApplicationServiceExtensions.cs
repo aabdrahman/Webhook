@@ -416,10 +416,11 @@ internal static class ApplicationServiceExtensions
             EnableMultipleHttp2Connections = true
         });
 
-        //This adds the webhook subscription verification httpclient with the base address which will be injected at the point of calling the challenge api.
+        //This adds the webhook subscription verification httpclient. The challenge URL is built per request, redirects are not followed
+        //and the timeout is short because a receiver only has to answer a small request.
         services.AddHttpClient("WebhookSubscriptionVerificationClient", opts =>
         {
-            opts.Timeout = TimeSpan.FromSeconds(30);
+            opts.Timeout = TimeSpan.FromSeconds(10);
 
         }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler()
         {

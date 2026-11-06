@@ -37,6 +37,7 @@ public static class CacheTestServiceExtensions
         services.TryAddSingleton(_ => Channel.CreateUnbounded<EventRaised>());
         services.TryAddSingleton(_ => Channel.CreateBounded<EmailSenderDto>(new BoundedChannelOptions(500) { FullMode = BoundedChannelFullMode.Wait }));
         services.TryAddSingleton(_ => Channel.CreateBounded<ApplicationCacheEvent>(new BoundedChannelOptions(500) { FullMode = BoundedChannelFullMode.Wait }));
+        services.TryAddSingleton(_ => Channel.CreateBounded<SubscriptionVerificationRaised>(new BoundedChannelOptions(500) { FullMode = BoundedChannelFullMode.Wait }));
         services.TryAddSingleton<IApplicationPublisher, ApplicationPublisher>();
 
         return services;

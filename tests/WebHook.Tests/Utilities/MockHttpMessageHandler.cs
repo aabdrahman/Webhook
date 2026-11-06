@@ -19,8 +19,12 @@ public sealed class MockHttpMessageHandler : HttpMessageHandler
     private readonly Dictionary<string, HttpStatusCode>? _urlResponses;
     private readonly Exception? _exceptionToThrow; // ← add this
     private readonly int _timespanDelay;
+    private readonly Func<CapturedRequest, HttpResponseMessage>? _responder;
 
     public int CallCount { get; private set; }
+
+    /// <summary>The most recent request, captured before it can be disposed. Null until a request is made.</summary>
+    public CapturedRequest? LastRequest { get; private set; }
 
     // Fixed status code for all requests
     public MockHttpMessageHandler(
@@ -39,6 +43,13 @@ public sealed class MockHttpMessageHandler : HttpMessageHandler
         _responseBody = "";
     }
 
+    // Builds each response from the captured request, so a test can act as a real receiver
+    public MockHttpMessageHandler(Func<CapturedRequest, HttpResponseMessage> responder)
+    {
+        _responder = responder;
+        _responseBody = "";
+    }
+
     // Throws exception for all requests ← new constructor
     public MockHttpMessageHandler(Exception exceptionToThrow)
     {
@@ -52,6 +63,11 @@ public sealed class MockHttpMessageHandler : HttpMessageHandler
         if (_timespanDelay > 0)
             await Task.Delay(_timespanDelay);
         CallCount++;
+
+        LastRequest = await CapturedRequest.FromAsync(request);
+
+        if (_responder is not null)
+            return _responder(LastRequest);
 
         // Throw if configured to do so
         if (_exceptionToThrow is not null)
@@ -75,5 +91,34 @@ public sealed class MockHttpMessageHandler : HttpMessageHandler
         {
             Content = new StringContent(_responseBody)
         };
+    }
+}
+
+/// <summary>
+/// A snapshot of an <see cref="HttpRequestMessage"/> taken while it is still alive.
+/// </summary>
+/// <param name="Method">The HTTP method.</param>
+/// <param name="Uri">The request URI.</param>
+/// <param name="Body">The request body, or an empty string if there was none.</param>
+/// <param name="Headers">Request and content headers, keyed case-insensitively.</param>
+public sealed record CapturedRequest(HttpMethod Method, Uri Uri, string Body, IReadOnlyDictionary<string, string> Headers)
+{
+    public static async Task<CapturedRequest> FromAsync(HttpRequestMessage request)
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var header in request.Headers)
+            headers[header.Key] = string.Join(",", header.Value);
+
+        string body = string.Empty;
+        if (request.Content is not null)
+        {
+            foreach (var header in request.Content.Headers)
+                headers[header.Key] = string.Join(",", header.Value);
+
+            body = await request.Content.ReadAsStringAsync();
+        }
+
+        return new CapturedRequest(request.Method, request.RequestUri!, body, headers);
     }
 }
