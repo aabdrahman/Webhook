@@ -189,6 +189,57 @@
                     }
                 </div>
             </div>
+
+            <!-- Verification history -->   
+            <div class="card" style="margin-top:var(--space-4);">
+                <div class="card-header">
+                    <h2 class="card-title">Verification History</h2>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    @if (_isLoadingVerifications)
+                    {
+                        <TableSkeleton Rows="4" Columns="4" />
+                    }
+                    else if (!_subscriptionVerifications.Any())
+                    {
+                        <EmptyState Title="No Subscription Verification yet"
+                                    Description="@(string.IsNullOrEmpty(_loadVerificationsErrorMessage) ? "No Callback Verification requested for subscription." : _loadVerificationsErrorMessage)"
+                                    Icon="delivery" />
+                    }
+                    else
+                    {
+                        <div class="table-wrapper" style="border:none;border-radius:0;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Created At</th>
+                                        <th>Status</th>
+                                        <th>Attempted At</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var verificationRecord in _subscriptionVerifications)
+                                    {
+                                        <tr>
+                                            <td class="table-mono text-sm">
+                                                @verificationRecord.CreatedAt.ToString("dd ddd MMM yyyy")
+                                            </td>
+                                            <td>
+                                                <Badge Value="@verificationRecord.Status"
+                                                       Variant="delivery" />
+                                            </td>
+                                            <td class="text-sm text-muted">
+                                                @(verificationRecord.AttemptedAt.HasValue ? verificationRecord.AttemptedAt.Value.ToString("dd MM yyyy HH:mm:ss") : "")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
         </div>
 
         <!-- Right column — subscribed events -->
@@ -425,9 +476,14 @@
     private bool                   _showSecretKey      = false;
     private WebhookSubscriptionDto? _subscription;
     private string _loadDeliveriesErrorMessage = string.Empty;
+    private bool _isLoadingVerifications = false;
+    private string _loadVerificationsErrorMessage = string.Empty;
 
     // Recent deliveries
     private List<DeliveryItem> _recentDeliveries = [];
+
+    //Subscription Verification
+    private List<WebHook.Core.DataTransferObjects.SubscriptionVerification.SubscriptionVerificationDto> _subscriptionVerifications = [];
 
     // Available catalog events not yet subscribed
     private List<string> _availableCatalogEvents = [];
@@ -473,7 +529,8 @@
         await LoadSubscriptionAsync();
         if(_subscription is not null)
         {
-            await LoadRecentDeliveriesAsync();
+            await Task.WhenAll(LoadRecentDeliveriesAsync(), LoadVerificationRecordAsync());
+            //await LoadRecentDeliveriesAsync();
         }
 
     }
@@ -494,7 +551,7 @@
             // }
             // _subscription = result.ResponseData;
 
-            await Task.Delay(600);
+            //await Task.Delay(600);
             var result = await getSubscriptionDetailsHandler.HandleAsync(Id);
             if (!result.response.successStatus && result.subscription is null)
             {
@@ -521,6 +578,37 @@
         }
     }
 
+    private async Task LoadVerificationRecordAsync()
+    {
+        _isLoadingVerifications = true;
+
+        if (_subscription is null) return;
+
+        try
+        {
+
+            var result = await getSubscriptionVerificationsHandler.HandleAsync(_subscription.Id);
+
+            if (!result.response.successStatus)
+            {
+                _loadVerificationsErrorMessage = result.response.responseMessage;
+                return;
+            }
+
+            if(result.verifications is null)
+            {
+                _loadVerificationsErrorMessage = result.response.responseMessage;
+                return;
+            }
+
+            _subscriptionVerifications = result.verifications.Select(x => new WebHook.Core.DataTransferObjects.SubscriptionVerification.SubscriptionVerificationDto(x.Id, x.CreatedAt, x.AttemptedAt, x.Status)).ToList();
+        }
+        finally
+        {
+            _isLoadingVerifications = false;
+        }
+    }
+
     private async Task LoadRecentDeliveriesAsync()
     {
         _isLoadingDeliveries = true;
@@ -528,7 +616,7 @@
         try
         {
 
-            await Task.Delay(400);
+            //await Task.Delay(400);
 
             var result = await getDeliveriesHandler.HandleAsync(new WebHook.Core.DataTransferObjects.WebhookDelivery.WebhookDeliveryQueryRequestParameter() { SubscriptionId = Id, PageSize = 5, StartDate = DateOnly.FromDateTime((_subscription!.CreatedDate.DateTime)) });
 
@@ -572,7 +660,7 @@
             //     .Where(e => !_subscription!.SubscribedEvents.Contains(e))
             //     .ToList();
 
-            await Task.Delay(400);
+           // await Task.Delay(400);
             var result = await getEventCatalogsHandler.HandleAsync();
             var all = result.catalogs.Any() ? result.catalogs.Select(x => x.EventCatalogName).ToList() : [];
 
@@ -730,7 +818,7 @@
 
         try
         {
-            await Task.Delay(600);
+            //await Task.Delay(600);
             //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             var result = await unsubscribeFromEventHandler.HandleAsync(_subscription!.Id, _selectedEvent);
@@ -789,7 +877,7 @@
         try
         {
             // TODO: replace with real service call
-            await Task.Delay(600);
+            //await Task.Delay(600);
             //bool success = DateTimeOffset.UtcNow.Second % 2 == 0;
 
             var result = await addEventToSubscriptionHandler.HandleAsync(_subscription!.Id, _addingEventName);

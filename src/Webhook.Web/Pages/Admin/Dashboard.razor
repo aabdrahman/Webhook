@@ -571,12 +571,11 @@
             // await LoadClientActivityAsync();
             // await LoadTopFailuresAsync();
             // await LoadRecentEventsAsync();
-            await Task.WhenAll( LoadWorkersAndHealthAsync(),
-                LoadClientActivityAsync());
+            await Task.WhenAll( LoadWorkersAndHealthAsync(), LoadClientActivityAsync(), LoadTopFailuresAsync(), LoadRecentEventsAsync());
                // await Task.Delay(500);
-            await Task.WhenAll(
-                LoadTopFailuresAsync(),
-                LoadRecentEventsAsync());
+            // await Task.WhenAll(
+            //     LoadTopFailuresAsync(),
+            //     LoadRecentEventsAsync());
         }
         finally
         {
