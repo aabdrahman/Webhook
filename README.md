@@ -193,6 +193,8 @@ X-Webhook-Challenge-Signature: sha256=<hmac>
 
 The platform recomputes the same value from its stored token and compares it in constant time. The answer is a different signature from the one in the request header and never appears in the request, so an endpoint that merely echoes what it receives cannot pass; only a holder of the secret can.
 
+**In the portal:** an `Inactive` subscription shows an **Activate** button on its list row and detail page. It opens a *Verify Callback URL* dialog that explains the handshake and, on **Send Challenge**, calls the `verify` endpoint. The request only queues the check, so the result appears afterwards in the detail page's **Verification History** card (created time, status badge, attempted time). `Success` shows green, `Failed` red and `Pending` amber. The Activate button is hidden once the subscription is `Active`.
+
 **Rules:** each challenge is single-use and valid for 10 minutes, redirects are not followed, the stored response is capped at 16 KB, and only one verification can be in progress per subscription. A user can only start and read verifications for their own subscriptions.
 
 Example receiver (C#):
@@ -406,7 +408,7 @@ https://localhost:<api-port>/webhookapi/api-docs   (ReDoc)
 | Area | Pages |
 |---|---|
 | Authentication | Login, register, request OTP, validate OTP, reset password |
-| User | Dashboard, subscriptions (list, create, detail with signing secret), deliveries and attempts, dead letters |
+| User | Dashboard, subscriptions (list, create, detail with signing secret and verification history, callback URL verification), deliveries and attempts, dead letters |
 | Admin | Dashboard, users, event catalog, service clients, health |
 | Trend analytics | In progress; hidden from the navigation for now |
 
@@ -878,7 +880,8 @@ Service-level tests covering authentication, users, OTP flows, subscriptions, de
 ### Integration Tests (`IntegrationTests/`)
 
 - **Controller tests** — `WebApplicationFactory<Program>` with mocked services, covering routing, auth, status code mapping, request forwarding and exception handling. A `TestAuthHandler` carries both `User` and `Admin` roles and seeds the cache mock with a JTI so `CustomAuthenticationFilter` passes
-- **Worker tests** — background workers run against a real PostgreSQL container, including concurrent workers competing for the same deliveries
+- **Worker tests** — background workers run against a real PostgreSQL container, including concurrent workers competing for the same deliveries. `SignatureVerificationProcessorWorker` is covered end to end against a fake subscriber that signs the challenge response
+- **Verification controller tests** — `WebhookSubscriptionVerificationController` is tested with a test auth handler whose roles come from an `X-Test-Roles` header, so role checks (`403` for admin-only callers on `verify`, `USER`/`User` casing) and the `per-user-rating` rate-limit policy on both endpoints are asserted. The challenge token and stored response body are checked never to appear in responses
 
 ### Running Tests
 
