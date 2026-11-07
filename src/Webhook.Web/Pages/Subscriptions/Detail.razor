@@ -26,17 +26,20 @@
                 </svg>
                 Delete
             </button>
-            <button class="btn btn-ghost btn-sm"
-                    @onclick="OpenActivationModal"
-                    style="color:#f59e0b;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <polyline points="9 12 11 14 15 10" />
-                </svg>
-                Activate
-            </button>
+            @if(_subscription.OnboardStatus.Equals("Inactive", StringComparison.OrdinalIgnoreCase))
+            {
+                <button class="btn btn-ghost btn-sm"
+                        @onclick="OpenActivationModal"
+                        style="color:#f59e0b;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <polyline points="9 12 11 14 15 10" />
+                    </svg>
+                    Activate
+                </button>
+            }
         </AdditionalActions>
     </PageHeader>
 
@@ -454,7 +457,7 @@
 
         <Alert Type="info"
                Title="How verification works"
-               Message="A signed challenge will be sent to your callback URL. Your endpoint must respond with the correct HMAC-SHA256 token to become active." />
+               Message="We POST a signed challenge to {Callback URL}/challenge. Your endpoint must check the X-Webhook-Challenge-Signature header using your secret key, then reply 200 with a JSON body with a 'response' field set to sha256= followed by the HMAC-SHA256 hex of 'challenge-response:' + the challenge, signed with your secret. The challenge expires after 10 minutes. Your secret key is never sent. Once the reply is verified, the subscription becomes Active." />
 
         <Alert Message="@_activateSubscriptionErrorMessage" />
 
@@ -660,7 +663,7 @@
             //     .Where(e => !_subscription!.SubscribedEvents.Contains(e))
             //     .ToList();
 
-           // await Task.Delay(400);
+            // await Task.Delay(400);
             var result = await getEventCatalogsHandler.HandleAsync();
             var all = result.catalogs.Any() ? result.catalogs.Select(x => x.EventCatalogName).ToList() : [];
 
@@ -849,24 +852,30 @@
         _isActivatingSubscription = true;
         _activateSubscriptionErrorMessage = "";
 
-        //var result = await SubscriptionService.InitiateVerificationAsync(_selectedSubscription.Id);
-        var result = await subscriptionCallbackUrlVerificationHandler.HandleAsync(_subscription.Id);
-        bool success = result.successStatus;
-
-        if (!success)
+        try
         {
-            _activateSubscriptionErrorMessage = $"Failed to verify subscription. {result.responseMessage}";
-            toastService.ShowError(_activateSubscriptionErrorMessage, "Subscription Activation Operation Failed.");
-            _isActivatingSubscription = false;
-            return;
+            //var result = await SubscriptionService.InitiateVerificationAsync(_selectedSubscription.Id);
+            var result = await subscriptionCallbackUrlVerificationHandler.HandleAsync(_subscription.Id);
+            bool success = result.successStatus;
 
+            if (!success)
+            {
+                _activateSubscriptionErrorMessage = $"Failed to verify subscription. {result.responseMessage}";
+                toastService.ShowError(_activateSubscriptionErrorMessage, "Subscription Activation Operation Failed.");
+                _isActivatingSubscription = false;
+                return;
+
+            }
+
+            toastService.ShowSuccess(title: $"Subscription verification submitted.", message: $"Subscription Activation Submitted. {result.responseMessage}");
+            await GetNewFormState();
+            CloseModals();
+        }
+        finally
+        {
+            _isActivatingSubscription = false;
         }
 
-        toastService.ShowSuccess($"Subscription verified successfully.", $"Subscription Activation Submitted. {result.responseMessage}");
-        await GetNewFormState();
-        CloseModals();
-
-        _isActivatingSubscription = false;
     }
 
     private async Task HandleAddEvent(string eventName)
@@ -916,7 +925,8 @@
         if (string.IsNullOrEmpty(key) || key.Length <= 8)
             return "••••••••";
 
-        return key[..4] + "••••••••" + key[^4..];
+        //return key[..4] + "••••••••" + key[^4..];
+        return "••••••••";
     }
 
     // -------------------------------------------------------------------------

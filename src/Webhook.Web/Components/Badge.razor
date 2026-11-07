@@ -54,7 +54,7 @@
         {
             return normalised switch
             {
-                "delivered"                                     => "badge-delivered",
+                "delivered" or "success"                        => "badge-delivered",
                 "pending"                                       => "badge-pending",
                 "failed"                                        => "badge-failed",
                 "deadletter" or "dead_letter" or "dead letter"  => "badge-dead-letter",
@@ -109,7 +109,7 @@
 
     private static readonly HashSet<string> DeliveryValues =
     [
-        "delivered", "pending", "failed",
+        "delivered", "success", "pending", "failed",
         "deadletter", "dead_letter", "dead letter", "processing"
     ];
 

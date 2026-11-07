@@ -296,7 +296,7 @@
 
         <Alert Type="info"
                Title="How verification works"
-               Message="A signed challenge will be sent to your callback URL. Your endpoint must respond with the correct HMAC-SHA256 token to become active." />
+               Message="We POST a signed challenge to {Callback URL}/challenge. Your endpoint must check the X-Webhook-Challenge-Signature header using your secret key, then reply 200 with a JSON body with a 'response' field set to sha256= followed by the HMAC-SHA256 hex of 'challenge-response:' + the challenge, signed with your secret. The challenge expires after 10 minutes. Your secret key is never sent. Once the reply is verified, the subscription becomes Active." />
 
         <Alert Message="@_activateSubscriptionErrorMessage" />
 
@@ -556,7 +556,8 @@
         if (string.IsNullOrEmpty(key) || key.Length <= 8)
             return "••••••••";
 
-        return key[..4] + "••••••••" + key[^4..];
+        //return key[..4] + "••••••••" + key[^4..];
+        return "••••••••";
     }
 
     private async Task HandleToggleInactive()
