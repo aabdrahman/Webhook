@@ -849,6 +849,7 @@
     private async Task HandleVerify()
     {
         if (_subscription is null) return;
+
         _isActivatingSubscription = true;
         _activateSubscriptionErrorMessage = "";
 

@@ -543,7 +543,7 @@
 
         }
 
-        toastService.ShowSuccess($"Subscription verified successfully.", $"Subscription Activation Submitted. {result.responseMessage}");
+        toastService.ShowSuccess(title: $"Subscription verified successfully.", message:$"Subscription Activation Submitted. {result.responseMessage}");
         _subscriptions.Clear();
         await LoadSubscriptionsAsync();
         CloseModals();
