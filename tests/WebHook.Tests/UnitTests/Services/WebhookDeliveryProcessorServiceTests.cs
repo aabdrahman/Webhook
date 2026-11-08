@@ -317,6 +317,30 @@ public sealed class WebhookDeliveryProcessorServiceTests
     }
 
     [Fact]
+    public async Task ProcessPendingDeliveriesAsync_SendsEventCorrelationIdHeader()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildPendingDelivery();
+        var expectedCorrelationId = delivery.webhookEvent.CorrelationId;
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        var handler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(handler, ctx);
+
+        // Act
+        await sut.ProcessPendingDeliveriesAsync();
+
+        // Assert — receivers use this with X-Webhook-Event to recognise a re-delivery
+        Assert.NotNull(handler.LastRequest);
+        Assert.Equal(expectedCorrelationId.ToString(), handler.LastRequest!.Headers["X-Webhook-Correlation-Id"]);
+        Assert.Equal("CUSTOMERCREATED", handler.LastRequest.Headers["X-Webhook-Event"]);
+    }
+
+    [Fact]
     public async Task ProcessPendingDeliveriesAsync_SuccessfulResponse_DeliveredAtIsSet()
     {
         // Arrange

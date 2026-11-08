@@ -340,6 +340,30 @@ public sealed class RetryAfterPendingServiceTests
         Assert.Equal(1, _httpHandler.CallCount);
     }
 
+    [Fact]
+    public async Task RunRetryAfterFirstAttemptAsync_SendsSameEventCorrelationIdHeaderOnRetry()
+    {
+        // Arrange
+        using var scope = _serviceProvider.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<RepositoryContext>();
+        var delivery = BuildRetryableDelivery(retryCount: 2);
+        var expectedCorrelationId = delivery.webhookEvent.CorrelationId;
+
+        await ctx.WebhookDeliveries.AddAsync(delivery);
+        await ctx.SaveChangesAsync();
+
+        _httpHandler = new MockHttpMessageHandler(HttpStatusCode.OK);
+        var sut = CreateSut(ctx);
+
+        // Act
+        await sut.RunRetryAfterFirstAttemptAsync();
+
+        // Assert — a retry carries the same correlation ID as the first attempt, so the receiver can de-duplicate
+        Assert.NotNull(_httpHandler.LastRequest);
+        Assert.Equal(expectedCorrelationId.ToString(), _httpHandler.LastRequest!.Headers["X-Webhook-Correlation-Id"]);
+        Assert.Equal("CUSTOMERCREATED", _httpHandler.LastRequest.Headers["X-Webhook-Event"]);
+    }
+
     //[Fact]
     //public async Task RunRetryAfterFirstAttemptAsync_DeliveryWithRetryCountOf1_IsNotPickedUp()
     //{

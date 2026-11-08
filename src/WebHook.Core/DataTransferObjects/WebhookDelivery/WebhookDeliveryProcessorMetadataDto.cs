@@ -12,6 +12,8 @@ public record WebhookDeliveryProcessorMetadataDto
     public string EncryptedSecret { get; set; }
     /// <summary>The event type being delivered, in upper case.</summary>
     public string RaisedEventName { get; set; }
+    /// <summary>The event's correlation ID, sent as <c>X-Webhook-Correlation-Id</c> so receivers can recognise a re-delivery.</summary>
+    public Guid CorrelationId { get; set; }
     /// <summary>The subscription's contact email for slow-endpoint and dead-letter notifications, if set.</summary>
     public string? ContactEmail { get; set; } = string.Empty;
     /// <summary>The name used to address the contact in notifications.</summary>

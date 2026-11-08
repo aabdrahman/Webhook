@@ -146,6 +146,7 @@ public sealed class WebhookDeliveryProcessorService
                                                     DeliveryId = x.Id,
                                                     EncryptedSecret = x.WebhookSubscriptionEvent.webhookSubscription.SecretKey,
                                                     RaisedEventName = x.webhookEvent.EventType.ToUpper(),
+                                                    CorrelationId = x.webhookEvent.CorrelationId,
                                                     ContactEmail = x.WebhookSubscriptionEvent.webhookSubscription.ContactEmail ?? "",
                                                     ContactName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
                                                     SubscriptionName = x.WebhookSubscriptionEvent.webhookSubscription.Name,
@@ -206,6 +207,7 @@ public sealed class WebhookDeliveryProcessorService
                 long signatureTimestamp = attemptedTime.ToUnixTimeSeconds();
                 httpRequest.Headers.Add("X-Webhook-Timestamp", signatureTimestamp.ToString());
                 httpRequest.Headers.Add("X-Webhook-Event", deliveryMetadata.RaisedEventName.ToUpper());
+                httpRequest.Headers.Add("X-Webhook-Correlation-Id", deliveryMetadata.CorrelationId.ToString());
                 httpRequest.Headers.Add("X-Webhook-Signature", _signatureService.GenerateSignature(payload, _encryptionService.Decrypt(deliveryMetadata.EncryptedSecret), signatureTimestamp));
 
                 var stopWatch = new Stopwatch();

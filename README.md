@@ -158,7 +158,7 @@ All public types in Core, Infrastructure and Api carry XML documentation comment
 - A dedicated background worker finds deliveries still `Processing` well after their `LockedUntil` timestamp — indicating a crashed worker — and releases them as `Failed` so the retry worker picks them up
 
 ### Webhook Signatures
-- Every delivery includes `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Event` and `X-Webhook-Signature: sha256=<hmac>` headers
+- Every delivery includes `X-Webhook-Timestamp` (Unix seconds), `X-Webhook-Event`, `X-Webhook-Correlation-Id` and `X-Webhook-Signature: sha256=<hmac>` headers
 - The signature is `HMAC-SHA256("{timestamp}.{body}")`, keyed with the UTF-8 bytes of the subscription secret, so a captured request cannot be replayed with a new timestamp
 - The secret is shown on the subscription's detail page (`GET` by ID); it is never included in list responses and is rotated when a subscription is reactivated
 - Secrets are encrypted at rest with AES-GCM
@@ -168,6 +168,56 @@ To verify a delivery, a subscriber should:
 2. Compute `"sha256=" + lowercase_hex(HMAC_SHA256(key = utf8(secret), message = utf8(timestamp + "." + body)))`.
 3. Compare it with `X-Webhook-Signature` in constant time.
 4. Reject the request if the timestamp is more than a few minutes from the current time.
+
+### Handling Re-deliveries (Idempotency)
+Delivery is **at-least-once**. A delivery is sent again when an attempt fails, times out, or succeeds but its response is lost, and an admin can also retry a dead-lettered delivery. A subscriber may therefore receive the same event more than once, and should make processing idempotent.
+
+Every delivery request carries these headers, and they are identical on the first attempt, every automatic retry and a manual dead-letter retry (which re-queues the same delivery):
+
+| Header | Value |
+|---|---|
+| `X-Webhook-Event` | The event type, upper-case, for example `ORDERPLACED` |
+| `X-Webhook-Correlation-Id` | The event's correlation ID (a GUID), as supplied when the event was published |
+| `X-Webhook-Timestamp` | Unix seconds of **this attempt**; it changes on every attempt |
+| `X-Webhook-Signature` | `sha256=<hmac>` for **this attempt**; it changes with the timestamp |
+
+The idempotency key is the pair `X-Webhook-Event` + `X-Webhook-Correlation-Id`. Do not use the timestamp or signature as a key, because they differ between attempts. Do not use the correlation ID on its own either: it is unique only together with the event type, so one correlation ID can legitimately appear with several event types (for example `ORDERPLACED` and `PAYMENTPROCESSED` for the same order).
+
+**What the receiver should do:**
+1. Verify the signature first (see above) and reject anything that fails.
+2. Look up the key. If it was already **processed**, skip the work and return `2xx` straight away; the platform treats any `2xx` as delivered and stops retrying.
+3. Otherwise record the key **atomically with the work** (a unique constraint is the simplest way) and return `2xx` once it is done. If processing fails, return a non-`2xx` status and do not record the key, so a retry can run it again.
+4. Keep keys for longer than the retry window, so a late retry is still recognised.
+
+Example receiver (C#, using a unique index on `(EventType, CorrelationId)`):
+```csharp
+app.MapPost("/hooks/webhook", async (HttpRequest req, AppDbContext db) =>
+{
+    // ... verify X-Webhook-Signature over the raw body first ...
+
+    var eventType = req.Headers["X-Webhook-Event"].ToString();
+    if (!Guid.TryParse(req.Headers["X-Webhook-Correlation-Id"], out var correlationId))
+        return Results.BadRequest();
+
+    if (await db.ProcessedEvents.AnyAsync(x => x.EventType == eventType && x.CorrelationId == correlationId))
+        return Results.Ok();                       // already handled: acknowledge, do nothing
+
+    try
+    {
+        // ... do the work ...
+        db.ProcessedEvents.Add(new ProcessedEvent(eventType, correlationId));
+        await db.SaveChangesAsync();               // the unique index rejects a concurrent duplicate
+    }
+    catch (DbUpdateException)
+    {
+        return Results.Ok();                       // another request recorded it first
+    }
+
+    return Results.Ok();
+});
+```
+
+The header is not covered by the HMAC signature, which signs only `{timestamp}.{body}`. A receiver that needs the correlation ID to be tamper-proof should not rely on the header alone. Verification challenges (`/challenge`) do not carry these headers.
 
 ### Verifying Your Endpoint
 A new subscription starts `Inactive` and receives no deliveries until its callback URL passes a challenge handshake. The owner starts it with `PUT /api/WebhookSubscription/{id}/verifications/verify`. The platform then sends a request to **`{callbackUrl}/challenge`** and the endpoint must answer it correctly within 10 seconds. A correct answer makes the subscription `Active`; anything else records a `Failed` attempt, and the owner can start another.
